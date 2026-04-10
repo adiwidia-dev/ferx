@@ -47,16 +47,20 @@ export function readStoredServices(saved: string | null): {
     };
   }
 
-  let parsedServices: StoredService[];
+  let parsedValue: unknown;
 
   try {
-    parsedServices = JSON.parse(saved) as StoredService[];
+    parsedValue = JSON.parse(saved);
   } catch {
     return {
       services: [],
       recoveredFromCorruption: true,
     };
   }
+
+  const parsedServices = Array.isArray(parsedValue)
+    ? (parsedValue as StoredService[])
+    : [];
 
   const { services: withStorageKeys } = ensureServiceStorageKeys(parsedServices);
   const { services } = ensureServiceNotificationPrefs(withStorageKeys);

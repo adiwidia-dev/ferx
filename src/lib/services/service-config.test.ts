@@ -48,8 +48,11 @@ describe("readStoredServices", () => {
     });
   });
 
-  it("does not treat valid JSON migration failures as corruption recovery", () => {
-    expect(() => readStoredServices("{}")).toThrow();
+  it("treats valid non-array JSON as an empty service list", () => {
+    expect(readStoredServices("{}")).toEqual({
+      services: [],
+      recoveredFromCorruption: false,
+    });
   });
 
   it("migrates stored services with missing storage keys and notification prefs", () => {
