@@ -1,3 +1,209 @@
+<script lang="ts" module>
+  import {
+    DEFAULT_NOTIFICATION_PREFS as DEFAULT_PAGE_NOTIFICATION_PREFS,
+  } from "$lib/services/notification-prefs";
+  import { createStorageKey as createPageStorageKey } from "$lib/services/storage-key";
+  import {
+    normalizeServiceUrl as normalizePageServiceUrl,
+    readStoredServices as readPageStoredServices,
+  } from "$lib/services/service-config";
+
+  export interface PageService {
+    id: string;
+    name: string;
+    url: string;
+    storageKey: string;
+    notificationPrefs: import("$lib/services/notification-prefs").NotificationPrefs;
+    disabled?: boolean;
+    badge?: number;
+  }
+
+  export function readStartupState(saved: string | null): {
+    services: PageService[];
+    activeId: string;
+    toastMessage: string;
+  } {
+    const { services, recoveredFromCorruption } = readPageStoredServices(saved);
+    const startupServices = services as PageService[];
+    const firstEnabled = startupServices.find((service) => !service.disabled);
+
+    return {
+      services: startupServices,
+      activeId: firstEnabled?.id ?? "",
+      toastMessage: recoveredFromCorruption ? "Saved services were reset." : "",
+    };
+  }
+
+  export function saveServiceState({
+    services,
+    activeId,
+    editingServiceId,
+    newServiceName,
+    newServiceUrl,
+    createServiceId,
+  }: {
+    services: PageService[];
+    activeId: string;
+    editingServiceId: string | null;
+    newServiceName: string;
+    newServiceUrl: string;
+    createServiceId: () => string;
+  }): {
+    services: PageService[];
+    activeId: string;
+    toastMessage: string;
+    shouldCloseModal: boolean;
+    loadService?: PageService;
+    deleteWebview?: { id: string; storageKey: string };
+  } {
+    if (!newServiceName || !newServiceUrl) {
+      return {
+        services,
+        activeId,
+        toastMessage: "",
+        shouldCloseModal: false,
+      };
+    }
+
+    const normalized = normalizePageServiceUrl(newServiceUrl);
+
+    if (!normalized.ok) {
+      return {
+        services,
+        activeId,
+        toastMessage: normalized.message,
+        shouldCloseModal: false,
+      };
+    }
+
+    if (editingServiceId) {
+      const existingService = services.find((service) => service.id === editingServiceId);
+
+      if (!existingService) {
+        return {
+          services,
+          activeId,
+          toastMessage: "",
+          shouldCloseModal: false,
+        };
+      }
+
+      const updatedService = {
+        ...existingService,
+        name: newServiceName,
+        url: normalized.url,
+      };
+
+      return {
+        services: services.map((service) =>
+          service.id === editingServiceId ? updatedService : service,
+        ),
+        activeId,
+        toastMessage: "",
+        shouldCloseModal: true,
+        deleteWebview:
+          existingService.url !== normalized.url
+            ? {
+                id: existingService.id,
+                storageKey: existingService.storageKey,
+              }
+            : undefined,
+      };
+    }
+
+    const newService: PageService = {
+      id: createServiceId(),
+      name: newServiceName,
+      url: normalized.url,
+      storageKey: createPageStorageKey(),
+      notificationPrefs: { ...DEFAULT_PAGE_NOTIFICATION_PREFS },
+    };
+
+    return {
+      services: [...services, newService],
+      activeId: newService.id,
+      toastMessage: "",
+      shouldCloseModal: true,
+      loadService: newService,
+    };
+  }
+
+  export function toggleServiceDisabled(
+    services: PageService[],
+    activeId: string,
+    id: string,
+  ): {
+    services: PageService[];
+    activeId: string;
+    deleteWebview?: { id: string; storageKey: string };
+  } {
+    const targetService = services.find((service) => service.id === id);
+
+    if (!targetService) {
+      return { services, activeId };
+    }
+
+    const nextDisabledState = !targetService.disabled;
+    const nextServices = services.map((service) =>
+      service.id === id ? { ...service, disabled: nextDisabledState } : service,
+    );
+
+    if (!nextDisabledState) {
+      return {
+        services: nextServices,
+        activeId,
+      };
+    }
+
+    const nextActiveId =
+      activeId === id
+        ? nextServices.find((service) => service.id !== id && !service.disabled)?.id ?? ""
+        : activeId;
+
+    return {
+      services: nextServices,
+      activeId: nextActiveId,
+      deleteWebview: {
+        id: targetService.id,
+        storageKey: targetService.storageKey,
+      },
+    };
+  }
+
+  export async function cleanupPageListeners({
+    unlistenToastPromise,
+    unlistenMenuPromise,
+    unlistenBadgePromise,
+    unlistenShortcutPromise,
+    toastTimeout,
+    clearTimeoutImpl = clearTimeout,
+  }: {
+    unlistenToastPromise: Promise<() => void>;
+    unlistenMenuPromise: Promise<() => void>;
+    unlistenBadgePromise: Promise<() => void>;
+    unlistenShortcutPromise: Promise<() => void>;
+    toastTimeout: ReturnType<typeof setTimeout> | null;
+    clearTimeoutImpl?: (timeout: ReturnType<typeof setTimeout>) => void;
+  }) {
+    if (toastTimeout) {
+      clearTimeoutImpl(toastTimeout);
+    }
+
+    const [unlistenToast, unlistenMenu, unlistenBadge, unlistenShortcut] =
+      await Promise.all([
+        unlistenToastPromise,
+        unlistenMenuPromise,
+        unlistenBadgePromise,
+        unlistenShortcutPromise,
+      ]);
+
+    unlistenToast();
+    unlistenMenu();
+    unlistenBadge();
+    unlistenShortcut();
+  }
+</script>
+
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
@@ -7,26 +213,12 @@
   import { Label } from "$lib/components/ui/label";
   import { moveItemToTarget } from "$lib/services/reorder";
   import {
-    DEFAULT_NOTIFICATION_PREFS,
     countTrayRelevantUnreadServices,
-    ensureServiceNotificationPrefs,
     type NotificationPrefs,
   } from "$lib/services/notification-prefs";
-  import {
-    createStorageKey,
-    ensureServiceStorageKeys,
-  } from "$lib/services/storage-key";
   import { onMount } from "svelte";
 
-  interface Service {
-    id: string;
-    name: string;
-    url: string;
-    storageKey: string;
-    notificationPrefs: NotificationPrefs;
-    disabled?: boolean;
-    badge?: number;
-  }
+  type Service = PageService;
   let toastMessage = $state("");
   let toastTimeout = $state<ReturnType<typeof setTimeout> | null>(null);
   let activeId = $state("");
@@ -57,40 +249,41 @@
       invoke("update_tray_icon", { has_unread: hasUnreadNotifications });
     }
   });
+
+  function showToast(message: string) {
+    toastMessage = message;
+
+    if (toastTimeout) {
+      clearTimeout(toastTimeout);
+    }
+
+    if (!message) {
+      toastTimeout = null;
+      return;
+    }
+
+    toastTimeout = setTimeout(() => {
+      toastMessage = "";
+      toastTimeout = null;
+    }, 3000);
+  }
+
   onMount(() => {
     const unlistenToastPromise = listen("show-toast", (event) => {
-      toastMessage = event.payload as string;
-      if (toastTimeout) clearTimeout(toastTimeout);
-
-      // Hide the toast automatically after 3 seconds
-      toastTimeout = setTimeout(() => {
-        toastMessage = "";
-      }, 3000);
+      showToast(event.payload as string);
     });
 
-    const saved = localStorage.getItem("ferx-workspace-services");
-    if (saved) {
-      const parsedServices = JSON.parse(saved) as Array<
-        Omit<Service, "storageKey" | "notificationPrefs"> & {
-          storageKey?: string;
-          notificationPrefs?: Partial<NotificationPrefs>;
-        }
-      >;
-      const migratedStorage = ensureServiceStorageKeys(parsedServices);
-      const migratedNotificationPrefs = ensureServiceNotificationPrefs(
-        migratedStorage.services,
-      );
-      services = migratedNotificationPrefs.services;
-    } else {
-      services = [];
+    const startupState = readStartupState(
+      localStorage.getItem("ferx-workspace-services"),
+    );
+    services = startupState.services;
+    activeId = startupState.activeId;
+
+    if (startupState.toastMessage) {
+      showToast(startupState.toastMessage);
     }
 
     if (services.length > 0) {
-      const firstEnabled = services.find((s) => !s.disabled);
-      if (firstEnabled) {
-        activeId = firstEnabled.id;
-      }
-
       // Give the main active service 1 full second to completely boot up and grab focus
       setTimeout(async () => {
         for (const s of services) {
@@ -167,9 +360,13 @@
     isInitialized = true;
 
     return () => {
-      unlistenPromise.then((fn) => fn());
-      unlistenBadgePromise.then((fn) => fn());
-      unlistenShortcutPromise.then((fn) => fn());
+      cleanupPageListeners({
+        unlistenToastPromise,
+        unlistenMenuPromise: unlistenPromise,
+        unlistenBadgePromise,
+        unlistenShortcutPromise,
+        toastTimeout,
+      });
     };
   });
 
@@ -277,9 +474,14 @@
   }
 
   function toggleDisable(id: string) {
-    services = services.map((s) =>
-      s.id === id ? { ...s, disabled: !s.disabled } : s,
-    );
+    const nextState = toggleServiceDisabled(services, activeId, id);
+
+    services = nextState.services;
+    activeId = nextState.activeId;
+
+    if (nextState.deleteWebview) {
+      invoke("delete_webview", nextState.deleteWebview);
+    }
   }
 
   function updateServiceNotificationPrefs(
@@ -327,36 +529,37 @@
   }
 
   function saveService() {
-    if (!newServiceName || !newServiceUrl) return;
+    const nextState = saveServiceState({
+      services,
+      activeId,
+      editingServiceId,
+      newServiceName,
+      newServiceUrl,
+      createServiceId: () => crypto.randomUUID().slice(0, 8),
+    });
 
-    let formattedUrl = newServiceUrl;
-    if (!/^https?:\/\//i.test(formattedUrl)) {
-      formattedUrl = "https://" + formattedUrl;
+    if (nextState.toastMessage) {
+      showToast(nextState.toastMessage);
     }
 
-    if (editingServiceId) {
-      services = services.map((s) =>
-        s.id === editingServiceId
-          ? { ...s, name: newServiceName, url: formattedUrl }
-          : s,
-      );
-    } else {
-      const newService: Service = {
-        id: crypto.randomUUID().slice(0, 8),
-        name: newServiceName,
-        url: formattedUrl,
-        storageKey: createStorageKey(),
-        notificationPrefs: { ...DEFAULT_NOTIFICATION_PREFS },
-      };
-      services = [...services, newService];
-      invoke("load_service", {
-        id: newService.id,
-        url: newService.url,
-        storageKey: newService.storageKey,
-        allowNotifications: newService.notificationPrefs.allowNotifications,
-      });
+    if (!nextState.shouldCloseModal) {
+      return;
+    }
 
-      activeId = newService.id;
+    services = nextState.services;
+    activeId = nextState.activeId;
+
+    if (nextState.deleteWebview) {
+      invoke("delete_webview", nextState.deleteWebview);
+    }
+
+    if (nextState.loadService) {
+      invoke("load_service", {
+        id: nextState.loadService.id,
+        url: nextState.loadService.url,
+        storageKey: nextState.loadService.storageKey,
+        allowNotifications: nextState.loadService.notificationPrefs.allowNotifications,
+      });
     }
 
     isAddModalOpen = false;
