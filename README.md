@@ -22,7 +22,7 @@ Ferx is a lightweight desktop application for running services like WhatsApp, Sl
 
 ## Current Status
 
-Ferx is source-first and usable for development, with public-release cleanup still in progress across metadata and docs.
+Ferx is usable today and still early in its public release, with core desktop workflows already in place.
 
 ## Platform Support
 

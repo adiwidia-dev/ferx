@@ -6,5 +6,5 @@
 - Confirm `.github/dependabot.yml`, issue templates, and pull request templates are ready for public use.
 - Enable Dependabot alerts on GitHub.
 - Enable secret scanning if available.
-- Enable private vulnerability reporting on GitHub.
+- Confirm private vulnerability reporting is enabled on GitHub and matches `SECURITY.md`.
 - Review `README.md`, repository description, and license details before publishing.
