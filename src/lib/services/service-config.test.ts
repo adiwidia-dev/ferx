@@ -22,10 +22,15 @@ describe("normalizeServiceUrl", () => {
     });
   });
 
-  it("does not prepend https when a non-slash scheme is already present", () => {
+  it("rejects URLs that do not use http or https", () => {
     expect(normalizeServiceUrl("mailto:team@example.com")).toEqual({
-      ok: true,
-      url: "mailto:team@example.com",
+      ok: false,
+      message: "Please enter a valid service URL.",
+    });
+
+    expect(normalizeServiceUrl("ftp://example.com")).toEqual({
+      ok: false,
+      message: "Please enter a valid service URL.",
     });
   });
 
@@ -175,6 +180,35 @@ describe("readStoredServices", () => {
           name: "Slack",
           url: "https://slack.com",
           storageKey: "storage-11111111",
+          notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+        },
+      ],
+      recoveredFromCorruption: false,
+    });
+  });
+
+  it("replaces malformed string storage keys with generated keys", () => {
+    const randomUUID = vi.spyOn(crypto, "randomUUID");
+    randomUUID.mockReturnValue("77777777-7777-7777-7777-777777777777");
+
+    const result = readStoredServices(
+      JSON.stringify([
+        {
+          id: "one",
+          name: "Slack",
+          url: "https://slack.com",
+          storageKey: "storage/one",
+        },
+      ]),
+    );
+
+    expect(result).toEqual({
+      services: [
+        {
+          id: "one",
+          name: "Slack",
+          url: "https://slack.com",
+          storageKey: "storage-77777777",
           notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
         },
       ],

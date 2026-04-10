@@ -44,6 +44,34 @@ describe("readStartupState", () => {
       toastMessage: "",
     });
   });
+
+  it("repairs malformed stored storage keys before startup selection", () => {
+    const randomUUID = vi.spyOn(crypto, "randomUUID");
+    randomUUID.mockReturnValue("88888888-8888-8888-8888-888888888888");
+
+    const saved = JSON.stringify([
+      createService({
+        id: "broken",
+        disabled: false,
+        storageKey: "storage/broken",
+      }),
+    ]);
+
+    expect(readStartupState(saved)).toEqual({
+      services: [
+        {
+          ...createService({
+            id: "broken",
+            disabled: false,
+            storageKey: "storage/broken",
+          }),
+          storageKey: "storage-88888888",
+        },
+      ],
+      activeId: "broken",
+      toastMessage: "",
+    });
+  });
 });
 
 describe("saveServiceState", () => {

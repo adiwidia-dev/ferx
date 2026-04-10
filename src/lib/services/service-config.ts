@@ -15,6 +15,12 @@ type StoredService = {
   };
 };
 
+const STORAGE_KEY_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+function isValidStorageKey(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && STORAGE_KEY_PATTERN.test(value);
+}
+
 function isNotificationPrefs(value: unknown): value is StoredService["notificationPrefs"] {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
@@ -31,23 +37,51 @@ function isNotificationPrefs(value: unknown): value is StoredService["notificati
   );
 }
 
-function isStoredService(value: unknown): value is StoredService {
+function parseStoredService(value: unknown): StoredService | null {
   if (!value || typeof value !== "object") {
-    return false;
+    return null;
   }
 
   const candidate = value as Record<string, unknown>;
 
-  return (
-    typeof candidate.id === "string" &&
-    typeof candidate.name === "string" &&
-    typeof candidate.url === "string" &&
-    (candidate.storageKey === undefined || typeof candidate.storageKey === "string") &&
-    (candidate.disabled === undefined || typeof candidate.disabled === "boolean") &&
-    (candidate.badge === undefined || typeof candidate.badge === "number") &&
-    (candidate.notificationPrefs === undefined ||
-      isNotificationPrefs(candidate.notificationPrefs))
-  );
+  if (
+    typeof candidate.id !== "string" ||
+    typeof candidate.name !== "string" ||
+    typeof candidate.url !== "string" ||
+    (candidate.disabled !== undefined && typeof candidate.disabled !== "boolean") ||
+    (candidate.badge !== undefined && typeof candidate.badge !== "number") ||
+    (candidate.notificationPrefs !== undefined &&
+      !isNotificationPrefs(candidate.notificationPrefs))
+  ) {
+    return null;
+  }
+
+  if (candidate.storageKey !== undefined) {
+    if (typeof candidate.storageKey !== "string") {
+      return null;
+    }
+
+    if (!isValidStorageKey(candidate.storageKey)) {
+      return {
+        id: candidate.id,
+        name: candidate.name,
+        url: candidate.url,
+        disabled: candidate.disabled,
+        badge: candidate.badge,
+        notificationPrefs: candidate.notificationPrefs,
+      };
+    }
+  }
+
+  return {
+    id: candidate.id,
+    name: candidate.name,
+    url: candidate.url,
+    storageKey: candidate.storageKey,
+    disabled: candidate.disabled,
+    badge: candidate.badge,
+    notificationPrefs: candidate.notificationPrefs,
+  };
 }
 
 export function normalizeServiceUrl(
@@ -59,9 +93,15 @@ export function normalizeServiceUrl(
     : `https://${trimmedUrl}`;
 
   try {
+    const normalizedUrl = new URL(urlWithScheme);
+
+    if (normalizedUrl.protocol !== "http:" && normalizedUrl.protocol !== "https:") {
+      throw new TypeError("Unsupported URL scheme");
+    }
+
     return {
       ok: true,
-      url: new URL(urlWithScheme).toString(),
+      url: normalizedUrl.toString(),
     };
   } catch {
     return {
@@ -94,7 +134,10 @@ export function readStoredServices(saved: string | null): {
   }
 
   const parsedServices = Array.isArray(parsedValue)
-    ? parsedValue.filter(isStoredService)
+    ? parsedValue.flatMap((service) => {
+        const parsedService = parseStoredService(service);
+        return parsedService ? [parsedService] : [];
+      })
     : [];
 
   const { services: withStorageKeys } = ensureServiceStorageKeys(parsedServices);
