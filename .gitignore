@@ -1,0 +1,13 @@
+.DS_Store
+node_modules
+.worktrees/
+docs/superpowers/
+/build
+/.svelte-kit
+/package
+.env
+.env.*
+!.env.example
+yarn-error.log
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
