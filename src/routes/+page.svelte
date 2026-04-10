@@ -181,7 +181,7 @@
     if (!shouldRecreateActiveEditedService && nextState.deleteWebview) {
       await deleteWebview(nextState.deleteWebview);
 
-      if (editedService && editedService.id !== currentActiveId) {
+      if (editedService && editedService.id !== currentActiveId && !editedService.disabled) {
         await loadService(editedService);
       }
     }

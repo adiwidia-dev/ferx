@@ -302,6 +302,48 @@ describe("saveServiceState", () => {
       "load:inactive:https://chat.example.com/inbox",
     ]);
   });
+
+  it("does not reload a disabled edited service after deleting the old webview", async () => {
+    const services = [
+      createService({
+        id: "active",
+        url: "https://mail.example.com",
+        storageKey: "storage-active",
+      }),
+      createService({
+        id: "disabled",
+        url: "https://chat.example.com",
+        storageKey: "storage-disabled",
+        disabled: true,
+      }),
+    ];
+    const nextState = saveServiceState({
+      services,
+      activeId: "active",
+      editingServiceId: "disabled",
+      newServiceName: "Chat",
+      newServiceUrl: "https://chat.example.com/inbox",
+      createServiceId: () => "unused",
+    });
+
+    const events: string[] = [];
+
+    await applySaveServiceResult({
+      nextState,
+      editingServiceId: "disabled",
+      currentActiveId: "active",
+      showToast: () => undefined,
+      setState: () => undefined,
+      deleteWebview: async ({ id }: { id: string; storageKey: string }) => {
+        events.push(`delete:${id}`);
+      },
+      loadService: async (service: PageService) => {
+        events.push(`load:${service.id}:${service.url}`);
+      },
+    });
+
+    expect(events).toEqual(["delete:disabled"]);
+  });
 });
 
 describe("toggleServiceDisabled", () => {
