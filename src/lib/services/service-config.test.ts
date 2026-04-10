@@ -55,6 +55,37 @@ describe("readStoredServices", () => {
     });
   });
 
+  it("ignores malformed array members and keeps valid service objects", () => {
+    const randomUUID = vi.spyOn(crypto, "randomUUID");
+    randomUUID.mockReturnValue("22222222-2222-2222-2222-222222222222");
+
+    const result = readStoredServices(
+      JSON.stringify([
+        null,
+        "bad-entry",
+        42,
+        {
+          id: "one",
+          name: "Slack",
+          url: "https://slack.com",
+        },
+      ]),
+    );
+
+    expect(result).toEqual({
+      services: [
+        {
+          id: "one",
+          name: "Slack",
+          url: "https://slack.com",
+          storageKey: "storage-22222222",
+          notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+        },
+      ],
+      recoveredFromCorruption: false,
+    });
+  });
+
   it("migrates stored services with missing storage keys and notification prefs", () => {
     const randomUUID = vi.spyOn(crypto, "randomUUID");
     randomUUID.mockReturnValue("11111111-1111-1111-1111-111111111111");

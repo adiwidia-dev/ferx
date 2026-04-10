@@ -15,6 +15,20 @@ type StoredService = {
   };
 };
 
+function isStoredService(value: unknown): value is StoredService {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.name === "string" &&
+    typeof candidate.url === "string"
+  );
+}
+
 export function normalizeServiceUrl(
   rawUrl: string,
 ): { ok: true; url: string } | { ok: false; message: string } {
@@ -59,7 +73,7 @@ export function readStoredServices(saved: string | null): {
   }
 
   const parsedServices = Array.isArray(parsedValue)
-    ? (parsedValue as StoredService[])
+    ? parsedValue.filter(isStoredService)
     : [];
 
   const { services: withStorageKeys } = ensureServiceStorageKeys(parsedServices);
