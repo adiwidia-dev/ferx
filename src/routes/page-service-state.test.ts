@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_NOTIFICATION_PREFS } from "$lib/services/notification-prefs";
 import {
+  applySaveServiceResult,
   cleanupPageListeners,
   readStartupState,
   saveServiceState,
@@ -137,6 +138,77 @@ describe("saveServiceState", () => {
         storageKey: "storage-service-1",
       },
     });
+  });
+
+  it("recreates an active edited service after deleting the old webview", async () => {
+    const services = [
+      createService({
+        id: "service-1",
+        url: "https://slack.com/app",
+        storageKey: "storage-service-1",
+      }),
+    ];
+    const nextState = saveServiceState({
+      services,
+      activeId: "service-1",
+      editingServiceId: "service-1",
+      newServiceName: "Slack HQ",
+      newServiceUrl: "https://app.slack.com/client",
+      createServiceId: () => "unused",
+    });
+
+    const events: string[] = [];
+    let currentOpenUrl = services[0].url;
+    let runtimeState = {
+      services,
+      activeId: "service-1",
+      isAddModalOpen: true,
+    };
+
+    await applySaveServiceResult({
+      nextState,
+      editingServiceId: "service-1",
+      currentActiveId: runtimeState.activeId,
+      showToast: () => undefined,
+      setState: ({
+        services,
+        activeId,
+        isAddModalOpen,
+      }: {
+        services: PageService[];
+        activeId: string;
+        isAddModalOpen: boolean;
+      }) => {
+        runtimeState = { services, activeId, isAddModalOpen };
+
+        const activeService = runtimeState.services.find(
+          (service) => service.id === runtimeState.activeId,
+        );
+
+        if (!runtimeState.isAddModalOpen && activeService && !activeService.disabled) {
+          events.push(
+            `open:${activeService.url}:existing=${currentOpenUrl || "none"}`,
+          );
+
+          if (!currentOpenUrl) {
+            currentOpenUrl = activeService.url;
+          }
+        }
+      },
+      deleteWebview: async ({ id }: { id: string; storageKey: string }) => {
+        events.push(`delete:${id}:${currentOpenUrl}`);
+        currentOpenUrl = "";
+      },
+      loadService: async () => {
+        events.push("load");
+      },
+    });
+
+    expect(events).toEqual([
+      "delete:service-1:https://slack.com/app",
+      "open:https://app.slack.com/client:existing=none",
+    ]);
+    expect(currentOpenUrl).toBe("https://app.slack.com/client");
   });
 });
 

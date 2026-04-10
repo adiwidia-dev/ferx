@@ -128,6 +128,59 @@
     };
   }
 
+  export async function applySaveServiceResult({
+    nextState,
+    editingServiceId,
+    currentActiveId,
+    showToast,
+    setState,
+    deleteWebview,
+    loadService,
+  }: {
+    nextState: ReturnType<typeof saveServiceState>;
+    editingServiceId: string | null;
+    currentActiveId: string;
+    showToast: (message: string) => void;
+    setState: (state: {
+      services: PageService[];
+      activeId: string;
+      isAddModalOpen: boolean;
+    }) => void;
+    deleteWebview: (payload: { id: string; storageKey: string }) => Promise<unknown>;
+    loadService: (service: PageService) => Promise<unknown>;
+  }) {
+    if (nextState.toastMessage) {
+      showToast(nextState.toastMessage);
+    }
+
+    if (!nextState.shouldCloseModal) {
+      return;
+    }
+
+    const shouldRecreateActiveEditedService =
+      !!editingServiceId &&
+      !!nextState.deleteWebview &&
+      currentActiveId === nextState.deleteWebview.id;
+
+    if (shouldRecreateActiveEditedService && nextState.deleteWebview) {
+      await deleteWebview(nextState.deleteWebview);
+    }
+
+    setState({
+      services: nextState.services,
+      activeId: nextState.activeId,
+      isAddModalOpen: false,
+    });
+
+    if (!shouldRecreateActiveEditedService && nextState.deleteWebview) {
+      await deleteWebview(nextState.deleteWebview);
+    }
+
+    if (nextState.loadService) {
+      await loadService(nextState.loadService);
+    }
+  }
+
   export function toggleServiceDisabled(
     services: PageService[],
     activeId: string,
@@ -538,31 +591,25 @@
       createServiceId: () => crypto.randomUUID().slice(0, 8),
     });
 
-    if (nextState.toastMessage) {
-      showToast(nextState.toastMessage);
-    }
-
-    if (!nextState.shouldCloseModal) {
-      return;
-    }
-
-    services = nextState.services;
-    activeId = nextState.activeId;
-
-    if (nextState.deleteWebview) {
-      invoke("delete_webview", nextState.deleteWebview);
-    }
-
-    if (nextState.loadService) {
-      invoke("load_service", {
-        id: nextState.loadService.id,
-        url: nextState.loadService.url,
-        storageKey: nextState.loadService.storageKey,
-        allowNotifications: nextState.loadService.notificationPrefs.allowNotifications,
-      });
-    }
-
-    isAddModalOpen = false;
+    void applySaveServiceResult({
+      nextState,
+      editingServiceId,
+      currentActiveId: activeId,
+      showToast,
+      setState: (next) => {
+        services = next.services;
+        activeId = next.activeId;
+        isAddModalOpen = next.isAddModalOpen;
+      },
+      deleteWebview: async (payload) => invoke("delete_webview", payload),
+      loadService: async (service) =>
+        invoke("load_service", {
+          id: service.id,
+          url: service.url,
+          storageKey: service.storageKey,
+          allowNotifications: service.notificationPrefs.allowNotifications,
+        }),
+    });
   }
 </script>
 
