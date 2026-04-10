@@ -1,7 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_NOTIFICATION_PREFS } from "./notification-prefs";
 import { normalizeServiceUrl, readStoredServices } from "./service-config";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("normalizeServiceUrl", () => {
   it("trims input, adds https, and returns a canonical URL", () => {
@@ -123,6 +127,12 @@ describe("readStoredServices", () => {
           },
         },
         {
+          id: "bad-prefs-array",
+          name: "Notion",
+          url: "https://notion.so",
+          notificationPrefs: [false],
+        },
+        {
           id: "one",
           name: "Slack",
           url: "https://slack.com",
@@ -164,7 +174,7 @@ describe("readStoredServices", () => {
           id: "one",
           name: "Slack",
           url: "https://slack.com",
-          storageKey: "storage-44444444",
+          storageKey: "storage-11111111",
           notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
         },
       ],

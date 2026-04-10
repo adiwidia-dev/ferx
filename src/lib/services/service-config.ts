@@ -16,7 +16,7 @@ type StoredService = {
 };
 
 function isNotificationPrefs(value: unknown): value is StoredService["notificationPrefs"] {
-  if (!value || typeof value !== "object") {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
 
