@@ -140,6 +140,39 @@ describe("saveServiceState", () => {
     });
   });
 
+  it("does not unload when a legacy stored URL normalizes to the same effective URL", () => {
+    const services = [
+      createService({
+        id: "service-1",
+        name: "Docs",
+        url: "https://docs.example.com",
+        storageKey: "storage-service-1",
+      }),
+    ];
+
+    expect(
+      saveServiceState({
+        services,
+        activeId: "service-1",
+        editingServiceId: "service-1",
+        newServiceName: "Docs",
+        newServiceUrl: "https://docs.example.com/",
+        createServiceId: () => "unused",
+      }),
+    ).toEqual({
+      services: [
+        {
+          ...services[0],
+          name: "Docs",
+          url: "https://docs.example.com/",
+        },
+      ],
+      activeId: "service-1",
+      toastMessage: "",
+      shouldCloseModal: true,
+    });
+  });
+
   it("recreates an active edited service after deleting the old webview", async () => {
     const services = [
       createService({

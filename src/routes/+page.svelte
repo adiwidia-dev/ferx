@@ -93,6 +93,9 @@
         name: newServiceName,
         url: normalized.url,
       };
+      const existingNormalized = normalizePageServiceUrl(existingService.url);
+      const effectiveUrlChanged =
+        !existingNormalized.ok || existingNormalized.url !== normalized.url;
 
       return {
         services: services.map((service) =>
@@ -102,7 +105,7 @@
         toastMessage: "",
         shouldCloseModal: true,
         deleteWebview:
-          existingService.url !== normalized.url
+          effectiveUrlChanged
             ? {
                 id: existingService.id,
                 storageKey: existingService.storageKey,
