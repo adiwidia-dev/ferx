@@ -86,6 +86,64 @@ describe("readStoredServices", () => {
     });
   });
 
+  it("ignores entries whose optional fields have invalid runtime types", () => {
+    const randomUUID = vi.spyOn(crypto, "randomUUID");
+    randomUUID
+      .mockReturnValueOnce("33333333-3333-3333-3333-333333333333")
+      .mockReturnValueOnce("44444444-4444-4444-4444-444444444444")
+      .mockReturnValueOnce("55555555-5555-5555-5555-555555555555")
+      .mockReturnValueOnce("66666666-6666-6666-6666-666666666666");
+
+    const result = readStoredServices(
+      JSON.stringify([
+        {
+          id: "bad-storage-key",
+          name: "Slack",
+          url: "https://slack.com",
+          storageKey: 123,
+        },
+        {
+          id: "bad-disabled",
+          name: "Teams",
+          url: "https://teams.microsoft.com",
+          disabled: "yes",
+        },
+        {
+          id: "bad-badge",
+          name: "Discord",
+          url: "https://discord.com",
+          badge: { count: 1 },
+        },
+        {
+          id: "bad-prefs",
+          name: "Linear",
+          url: "https://linear.app",
+          notificationPrefs: {
+            showBadge: "true",
+          },
+        },
+        {
+          id: "one",
+          name: "Slack",
+          url: "https://slack.com",
+        },
+      ]),
+    );
+
+    expect(result).toEqual({
+      services: [
+        {
+          id: "one",
+          name: "Slack",
+          url: "https://slack.com",
+          storageKey: "storage-33333333",
+          notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+        },
+      ],
+      recoveredFromCorruption: false,
+    });
+  });
+
   it("migrates stored services with missing storage keys and notification prefs", () => {
     const randomUUID = vi.spyOn(crypto, "randomUUID");
     randomUUID.mockReturnValue("11111111-1111-1111-1111-111111111111");
@@ -106,7 +164,7 @@ describe("readStoredServices", () => {
           id: "one",
           name: "Slack",
           url: "https://slack.com",
-          storageKey: "storage-11111111",
+          storageKey: "storage-44444444",
           notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
         },
       ],

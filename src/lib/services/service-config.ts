@@ -15,6 +15,22 @@ type StoredService = {
   };
 };
 
+function isNotificationPrefs(value: unknown): value is StoredService["notificationPrefs"] {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    (candidate.showBadge === undefined || typeof candidate.showBadge === "boolean") &&
+    (candidate.affectTray === undefined ||
+      typeof candidate.affectTray === "boolean") &&
+    (candidate.allowNotifications === undefined ||
+      typeof candidate.allowNotifications === "boolean")
+  );
+}
+
 function isStoredService(value: unknown): value is StoredService {
   if (!value || typeof value !== "object") {
     return false;
@@ -25,7 +41,12 @@ function isStoredService(value: unknown): value is StoredService {
   return (
     typeof candidate.id === "string" &&
     typeof candidate.name === "string" &&
-    typeof candidate.url === "string"
+    typeof candidate.url === "string" &&
+    (candidate.storageKey === undefined || typeof candidate.storageKey === "string") &&
+    (candidate.disabled === undefined || typeof candidate.disabled === "boolean") &&
+    (candidate.badge === undefined || typeof candidate.badge === "number") &&
+    (candidate.notificationPrefs === undefined ||
+      isNotificationPrefs(candidate.notificationPrefs))
   );
 }
 
