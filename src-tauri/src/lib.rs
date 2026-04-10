@@ -43,7 +43,7 @@ fn data_store_identifier_for_storage_key(storage_key: &str) -> [u8; 16] {
 mod tests {
     use super::{
         badge_strategy_for_url, data_store_identifier_for_storage_key, external_webview_url,
-        injected_js,
+        injected_js, service_webview_setup,
     };
 
     #[test]
@@ -157,6 +157,18 @@ mod tests {
     #[test]
     fn external_webview_url_rejects_invalid_urls() {
         assert!(external_webview_url("not a url").is_none());
+    }
+
+    #[test]
+    fn service_webview_setup_accepts_valid_external_urls() {
+        let setup = service_webview_setup("https://example.com/inbox", false);
+
+        assert!(matches!(setup, Some((tauri::WebviewUrl::External(_), _))));
+    }
+
+    #[test]
+    fn service_webview_setup_rejects_invalid_external_urls() {
+        assert!(service_webview_setup("not a url", false).is_none());
     }
 }
 
@@ -347,6 +359,13 @@ fn badge_strategy_for_url(url: &str) -> &'static str {
 
 fn external_webview_url(raw: &str) -> Option<tauri::WebviewUrl> {
     raw.parse().ok().map(tauri::WebviewUrl::External)
+}
+
+fn service_webview_setup(url: &str, allow_notifications: bool) -> Option<(tauri::WebviewUrl, String)> {
+    Some((
+        external_webview_url(url)?,
+        injected_js_for_url(url, allow_notifications),
+    ))
 }
 
 fn notification_script(allow_notifications: bool) -> &'static str {
@@ -601,6 +620,13 @@ async fn open_service(
 ) {
     use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize};
 
+    let Some((webview_url, initialization_script)) = service_webview_setup(&url, allow_notifications)
+    else {
+        eprintln!("Invalid external url for open_service: {url}");
+        let _ = app.emit("show-toast", "Invalid service URL");
+        return;
+    };
+
     {
         let state = app.state::<ActiveWebview>();
         *state.0.lock().unwrap() = id.clone();
@@ -645,13 +671,6 @@ async fn open_service(
 
         let app_handle = app.clone();
         let service_id = id.clone();
-
-        let initialization_script = injected_js_for_url(&url, allow_notifications);
-        let Some(webview_url) = external_webview_url(&url) else {
-            eprintln!("Invalid external url for open_service: {url}");
-            let _ = app.emit("show-toast", "Invalid service URL");
-            return;
-        };
         let mut builder = tauri::WebviewBuilder::new(&id, webview_url);
 
         #[cfg(target_os = "macos")]
@@ -736,8 +755,9 @@ async fn load_service(
         let app_handle = app.clone();
         let service_id = id.clone();
 
-        let initialization_script = injected_js_for_url(&url, allow_notifications);
-        let Some(webview_url) = external_webview_url(&url) else {
+        let Some((webview_url, initialization_script)) =
+            service_webview_setup(&url, allow_notifications)
+        else {
             eprintln!("Invalid external url for load_service: {url}");
             let _ = app.emit("show-toast", "Invalid service URL");
             return;
