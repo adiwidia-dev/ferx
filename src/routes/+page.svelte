@@ -164,6 +164,9 @@
       !!editingServiceId &&
       !!nextState.deleteWebview &&
       currentActiveId === nextState.deleteWebview.id;
+    const editedService = editingServiceId
+      ? nextState.services.find((service) => service.id === editingServiceId)
+      : undefined;
 
     if (shouldRecreateActiveEditedService && nextState.deleteWebview) {
       await deleteWebview(nextState.deleteWebview);
@@ -177,6 +180,10 @@
 
     if (!shouldRecreateActiveEditedService && nextState.deleteWebview) {
       await deleteWebview(nextState.deleteWebview);
+
+      if (editedService && editedService.id !== currentActiveId) {
+        await loadService(editedService);
+      }
     }
 
     if (nextState.loadService) {

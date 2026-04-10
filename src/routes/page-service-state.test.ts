@@ -243,6 +243,65 @@ describe("saveServiceState", () => {
     ]);
     expect(currentOpenUrl).toBe("https://app.slack.com/client");
   });
+
+  it("recreates an inactive edited service off-screen after deleting the old webview", async () => {
+    const services = [
+      createService({
+        id: "active",
+        url: "https://mail.example.com",
+        storageKey: "storage-active",
+      }),
+      createService({
+        id: "inactive",
+        url: "https://chat.example.com",
+        storageKey: "storage-inactive",
+      }),
+    ];
+    const nextState = saveServiceState({
+      services,
+      activeId: "active",
+      editingServiceId: "inactive",
+      newServiceName: "Chat",
+      newServiceUrl: "https://chat.example.com/inbox",
+      createServiceId: () => "unused",
+    });
+
+    const events: string[] = [];
+    let runtimeState = {
+      services,
+      activeId: "active",
+      isAddModalOpen: true,
+    };
+
+    await applySaveServiceResult({
+      nextState,
+      editingServiceId: "inactive",
+      currentActiveId: runtimeState.activeId,
+      showToast: () => undefined,
+      setState: ({
+        services,
+        activeId,
+        isAddModalOpen,
+      }: {
+        services: PageService[];
+        activeId: string;
+        isAddModalOpen: boolean;
+      }) => {
+        runtimeState = { services, activeId, isAddModalOpen };
+      },
+      deleteWebview: async ({ id }: { id: string; storageKey: string }) => {
+        events.push(`delete:${id}`);
+      },
+      loadService: async (service: PageService) => {
+        events.push(`load:${service.id}:${service.url}`);
+      },
+    });
+
+    expect(events).toEqual([
+      "delete:inactive",
+      "load:inactive:https://chat.example.com/inbox",
+    ]);
+  });
 });
 
 describe("toggleServiceDisabled", () => {
