@@ -45,9 +45,9 @@ fn data_store_identifier_for_storage_key(storage_key: &str) -> [u8; 16] {
 
 #[cfg(test)]
 mod tests {
-    use super::{badge_strategy_for_url, data_store_identifier_for_storage_key, injected_js};
+    use super::{badge_strategy_for_url, data_store_identifier_for_storage_key};
     use crate::service_runtime::{extract_hostname, hostname_matches};
-    use crate::service_webview::{external_webview_url, service_webview_setup};
+    use crate::service_webview::{external_webview_url, injected_js, service_webview_setup};
 
     #[test]
     fn data_store_identifier_is_stable_for_same_storage_key() {
@@ -178,17 +178,19 @@ mod tests {
 
     #[test]
     fn service_webview_setup_accepts_valid_external_urls() {
-        let setup = service_webview_setup(
-            "https://example.com/inbox",
-            "window.__ferx = true;".to_string(),
-        );
+        let setup = service_webview_setup("https://teams.microsoft.com", false);
 
-        assert!(matches!(setup, Some((tauri::WebviewUrl::External(_), _))));
+        let Some((tauri::WebviewUrl::External(_), initialization_script)) = setup else {
+            panic!("expected valid external webview setup");
+        };
+
+        assert!(initialization_script.contains("window.__ferx_badge_strategy = 'teams-title'"));
+        assert!(initialization_script.contains("permission: 'denied'"));
     }
 
     #[test]
     fn service_webview_setup_rejects_invalid_external_urls() {
-        assert!(service_webview_setup("not a url", "window.__ferx = true;".to_string()).is_none());
+        assert!(service_webview_setup("not a url", false).is_none());
     }
 }
 
@@ -361,248 +363,6 @@ fn badge_strategy_for_url(url: &str) -> &'static str {
     }
 }
 
-fn notification_script(allow_notifications: bool) -> &'static str {
-    if allow_notifications {
-        r#"
-    const mockNotification = Object.assign(function(title, options) {}, {
-        permission: 'granted',
-        requestPermission: () => Promise.resolve('granted')
-    });
-    Object.defineProperty(window, 'Notification', { value: mockNotification, writable: true, configurable: true });
-
-    if (window.navigator && window.navigator.permissions) {
-        const originalQuery = window.navigator.permissions.query.bind(window.navigator.permissions);
-        window.navigator.permissions.query = (params) => {
-            if (params && params.name === 'notifications') return Promise.resolve({ state: 'granted', onchange: null });
-            return originalQuery(params);
-        };
-    }
-"#
-    } else {
-        r#"
-    const deniedNotification = Object.assign(function() {
-        throw new Error('Notifications are disabled for this service');
-    }, {
-        permission: 'denied',
-        requestPermission: () => Promise.resolve('denied')
-    });
-    Object.defineProperty(window, 'Notification', { value: deniedNotification, writable: true, configurable: true });
-
-    if (window.navigator && window.navigator.permissions) {
-        const originalQuery = window.navigator.permissions.query.bind(window.navigator.permissions);
-        window.navigator.permissions.query = (params) => {
-            if (params && params.name === 'notifications') return Promise.resolve({ state: 'denied', onchange: null });
-            return originalQuery(params);
-        };
-    }
-"#
-    }
-}
-
-fn common_webview_script() -> &'static str {
-    r#"
-    document.addEventListener('click', (e) => {
-        let a = e.target.closest('a');
-        if (a && a.href && a.href.startsWith('http') && (a.hasAttribute('download') || a.target === '_blank')) {
-            e.preventDefault();
-            e.stopPropagation();
-            window.location.href = 'https://ferx.download/?url=' + encodeURIComponent(a.href);
-        }
-    }, true);
-
-    window.addEventListener('keydown', (e) => {
-        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
-            const key = parseInt(e.key);
-            if (!isNaN(key) && key >= 1 && key <= 9) {
-                e.preventDefault();
-                window.location.href = 'https://ferx.shortcut/' + key;
-            }
-        }
-    });
-"#
-}
-
-fn badge_engine_script(strategy_name: &str) -> String {
-    format!(
-        r#"
-    (() => {{
-        window.__ferx_badge_strategy = '{strategy_name}';
-        window.__ferx_last_badge_state = window.__ferx_last_badge_state || '__ferx:init__';
-        window.__ferx_badge_dom_timer = window.__ferx_badge_dom_timer || null;
-
-        const normalizeTitle = (title) => (title || '').replace(/[\u200E\u200F\u200B-\u200D]/g, '').trim();
-        const unsupportedTitleState = (title) => {{
-            const normalized = normalizeTitle(title);
-            const match = normalized.match(/\((\d+)\)/) || normalized.match(/\[(\d+)\]/);
-            if (!match) return 'clear';
-
-            const count = parseInt(match[1], 10);
-            if (!Number.isFinite(count) || count <= 0) return 'clear';
-
-            return 'count:' + count;
-        }};
-
-        const titleCountState = (title) => {{
-            const normalized = normalizeTitle(title);
-            const match = normalized.match(/\((\d+)\)/) || normalized.match(/\[(\d+)\]/) || normalized.match(/^(\d+)\s*(?:unread|baru|new|messages?)/i);
-            if (!match) return 'clear';
-
-            const count = parseInt(match[1], 10);
-            if (!Number.isFinite(count) || count <= 0) return 'clear';
-
-            return 'count:' + count;
-        }};
-
-        const parseFolderCount = (text, label) => {{
-            const collapsed = (text || '').replace(/\s+/g, ' ').trim();
-            const escapedLabel = label.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
-            const match = collapsed.match(new RegExp('(?:^|\\b)' + escapedLabel + '\\s*(\\d+)(?:\\b|$)', 'i'));
-            if (!match) return null;
-
-            const count = parseInt(match[1], 10);
-            return Number.isFinite(count) && count > 0 ? count : 0;
-        }};
-
-        const isVisibleNode = (node) => {{
-            if (!node || typeof node.getBoundingClientRect !== 'function') return false;
-            const rect = node.getBoundingClientRect();
-            return rect.width > 0 && rect.height > 0;
-        }};
-
-        const outlookFolderState = () => {{
-            const rows = Array.from(document.querySelectorAll('[role="treeitem"], [role="option"]'));
-            let bestCount = null;
-            for (const row of rows) {{
-                if (!isVisibleNode(row)) continue;
-
-                const text = (row.innerText || row.textContent || '').trim();
-                if (!text) continue;
-
-                const lower = text.toLowerCase();
-                if (!lower.includes('inbox') && !lower.includes('kotak masuk')) continue;
-
-                const count = parseFolderCount(text, 'Inbox') ?? parseFolderCount(text, 'Kotak Masuk');
-                if (count === null) continue;
-
-                bestCount = Math.max(bestCount || 0, count);
-            }}
-
-            if (bestCount === null) return null;
-            return bestCount > 0 ? 'count:' + bestCount : 'clear';
-        }};
-
-        const strategies = {{
-            'unsupported': {{
-                needsDomObservation: false,
-                readState: () => unsupportedTitleState(document.title)
-            }},
-            'teams-title': {{
-                needsDomObservation: false,
-                readState: () => titleCountState(document.title)
-            }},
-            'whatsapp-title': {{
-                needsDomObservation: false,
-                readState: () => titleCountState(document.title)
-            }},
-            'outlook-folder-dom': {{
-                needsDomObservation: true,
-                readState: () => outlookFolderState() || titleCountState(document.title)
-            }}
-        }};
-
-        const strategy = strategies[window.__ferx_badge_strategy] || strategies['unsupported'];
-        const emitBadgeState = (nextState) => {{
-            let payload = nextState;
-            if (payload === 'unknown') {{
-                payload = 'unknown';
-            }} else if (typeof payload === 'string' && payload.startsWith('count:')) {{
-                const count = payload.slice(6);
-                payload = 'count:' + count;
-            }} else {{
-                payload = 'clear';
-            }}
-
-            if (payload === window.__ferx_last_badge_state) return;
-
-            window.__ferx_last_badge_state = payload;
-            window.location.href = 'https://ferx.notify/' + payload;
-        }};
-
-        const evaluateBadgeState = () => {{
-            try {{
-                emitBadgeState(strategy.readState());
-            }} catch (error) {{
-                emitBadgeState('clear');
-            }}
-        }};
-        const scheduleDomEvaluation = () => {{
-            if (!strategy.needsDomObservation) return;
-            if (window.__ferx_badge_dom_timer) clearTimeout(window.__ferx_badge_dom_timer);
-            window.__ferx_badge_dom_timer = window.setTimeout(() => {{
-                window.__ferx_badge_dom_timer = null;
-                evaluateBadgeState();
-            }}, 150);
-        }};
-
-        const observeTitle = () => {{
-            const target = document.head || document.documentElement;
-            if (!target) return;
-
-            new MutationObserver(() => evaluateBadgeState()).observe(target, {{
-                childList: true,
-                subtree: true,
-                characterData: true
-            }});
-        }};
-
-        const observeDom = () => {{
-            if (!strategy.needsDomObservation) return;
-
-            const target = document.body || document.documentElement;
-            if (!target) return;
-
-            new MutationObserver(() => scheduleDomEvaluation()).observe(target, {{
-                childList: true,
-                subtree: true,
-                characterData: true
-            }});
-        }};
-
-        const start = () => {{
-            observeTitle();
-            observeDom();
-            evaluateBadgeState();
-        }};
-
-        if (document.readyState === 'loading') {{
-            document.addEventListener('DOMContentLoaded', start, {{ once: true }});
-        }} else {{
-            start();
-        }}
-
-        window.addEventListener('focus', evaluateBadgeState);
-        window.addEventListener('hashchange', evaluateBadgeState);
-        window.addEventListener('popstate', evaluateBadgeState);
-    }})();
-"#
-    )
-}
-
-fn injected_js_for_url(url: &str, allow_notifications: bool) -> String {
-    let strategy_name = badge_strategy_for_url(url);
-    format!(
-        "{}{}{}",
-        notification_script(allow_notifications),
-        common_webview_script(),
-        badge_engine_script(strategy_name)
-    )
-}
-
-#[cfg(test)]
-fn injected_js(allow_notifications: bool) -> String {
-    injected_js_for_url("", allow_notifications)
-}
-
 #[tauri::command]
 async fn open_service(
     app: tauri::AppHandle,
@@ -613,9 +373,8 @@ async fn open_service(
 ) {
     use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize};
 
-    let initialization_script = injected_js_for_url(&url, allow_notifications);
     let Some((webview_url, initialization_script)) =
-        service_webview_setup(&url, initialization_script)
+        service_webview_setup(&url, allow_notifications)
     else {
         eprintln!("Invalid external url for open_service: {url}");
         let _ = app.emit("show-toast", "Invalid service URL");
@@ -750,9 +509,8 @@ async fn load_service(
         let app_handle = app.clone();
         let service_id = id.clone();
 
-        let initialization_script = injected_js_for_url(&url, allow_notifications);
         let Some((webview_url, initialization_script)) =
-            service_webview_setup(&url, initialization_script)
+            service_webview_setup(&url, allow_notifications)
         else {
             eprintln!("Invalid external url for load_service: {url}");
             let _ = app.emit("show-toast", "Invalid service URL");
