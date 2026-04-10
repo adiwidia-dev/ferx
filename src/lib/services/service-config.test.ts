@@ -18,6 +18,13 @@ describe("normalizeServiceUrl", () => {
     });
   });
 
+  it("does not prepend https when a non-slash scheme is already present", () => {
+    expect(normalizeServiceUrl("mailto:team@example.com")).toEqual({
+      ok: true,
+      url: "mailto:team@example.com",
+    });
+  });
+
   it("rejects malformed URLs", () => {
     expect(normalizeServiceUrl("https://exa mple.com")).toEqual({
       ok: false,
@@ -39,6 +46,10 @@ describe("readStoredServices", () => {
       services: [],
       recoveredFromCorruption: true,
     });
+  });
+
+  it("does not treat valid JSON migration failures as corruption recovery", () => {
+    expect(() => readStoredServices("{}")).toThrow();
   });
 
   it("migrates stored services with missing storage keys and notification prefs", () => {

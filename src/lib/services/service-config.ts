@@ -19,7 +19,7 @@ export function normalizeServiceUrl(
   rawUrl: string,
 ): { ok: true; url: string } | { ok: false; message: string } {
   const trimmedUrl = rawUrl.trim();
-  const urlWithScheme = /^[a-z][a-z\d+.-]*:\/\//i.test(trimmedUrl)
+  const urlWithScheme = /^[a-z][a-z\d+.-]*:/i.test(trimmedUrl)
     ? trimmedUrl
     : `https://${trimmedUrl}`;
 
@@ -47,21 +47,24 @@ export function readStoredServices(saved: string | null): {
     };
   }
 
-  try {
-    const parsedServices = JSON.parse(saved) as StoredService[];
-    const { services: withStorageKeys } = ensureServiceStorageKeys(parsedServices);
-    const { services } = ensureServiceNotificationPrefs(withStorageKeys);
+  let parsedServices: StoredService[];
 
-    return {
-      services,
-      recoveredFromCorruption: false,
-    };
+  try {
+    parsedServices = JSON.parse(saved) as StoredService[];
   } catch {
     return {
       services: [],
       recoveredFromCorruption: true,
     };
   }
+
+  const { services: withStorageKeys } = ensureServiceStorageKeys(parsedServices);
+  const { services } = ensureServiceNotificationPrefs(withStorageKeys);
+
+  return {
+    services,
+    recoveredFromCorruption: false,
+  };
 }
 
 export type { StoredService };
