@@ -46,7 +46,7 @@ yarn tauri dev
 
 - [Contributing](./CONTRIBUTING.md)
 - [Architecture Notes](./docs/architecture.md)
-- [GitHub Issues](https://github.com/danielpanjaitan/ferx/issues)
-- [Repository](https://github.com/danielpanjaitan/ferx)
+- [GitHub Issues](https://github.com/adiwidia-dev/ferx/issues)
+- [Repository](https://github.com/adiwidia-dev/ferx)
 - [Security Policy](./SECURITY.md)
 - [License](./LICENSE)
