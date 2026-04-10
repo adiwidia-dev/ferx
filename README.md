@@ -20,6 +20,14 @@ Ferx is a lightweight desktop application for running services like WhatsApp, Sl
 - Native context menus for sidebar actions
 - Camera and microphone support for meeting-oriented services
 
+## Current Status
+
+Ferx is source-first and usable for development, with public-release cleanup still in progress across metadata and docs.
+
+## Platform Support
+
+Current development and support are macOS-focused. Other platforms may build with additional work, but they are not yet treated as first-class supported targets.
+
 ## Prerequisites
 
 - Node.js
@@ -38,5 +46,7 @@ yarn tauri dev
 
 - [Contributing](./CONTRIBUTING.md)
 - [Architecture Notes](./docs/architecture.md)
+- [GitHub Issues](https://github.com/danielpanjaitan/ferx/issues)
+- [Repository](https://github.com/danielpanjaitan/ferx)
 - [Security Policy](./SECURITY.md)
 - [License](./LICENSE)
