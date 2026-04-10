@@ -28,5 +28,6 @@ cargo test --manifest-path src-tauri/Cargo.toml --lib
 ## Related Docs
 
 - [Architecture Notes](./docs/architecture.md)
+- [Project Structure](./docs/project-structure.md)
 - [Security Policy](./SECURITY.md)
 - [License](./LICENSE)
