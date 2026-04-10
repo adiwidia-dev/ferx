@@ -3,6 +3,7 @@
     DEFAULT_NOTIFICATION_PREFS as DEFAULT_PAGE_NOTIFICATION_PREFS,
   } from "$lib/services/notification-prefs";
   import { createStorageKey as createPageStorageKey } from "$lib/services/storage-key";
+  import { createDeletePayload as createServiceDeletePayload } from "$lib/services/service-runtime";
   import {
     normalizeServiceUrl as normalizePageServiceUrl,
     readStoredServices as readPageStoredServices,
@@ -226,10 +227,7 @@
     return {
       services: nextServices,
       activeId: nextActiveId,
-      deleteWebview: {
-        id: targetService.id,
-        storageKey: targetService.storageKey,
-      },
+      deleteWebview: createServiceDeletePayload(targetService),
     };
   }
 
@@ -275,6 +273,11 @@
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
   import { moveItemToTarget } from "$lib/services/reorder";
+  import {
+    createDeletePayload,
+    createServiceLoadPayload,
+    shouldPreloadService,
+  } from "$lib/services/service-runtime";
   import {
     countTrayRelevantUnreadServices,
     type NotificationPrefs,
@@ -350,14 +353,9 @@
       // Give the main active service 1 full second to completely boot up and grab focus
       setTimeout(async () => {
         for (const s of services) {
-          if (!s.disabled && s.id !== activeId) {
+          if (shouldPreloadService(s, activeId)) {
             // Tell Rust to load the next service off-screen
-            await invoke("load_service", {
-              id: s.id,
-              url: s.url,
-              storageKey: s.storageKey,
-              allowNotifications: s.notificationPrefs.allowNotifications,
-            });
+            await invoke("load_service", createServiceLoadPayload(s));
             // Wait 250ms before spawning the next one to keep CPU usage buttery smooth
             await new Promise((r) => setTimeout(r, 250));
           }
@@ -443,12 +441,7 @@
     if (isAddModalOpen || (activeService && activeService.disabled)) {
       invoke("hide_all_webviews");
     } else if (activeService && !activeService.disabled) {
-      invoke("open_service", {
-        id: activeId,
-        url: activeService.url,
-        storageKey: activeService.storageKey,
-        allowNotifications: activeService.notificationPrefs.allowNotifications,
-      });
+      invoke("open_service", createServiceLoadPayload(activeService));
     }
   });
 
@@ -566,7 +559,7 @@
     }
 
     services = services.filter((s) => s.id !== id);
-    invoke("delete_webview", { id, storageKey: serviceToDelete.storageKey });
+    invoke("delete_webview", createDeletePayload(serviceToDelete));
     if (activeId === id) {
       const nextAvailable = services.find((s) => !s.disabled);
       activeId = nextAvailable ? nextAvailable.id : "";
@@ -612,13 +605,7 @@
         isAddModalOpen = next.isAddModalOpen;
       },
       deleteWebview: async (payload) => invoke("delete_webview", payload),
-      loadService: async (service) =>
-        invoke("load_service", {
-          id: service.id,
-          url: service.url,
-          storageKey: service.storageKey,
-          allowNotifications: service.notificationPrefs.allowNotifications,
-        }),
+      loadService: async (service) => invoke("load_service", createServiceLoadPayload(service)),
     });
   }
 </script>
