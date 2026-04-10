@@ -1,6 +1,10 @@
 mod badge_payload;
+mod service_runtime;
+mod service_webview;
 
 use badge_payload::{parse_badge_payload, BadgePayload};
+use service_runtime::{extract_hostname, hostname_matches};
+use service_webview::service_webview_setup;
 use std::{path::PathBuf, sync::Mutex};
 use tauri::{AppHandle, Manager};
 
@@ -41,10 +45,9 @@ fn data_store_identifier_for_storage_key(storage_key: &str) -> [u8; 16] {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        badge_strategy_for_url, data_store_identifier_for_storage_key, external_webview_url,
-        injected_js, service_webview_setup,
-    };
+    use super::{badge_strategy_for_url, data_store_identifier_for_storage_key, injected_js};
+    use crate::service_runtime::{extract_hostname, hostname_matches};
+    use crate::service_webview::{external_webview_url, service_webview_setup};
 
     #[test]
     fn data_store_identifier_is_stable_for_same_storage_key() {
@@ -62,6 +65,20 @@ mod tests {
             data_store_identifier_for_storage_key("storage-11111111"),
             data_store_identifier_for_storage_key("storage-22222222")
         );
+    }
+
+    #[test]
+    fn extract_hostname_returns_hostname_without_port() {
+        assert_eq!(
+            extract_hostname("https://user@example.com:443/inbox"),
+            Some("example.com")
+        );
+    }
+
+    #[test]
+    fn hostname_matches_allows_subdomains_only() {
+        assert!(hostname_matches("teams.microsoft.com", "microsoft.com"));
+        assert!(!hostname_matches("notmicrosoft.com", "microsoft.com"));
     }
 
     #[test]
@@ -161,14 +178,17 @@ mod tests {
 
     #[test]
     fn service_webview_setup_accepts_valid_external_urls() {
-        let setup = service_webview_setup("https://example.com/inbox", false);
+        let setup = service_webview_setup(
+            "https://example.com/inbox",
+            "window.__ferx = true;".to_string(),
+        );
 
         assert!(matches!(setup, Some((tauri::WebviewUrl::External(_), _))));
     }
 
     #[test]
     fn service_webview_setup_rejects_invalid_external_urls() {
-        assert!(service_webview_setup("not a url", false).is_none());
+        assert!(service_webview_setup("not a url", "window.__ferx = true;".to_string()).is_none());
     }
 }
 
@@ -322,22 +342,6 @@ fn update_tray_icon(app: tauri::AppHandle, has_unread: bool) {
     }
 }
 
-fn extract_hostname(url: &str) -> Option<&str> {
-    let remainder = url.split_once("://")?.1;
-    let host_port = remainder.split(['/', '?', '#']).next()?;
-    let host_port = host_port.rsplit('@').next().unwrap_or(host_port);
-
-    if host_port.is_empty() {
-        return None;
-    }
-
-    Some(host_port.split(':').next().unwrap_or(host_port))
-}
-
-fn hostname_matches(hostname: &str, expected_host: &str) -> bool {
-    hostname == expected_host || hostname.ends_with(&format!(".{expected_host}"))
-}
-
 fn badge_strategy_for_url(url: &str) -> &'static str {
     let hostname = extract_hostname(url)
         .unwrap_or_default()
@@ -355,17 +359,6 @@ fn badge_strategy_for_url(url: &str) -> &'static str {
     } else {
         "unsupported"
     }
-}
-
-fn external_webview_url(raw: &str) -> Option<tauri::WebviewUrl> {
-    raw.parse().ok().map(tauri::WebviewUrl::External)
-}
-
-fn service_webview_setup(url: &str, allow_notifications: bool) -> Option<(tauri::WebviewUrl, String)> {
-    Some((
-        external_webview_url(url)?,
-        injected_js_for_url(url, allow_notifications),
-    ))
 }
 
 fn notification_script(allow_notifications: bool) -> &'static str {
@@ -620,7 +613,9 @@ async fn open_service(
 ) {
     use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize};
 
-    let Some((webview_url, initialization_script)) = service_webview_setup(&url, allow_notifications)
+    let initialization_script = injected_js_for_url(&url, allow_notifications);
+    let Some((webview_url, initialization_script)) =
+        service_webview_setup(&url, initialization_script)
     else {
         eprintln!("Invalid external url for open_service: {url}");
         let _ = app.emit("show-toast", "Invalid service URL");
@@ -755,8 +750,9 @@ async fn load_service(
         let app_handle = app.clone();
         let service_id = id.clone();
 
+        let initialization_script = injected_js_for_url(&url, allow_notifications);
         let Some((webview_url, initialization_script)) =
-            service_webview_setup(&url, allow_notifications)
+            service_webview_setup(&url, initialization_script)
         else {
             eprintln!("Invalid external url for load_service: {url}");
             let _ = app.emit("show-toast", "Invalid service URL");
