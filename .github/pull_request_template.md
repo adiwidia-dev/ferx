@@ -4,8 +4,9 @@
 
 ## Testing
 
-- [ ] `yarn test`
+- [ ] `yarn test --run`
 - [ ] `yarn check`
+- [ ] `cargo test --manifest-path src-tauri/Cargo.toml --lib`
 - [ ] Manual verification completed where applicable
 
 ## Risk Review
