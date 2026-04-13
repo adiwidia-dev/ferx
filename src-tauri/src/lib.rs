@@ -4,7 +4,7 @@ mod service_webview;
 
 use badge_payload::{parse_badge_payload, BadgePayload};
 use service_runtime::{extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind};
-use service_webview::service_webview_setup;
+use service_webview::{service_webview_setup, user_agent_for_url};
 use std::{path::PathBuf, sync::Mutex};
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -53,10 +53,6 @@ fn badge_update_event_payload(label: &str, payload: &str) -> Option<String> {
     Some(format!("{}:{}", label, normalized))
 }
 
-fn supported_edge_user_agent() -> &'static str {
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0"
-}
-
 fn emit_badge_update(app: &AppHandle, label: &str, payload: &str) {
     if let Some(event_payload) = badge_update_event_payload(label, payload) {
         let _ = app.emit("update-badge", event_payload);
@@ -67,12 +63,13 @@ fn emit_badge_update(app: &AppHandle, label: &str, payload: &str) {
 mod tests {
     use super::{
         badge_strategy_for_url, badge_update_event_payload, data_store_identifier_for_storage_key,
-        supported_edge_user_agent,
     };
     use crate::service_runtime::{
         extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
     };
-    use crate::service_webview::{external_webview_url, injected_js, service_webview_setup};
+    use crate::service_webview::{
+        external_webview_url, injected_js, service_webview_setup, user_agent_for_url,
+    };
 
     #[test]
     fn data_store_identifier_is_stable_for_same_storage_key() {
@@ -267,7 +264,7 @@ mod tests {
             panic!("expected valid external webview setup");
         };
 
-        assert!(!initialization_script.contains("permission: 'denied'"));
+        assert!(!initialization_script.contains("Object.defineProperty(window, 'Notification'"));
         assert!(!initialization_script.contains("window.location.href = 'https://ferx.download/?url='"));
         assert!(!initialization_script.contains("window.location.href = 'https://ferx.shortcut/' + key"));
         assert!(!initialization_script.contains("window.__ferx_badge_strategy = 'teams-title'"));
@@ -289,6 +286,114 @@ mod tests {
     }
 
     #[test]
+    fn service_webview_setup_skips_notification_shim_for_microsoft_apps() {
+        let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
+        else {
+            panic!("expected valid teams setup");
+        };
+        let Some((_, outlook_script)) =
+            service_webview_setup("https://outlook.office.com/mail", true)
+        else {
+            panic!("expected valid outlook setup");
+        };
+
+        assert!(!teams_script.contains("window.navigator.permissions.query ="));
+        assert!(!outlook_script.contains("Object.defineProperty(window, 'Notification'"));
+        assert!(!outlook_script.contains("window.navigator.permissions.query ="));
+    }
+
+    #[test]
+    fn service_webview_setup_skips_badge_navigation_for_microsoft_apps() {
+        let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
+        else {
+            panic!("expected valid teams setup");
+        };
+        let Some((_, outlook_script)) =
+            service_webview_setup("https://outlook.office.com/mail", true)
+        else {
+            panic!("expected valid outlook setup");
+        };
+
+        assert!(!teams_script.contains("https://ferx.notify/"));
+        assert!(!teams_script.contains("new MutationObserver"));
+        assert!(!outlook_script.contains("https://ferx.notify/"));
+        assert!(outlook_script.contains("new MutationObserver"));
+    }
+
+    #[test]
+    fn teams_setup_skips_common_navigation_hooks() {
+        let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
+        else {
+            panic!("expected valid teams setup");
+        };
+
+        assert!(!teams_script.contains("https://ferx.download/"));
+        assert!(!teams_script.contains("https://ferx.shortcut/"));
+    }
+
+    #[test]
+    fn cloud_teams_setup_uses_teams_safeguards() {
+        let Some((_, teams_script)) = service_webview_setup("https://teams.cloud.microsoft/", false)
+        else {
+            panic!("expected valid cloud teams setup");
+        };
+
+        assert!(!teams_script.contains("Object.defineProperty(window, 'Notification'"));
+        assert!(!teams_script.contains("https://ferx.notify/"));
+        assert!(!teams_script.contains("https://ferx.download/"));
+        assert!(!teams_script.contains("https://ferx.shortcut/"));
+        assert_eq!(
+            user_agent_for_url("https://teams.cloud.microsoft/"),
+            Some(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
+            )
+        );
+        assert_eq!(badge_strategy_for_url("https://teams.cloud.microsoft/"), "teams-title");
+    }
+
+    #[test]
+    fn service_webview_setup_keeps_notification_shim_for_supported_apps() {
+        let Some((_, script)) = service_webview_setup("https://discord.com/channels/@me", false)
+        else {
+            panic!("expected valid discord setup");
+        };
+
+        assert!(script.contains("permission: 'denied'"));
+        assert!(script.contains("Object.defineProperty(window, 'Notification'"));
+    }
+
+    #[test]
+    fn microsoft_apps_do_not_use_spoofed_chrome_user_agent() {
+        assert_eq!(user_agent_for_url("https://outlook.office.com/mail"), None);
+    }
+
+    #[test]
+    fn teams_apps_use_supported_edge_user_agent() {
+        assert_eq!(
+            user_agent_for_url("https://teams.microsoft.com"),
+            Some(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
+            )
+        );
+        assert_eq!(
+            user_agent_for_url("https://teams.cloud.microsoft/"),
+            Some(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
+            )
+        );
+    }
+
+    #[test]
+    fn non_microsoft_apps_keep_spoofed_chrome_user_agent() {
+        assert_eq!(
+            user_agent_for_url("https://discord.com/channels/@me"),
+            Some(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+            )
+        );
+    }
+
+    #[test]
     fn teams_cloud_setup_keeps_supported_edge_user_agent_and_no_badge_script() {
         let Some((_, teams_script)) =
             service_webview_setup("https://teams.cloud.microsoft/", false)
@@ -296,9 +401,12 @@ mod tests {
             panic!("expected valid teams setup");
         };
 
-        assert!(supported_edge_user_agent().starts_with("Mozilla/5.0"));
-        assert!(supported_edge_user_agent().contains("Chrome/123.0.0.0"));
-        assert!(supported_edge_user_agent().contains("Edg/123.0.0.0"));
+        assert_eq!(
+            user_agent_for_url("https://teams.cloud.microsoft/"),
+            Some(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
+            )
+        );
         assert!(teams_script.is_empty());
     }
 
@@ -588,10 +696,13 @@ async fn open_service(
             builder = builder.data_directory(data_dir);
         }
 
-        let builder = builder
-            .user_agent(supported_edge_user_agent())
-            .initialization_script(&initialization_script)
-            .on_navigation(move |url| {
+        let builder = if let Some(user_agent) = user_agent_for_url(&url) {
+            builder.user_agent(user_agent)
+        } else {
+            builder
+        }
+        .initialization_script(&initialization_script)
+        .on_navigation(move |url| {
                 if url.host_str() == Some("ferx.notify") {
                     if let Some(payload_str) = url.path().strip_prefix('/') {
                         emit_badge_update(&app_handle, &service_id, payload_str);
@@ -672,10 +783,13 @@ async fn load_service(
             builder = builder.data_directory(data_dir);
         }
 
-        let builder = builder
-            .user_agent(supported_edge_user_agent())
-            .initialization_script(&initialization_script)
-            .on_navigation(move |url| {
+        let builder = if let Some(user_agent) = user_agent_for_url(&url) {
+            builder.user_agent(user_agent)
+        } else {
+            builder
+        }
+        .initialization_script(&initialization_script)
+        .on_navigation(move |url| {
                 if url.host_str() == Some("ferx.notify") {
                     if let Some(payload_str) = url.path().strip_prefix('/') {
                         emit_badge_update(&app_handle, &service_id, payload_str);
