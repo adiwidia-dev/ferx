@@ -3,10 +3,10 @@ mod service_runtime;
 mod service_webview;
 
 use badge_payload::{parse_badge_payload, BadgePayload};
-use service_runtime::{extract_hostname, hostname_matches};
+use service_runtime::{extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind};
 use service_webview::service_webview_setup;
 use std::{path::PathBuf, sync::Mutex};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 struct ActiveWebview(Mutex<String>);
 
@@ -43,10 +43,35 @@ fn data_store_identifier_for_storage_key(storage_key: &str) -> [u8; 16] {
     identifier
 }
 
+fn badge_update_event_payload(label: &str, payload: &str) -> Option<String> {
+    let normalized = match parse_badge_payload(payload)? {
+        BadgePayload::Count(count) => count.to_string(),
+        BadgePayload::Unknown => "-1".to_string(),
+        BadgePayload::Clear => "0".to_string(),
+    };
+
+    Some(format!("{}:{}", label, normalized))
+}
+
+fn supported_edge_user_agent() -> &'static str {
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0"
+}
+
+fn emit_badge_update(app: &AppHandle, label: &str, payload: &str) {
+    if let Some(event_payload) = badge_update_event_payload(label, payload) {
+        let _ = app.emit("update-badge", event_payload);
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{badge_strategy_for_url, data_store_identifier_for_storage_key};
-    use crate::service_runtime::{extract_hostname, hostname_matches};
+    use super::{
+        badge_strategy_for_url, badge_update_event_payload, data_store_identifier_for_storage_key,
+        supported_edge_user_agent,
+    };
+    use crate::service_runtime::{
+        extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
+    };
     use crate::service_webview::{external_webview_url, injected_js, service_webview_setup};
 
     #[test]
@@ -82,19 +107,65 @@ mod tests {
     }
 
     #[test]
-    fn injected_js_uses_structured_badge_payloads() {
-        let script = injected_js(false);
+    fn outlook_badge_script_uses_command_bridge_payloads() {
+        let Some((_, script)) = service_webview_setup("https://outlook.office.com/mail", false)
+        else {
+            panic!("expected valid outlook setup");
+        };
 
+        assert!(script.contains("window.__TAURI_INTERNALS__?.invoke"));
         assert!(script.contains("payload = 'unknown'"));
         assert!(script.contains("payload = 'clear'"));
-        assert!(script.contains("payload = 'count:' + count"));
-        assert!(script.contains("https://ferx.notify/' + payload"));
+        assert!(script.contains("await invoke('report_outlook_badge', { payload })"));
+        assert!(!script.contains("https://ferx.notify/"));
+    }
+
+    #[test]
+    fn badge_update_event_payload_normalizes_reported_badges() {
+        assert_eq!(
+            badge_update_event_payload("outlook", "count:7"),
+            Some("outlook:7".to_string())
+        );
+        assert_eq!(
+            badge_update_event_payload("outlook", "unknown"),
+            Some("outlook:-1".to_string())
+        );
+        assert_eq!(
+            badge_update_event_payload("outlook", "clear"),
+            Some("outlook:0".to_string())
+        );
+        assert_eq!(badge_update_event_payload("outlook", "bogus"), None);
+    }
+
+    #[test]
+    fn microsoft_service_kind_centralizes_outlook_and_teams_host_matching() {
+        assert_eq!(
+            microsoft_service_kind("https://outlook.office.com/mail"),
+            Some(MicrosoftServiceKind::Outlook)
+        );
+        assert_eq!(
+            microsoft_service_kind("https://office.com/mail"),
+            Some(MicrosoftServiceKind::Outlook)
+        );
+        assert_eq!(
+            microsoft_service_kind("https://teams.microsoft.com"),
+            Some(MicrosoftServiceKind::Teams)
+        );
+        assert_eq!(
+            microsoft_service_kind("https://teams.cloud.microsoft/"),
+            Some(MicrosoftServiceKind::Teams)
+        );
+        assert_eq!(microsoft_service_kind("https://example.com"), None);
     }
 
     #[test]
     fn badge_strategy_uses_explicit_hostname_mapping() {
         assert_eq!(
             badge_strategy_for_url("https://outlook.office.com/mail"),
+            "outlook-folder-dom"
+        );
+        assert_eq!(
+            badge_strategy_for_url("https://office.com/mail"),
             "outlook-folder-dom"
         );
         assert_eq!(
@@ -116,6 +187,18 @@ mod tests {
         );
         assert_eq!(
             badge_strategy_for_url("https://mail.office.example.com"),
+            "unsupported"
+        );
+    }
+
+    #[test]
+    fn unrelated_office_host_does_not_resolve_as_outlook() {
+        assert_eq!(
+            microsoft_service_kind("https://config.office.com"),
+            None
+        );
+        assert_eq!(
+            badge_strategy_for_url("https://config.office.com"),
             "unsupported"
         );
     }
@@ -184,8 +267,52 @@ mod tests {
             panic!("expected valid external webview setup");
         };
 
-        assert!(initialization_script.contains("window.__ferx_badge_strategy = 'teams-title'"));
-        assert!(initialization_script.contains("permission: 'denied'"));
+        assert!(!initialization_script.contains("permission: 'denied'"));
+        assert!(!initialization_script.contains("window.location.href = 'https://ferx.download/?url='"));
+        assert!(!initialization_script.contains("window.location.href = 'https://ferx.shortcut/' + key"));
+        assert!(!initialization_script.contains("window.__ferx_badge_strategy = 'teams-title'"));
+        assert!(!initialization_script.contains("https://ferx.notify/"));
+    }
+
+    #[test]
+    fn outlook_setup_restores_badge_detection_without_notify_navigation() {
+        let Some((_, outlook_script)) =
+            service_webview_setup("https://outlook.office.com/mail", true)
+        else {
+            panic!("expected valid outlook setup");
+        };
+
+        assert!(outlook_script.contains("window.__ferx_badge_strategy = 'outlook-folder-dom'"));
+        assert!(outlook_script.contains("new MutationObserver"));
+        assert!(outlook_script.contains("invoke('report_outlook_badge'"));
+        assert!(!outlook_script.contains("https://ferx.notify/"));
+    }
+
+    #[test]
+    fn teams_cloud_setup_keeps_supported_edge_user_agent_and_no_badge_script() {
+        let Some((_, teams_script)) =
+            service_webview_setup("https://teams.cloud.microsoft/", false)
+        else {
+            panic!("expected valid teams setup");
+        };
+
+        assert!(supported_edge_user_agent().starts_with("Mozilla/5.0"));
+        assert!(supported_edge_user_agent().contains("Chrome/123.0.0.0"));
+        assert!(supported_edge_user_agent().contains("Edg/123.0.0.0"));
+        assert!(teams_script.is_empty());
+    }
+
+    #[test]
+    fn discord_setup_keeps_existing_badge_transport() {
+        let Some((_, discord_script)) =
+            service_webview_setup("https://discord.com/channels/@me", false)
+        else {
+            panic!("expected valid discord setup");
+        };
+
+        assert!(discord_script.contains("window.__ferx_badge_strategy = 'unsupported'"));
+        assert!(discord_script.contains("https://ferx.notify/"));
+        assert!(!discord_script.contains("invoke('report_outlook_badge'"));
     }
 
     #[test]
@@ -230,6 +357,15 @@ async fn reload_webview(app: AppHandle, id: String) {
     if let Some(webview) = app.get_webview(&id) {
         let _ = webview.eval("window.location.reload()");
     }
+}
+
+#[tauri::command]
+fn report_outlook_badge(
+    app: AppHandle,
+    webview_window: tauri::WebviewWindow,
+    payload: String,
+) {
+    emit_badge_update(&app, webview_window.label(), &payload);
 }
 
 #[tauri::command]
@@ -345,18 +481,22 @@ fn update_tray_icon(app: tauri::AppHandle, has_unread: bool) {
 }
 
 fn badge_strategy_for_url(url: &str) -> &'static str {
-    let hostname = extract_hostname(url)
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-
-    if hostname_matches(&hostname, "outlook.office.com")
-        || hostname_matches(&hostname, "office.com")
-        || hostname_matches(&hostname, "outlook.live.com")
-    {
+    if matches!(
+        microsoft_service_kind(url),
+        Some(MicrosoftServiceKind::Outlook)
+    ) {
         "outlook-folder-dom"
-    } else if hostname_matches(&hostname, "teams.microsoft.com") {
+    } else if matches!(
+        microsoft_service_kind(url),
+        Some(MicrosoftServiceKind::Teams)
+    ) {
         "teams-title"
-    } else if hostname_matches(&hostname, "web.whatsapp.com") {
+    } else if hostname_matches(
+        &extract_hostname(url)
+            .unwrap_or_default()
+            .to_ascii_lowercase(),
+        "web.whatsapp.com",
+    ) {
         "whatsapp-title"
     } else {
         "unsupported"
@@ -371,7 +511,7 @@ async fn open_service(
     storage_key: String,
     allow_notifications: bool,
 ) {
-    use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize};
+    use tauri::{Manager, PhysicalPosition, PhysicalSize};
 
     let Some((webview_url, initialization_script)) =
         service_webview_setup(&url, allow_notifications)
@@ -449,19 +589,12 @@ async fn open_service(
         }
 
         let builder = builder
-            .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
+            .user_agent(supported_edge_user_agent())
             .initialization_script(&initialization_script)
             .on_navigation(move |url| {
                 if url.host_str() == Some("ferx.notify") {
                     if let Some(payload_str) = url.path().strip_prefix('/') {
-                        if let Some(payload) = parse_badge_payload(payload_str) {
-                            let normalized = match payload {
-                                BadgePayload::Count(count) => count.to_string(),
-                                BadgePayload::Unknown => "-1".to_string(),
-                                BadgePayload::Clear => "0".to_string(),
-                            };
-                            let _ = app_handle.emit("update-badge", format!("{}:{}", service_id, normalized));
-                        }
+                        emit_badge_update(&app_handle, &service_id, payload_str);
                     }
                     return false;
                 }
@@ -499,7 +632,7 @@ async fn load_service(
     storage_key: String,
     allow_notifications: bool,
 ) {
-    use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize};
+    use tauri::{Manager, PhysicalPosition, PhysicalSize};
 
     if app.get_webview(&id).is_some() {
         return;
@@ -540,19 +673,12 @@ async fn load_service(
         }
 
         let builder = builder
-            .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
+            .user_agent(supported_edge_user_agent())
             .initialization_script(&initialization_script)
             .on_navigation(move |url| {
                 if url.host_str() == Some("ferx.notify") {
                     if let Some(payload_str) = url.path().strip_prefix('/') {
-                        if let Some(payload) = parse_badge_payload(payload_str) {
-                            let normalized = match payload {
-                                BadgePayload::Count(count) => count.to_string(),
-                                BadgePayload::Unknown => "-1".to_string(),
-                                BadgePayload::Clear => "0".to_string(),
-                            };
-                            let _ = app_handle.emit("update-badge", format!("{}:{}", service_id, normalized));
-                        }
+                        emit_badge_update(&app_handle, &service_id, payload_str);
                     }
                     return false;
                 }
@@ -693,6 +819,7 @@ pub fn run() {
             open_service,
             hide_all_webviews,
             reload_webview,
+            report_outlook_badge,
             delete_webview,
             show_context_menu,
             load_service,

@@ -1,3 +1,5 @@
+use crate::service_runtime::{microsoft_service_kind, MicrosoftServiceKind};
+
 pub(crate) fn external_webview_url(raw: &str) -> Option<tauri::WebviewUrl> {
     raw.parse().ok().map(tauri::WebviewUrl::External)
 }
@@ -229,14 +231,170 @@ fn badge_engine_script(strategy_name: &str) -> String {
     )
 }
 
+fn outlook_badge_engine_script(strategy_name: &str) -> String {
+    format!(
+        r#"
+    (() => {{
+        const invoke = window.__TAURI_INTERNALS__?.invoke;
+        if (typeof invoke !== 'function') return;
+
+        window.__ferx_badge_strategy = '{strategy_name}';
+        window.__ferx_last_badge_state = window.__ferx_last_badge_state || '__ferx:init__';
+        window.__ferx_badge_dom_timer = window.__ferx_badge_dom_timer || null;
+
+        const normalizeTitle = (title) => (title || '').replace(/[\u200E\u200F\u200B-\u200D]/g, '').trim();
+        const titleCountState = (title) => {{
+            const normalized = normalizeTitle(title);
+            const match = normalized.match(/\((\d+)\)/) || normalized.match(/\[(\d+)\]/);
+            if (!match) return 'clear';
+
+            const count = parseInt(match[1], 10);
+            return Number.isFinite(count) && count > 0 ? 'count:' + count : 'clear';
+        }};
+
+        const parseFolderCount = (text, label) => {{
+            const collapsed = (text || '').replace(/\s+/g, ' ').trim();
+            const escapedLabel = label.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
+            const match = collapsed.match(new RegExp('(?:^|\\b)' + escapedLabel + '\\s*(\\d+)(?:\\b|$)', 'i'));
+            if (!match) return null;
+
+            const count = parseInt(match[1], 10);
+            return Number.isFinite(count) && count > 0 ? count : 0;
+        }};
+
+        const isVisibleNode = (node) => {{
+            if (!node || typeof node.getBoundingClientRect !== 'function') return false;
+            const rect = node.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+        }};
+
+        const outlookFolderState = () => {{
+            const rows = Array.from(document.querySelectorAll('[role="treeitem"], [role="option"]'));
+            let bestCount = null;
+
+            for (const row of rows) {{
+                if (!isVisibleNode(row)) continue;
+
+                const text = (row.innerText || row.textContent || '').trim();
+                if (!text) continue;
+
+                const lower = text.toLowerCase();
+                if (!lower.includes('inbox') && !lower.includes('kotak masuk')) continue;
+
+                const count = parseFolderCount(text, 'Inbox') ?? parseFolderCount(text, 'Kotak Masuk');
+                if (count === null) continue;
+
+                bestCount = Math.max(bestCount || 0, count);
+            }}
+
+            if (bestCount === null) return null;
+            return bestCount > 0 ? 'count:' + bestCount : 'clear';
+        }};
+
+        const emitBadgeState = async (nextState) => {{
+            let payload = nextState;
+            if (payload === 'unknown') {{
+                payload = 'unknown';
+            }} else if (typeof payload === 'string' && payload.startsWith('count:')) {{
+                payload = payload;
+            }} else {{
+                payload = 'clear';
+            }}
+
+            if (payload === window.__ferx_last_badge_state) return;
+
+            window.__ferx_last_badge_state = payload;
+            try {{
+                await invoke('report_outlook_badge', {{ payload }});
+            }} catch (_error) {{
+                window.__ferx_last_badge_state = '__ferx:error__';
+            }}
+        }};
+
+        const evaluateBadgeState = async () => {{
+            try {{
+                await emitBadgeState(outlookFolderState() || titleCountState(document.title));
+            }} catch (_error) {{
+                await emitBadgeState('clear');
+            }}
+        }};
+
+        const scheduleDomEvaluation = () => {{
+            if (window.__ferx_badge_dom_timer) clearTimeout(window.__ferx_badge_dom_timer);
+            window.__ferx_badge_dom_timer = window.setTimeout(() => {{
+                window.__ferx_badge_dom_timer = null;
+                void evaluateBadgeState();
+            }}, 150);
+        }};
+
+        const observeTitle = () => {{
+            const target = document.head || document.documentElement;
+            if (!target) return;
+
+            new MutationObserver(() => {{
+                void evaluateBadgeState();
+            }}).observe(target, {{
+                childList: true,
+                subtree: true,
+                characterData: true
+            }});
+        }};
+
+        const observeDom = () => {{
+            const target = document.body || document.documentElement;
+            if (!target) return;
+
+            new MutationObserver(() => scheduleDomEvaluation()).observe(target, {{
+                childList: true,
+                subtree: true,
+                characterData: true
+            }});
+        }};
+
+        const start = () => {{
+            observeTitle();
+            observeDom();
+            void evaluateBadgeState();
+        }};
+
+        if (document.readyState === 'loading') {{
+            document.addEventListener('DOMContentLoaded', start, {{ once: true }});
+        }} else {{
+            start();
+        }}
+
+        window.addEventListener('focus', () => {{
+            void evaluateBadgeState();
+        }});
+        window.addEventListener('hashchange', () => {{
+            void evaluateBadgeState();
+        }});
+        window.addEventListener('popstate', () => {{
+            void evaluateBadgeState();
+        }});
+    }})();
+"#
+    )
+}
+
 fn injected_js_for_url(url: &str, allow_notifications: bool) -> String {
     let strategy_name = crate::badge_strategy_for_url(url);
-    format!(
-        "{}{}{}",
-        notification_script(allow_notifications),
-        common_webview_script(),
-        badge_engine_script(strategy_name)
-    )
+    let microsoft_service = microsoft_service_kind(url);
+
+    if matches!(microsoft_service, Some(MicrosoftServiceKind::Teams)) {
+        String::new()
+    } else {
+        format!(
+            "{}{}{}",
+            notification_script(allow_notifications),
+            common_webview_script(),
+            match microsoft_service {
+                Some(MicrosoftServiceKind::Outlook) => outlook_badge_engine_script(strategy_name),
+                Some(MicrosoftServiceKind::Teams) => String::new(),
+                None => badge_engine_script(strategy_name),
+            }
+        )
+    }
 }
 
 #[cfg(test)]
