@@ -4,7 +4,7 @@ mod service_webview;
 
 use badge_payload::{parse_badge_payload, BadgePayload};
 use service_runtime::{extract_hostname, hostname_matches};
-use service_webview::service_webview_setup;
+use service_webview::{service_webview_setup, user_agent_for_url};
 use std::{path::PathBuf, sync::Mutex};
 use tauri::{AppHandle, Manager};
 
@@ -47,7 +47,9 @@ fn data_store_identifier_for_storage_key(storage_key: &str) -> [u8; 16] {
 mod tests {
     use super::{badge_strategy_for_url, data_store_identifier_for_storage_key};
     use crate::service_runtime::{extract_hostname, hostname_matches};
-    use crate::service_webview::{external_webview_url, injected_js, service_webview_setup};
+    use crate::service_webview::{
+        external_webview_url, injected_js, service_webview_setup, user_agent_for_url,
+    };
 
     #[test]
     fn data_store_identifier_is_stable_for_same_storage_key() {
@@ -184,8 +186,117 @@ mod tests {
             panic!("expected valid external webview setup");
         };
 
-        assert!(initialization_script.contains("window.__ferx_badge_strategy = 'teams-title'"));
-        assert!(initialization_script.contains("permission: 'denied'"));
+        assert!(!initialization_script.contains("Object.defineProperty(window, 'Notification'"));
+        assert!(!initialization_script.contains("https://ferx.notify/"));
+    }
+
+    #[test]
+    fn service_webview_setup_skips_notification_shim_for_microsoft_apps() {
+        let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
+        else {
+            panic!("expected valid teams setup");
+        };
+        let Some((_, outlook_script)) =
+            service_webview_setup("https://outlook.office.com/mail", true)
+        else {
+            panic!("expected valid outlook setup");
+        };
+
+        assert!(!teams_script.contains("Object.defineProperty(window, 'Notification'"));
+        assert!(!teams_script.contains("window.navigator.permissions.query ="));
+        assert!(!outlook_script.contains("Object.defineProperty(window, 'Notification'"));
+        assert!(!outlook_script.contains("window.navigator.permissions.query ="));
+    }
+
+    #[test]
+    fn service_webview_setup_skips_badge_navigation_for_microsoft_apps() {
+        let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
+        else {
+            panic!("expected valid teams setup");
+        };
+        let Some((_, outlook_script)) =
+            service_webview_setup("https://outlook.office.com/mail", true)
+        else {
+            panic!("expected valid outlook setup");
+        };
+
+        assert!(!teams_script.contains("https://ferx.notify/"));
+        assert!(!teams_script.contains("new MutationObserver"));
+        assert!(!outlook_script.contains("https://ferx.notify/"));
+        assert!(!outlook_script.contains("new MutationObserver"));
+    }
+
+    #[test]
+    fn teams_setup_skips_common_navigation_hooks() {
+        let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
+        else {
+            panic!("expected valid teams setup");
+        };
+
+        assert!(!teams_script.contains("https://ferx.download/"));
+        assert!(!teams_script.contains("https://ferx.shortcut/"));
+    }
+
+    #[test]
+    fn cloud_teams_setup_uses_teams_safeguards() {
+        let Some((_, teams_script)) = service_webview_setup("https://teams.cloud.microsoft/", false)
+        else {
+            panic!("expected valid cloud teams setup");
+        };
+
+        assert!(!teams_script.contains("Object.defineProperty(window, 'Notification'"));
+        assert!(!teams_script.contains("https://ferx.notify/"));
+        assert!(!teams_script.contains("https://ferx.download/"));
+        assert!(!teams_script.contains("https://ferx.shortcut/"));
+        assert_eq!(
+            user_agent_for_url("https://teams.cloud.microsoft/"),
+            Some(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
+            )
+        );
+        assert_eq!(badge_strategy_for_url("https://teams.cloud.microsoft/"), "teams-title");
+    }
+
+    #[test]
+    fn service_webview_setup_keeps_notification_shim_for_supported_apps() {
+        let Some((_, script)) = service_webview_setup("https://discord.com/channels/@me", false)
+        else {
+            panic!("expected valid discord setup");
+        };
+
+        assert!(script.contains("permission: 'denied'"));
+        assert!(script.contains("Object.defineProperty(window, 'Notification'"));
+    }
+
+    #[test]
+    fn microsoft_apps_do_not_use_spoofed_chrome_user_agent() {
+        assert_eq!(user_agent_for_url("https://outlook.office.com/mail"), None);
+    }
+
+    #[test]
+    fn teams_apps_use_supported_edge_user_agent() {
+        assert_eq!(
+            user_agent_for_url("https://teams.microsoft.com"),
+            Some(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
+            )
+        );
+        assert_eq!(
+            user_agent_for_url("https://teams.cloud.microsoft/"),
+            Some(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
+            )
+        );
+    }
+
+    #[test]
+    fn non_microsoft_apps_keep_spoofed_chrome_user_agent() {
+        assert_eq!(
+            user_agent_for_url("https://discord.com/channels/@me"),
+            Some(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+            )
+        );
     }
 
     #[test]
@@ -354,7 +465,9 @@ fn badge_strategy_for_url(url: &str) -> &'static str {
         || hostname_matches(&hostname, "outlook.live.com")
     {
         "outlook-folder-dom"
-    } else if hostname_matches(&hostname, "teams.microsoft.com") {
+    } else if hostname_matches(&hostname, "teams.microsoft.com")
+        || hostname_matches(&hostname, "teams.cloud.microsoft")
+    {
         "teams-title"
     } else if hostname_matches(&hostname, "web.whatsapp.com") {
         "whatsapp-title"
@@ -448,10 +561,13 @@ async fn open_service(
             builder = builder.data_directory(data_dir);
         }
 
-        let builder = builder
-            .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
-            .initialization_script(&initialization_script)
-            .on_navigation(move |url| {
+        let builder = if let Some(user_agent) = user_agent_for_url(&url) {
+            builder.user_agent(user_agent)
+        } else {
+            builder
+        }
+        .initialization_script(&initialization_script)
+        .on_navigation(move |url| {
                 if url.host_str() == Some("ferx.notify") {
                     if let Some(payload_str) = url.path().strip_prefix('/') {
                         if let Some(payload) = parse_badge_payload(payload_str) {
@@ -539,10 +655,13 @@ async fn load_service(
             builder = builder.data_directory(data_dir);
         }
 
-        let builder = builder
-            .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
-            .initialization_script(&initialization_script)
-            .on_navigation(move |url| {
+        let builder = if let Some(user_agent) = user_agent_for_url(&url) {
+            builder.user_agent(user_agent)
+        } else {
+            builder
+        }
+        .initialization_script(&initialization_script)
+        .on_navigation(move |url| {
                 if url.host_str() == Some("ferx.notify") {
                     if let Some(payload_str) = url.path().strip_prefix('/') {
                         if let Some(payload) = parse_badge_payload(payload_str) {

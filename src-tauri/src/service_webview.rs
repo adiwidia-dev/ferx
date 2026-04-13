@@ -1,5 +1,45 @@
+use crate::service_runtime::{extract_hostname, hostname_matches};
+
 pub(crate) fn external_webview_url(raw: &str) -> Option<tauri::WebviewUrl> {
     raw.parse().ok().map(tauri::WebviewUrl::External)
+}
+
+const SPOOFED_CHROME_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36";
+const TEAMS_EDGE_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0";
+
+fn is_microsoft_service(url: &str) -> bool {
+    let hostname = extract_hostname(url)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    hostname_matches(&hostname, "teams.microsoft.com")
+        || hostname_matches(&hostname, "teams.cloud.microsoft")
+        || hostname_matches(&hostname, "outlook.office.com")
+        || hostname_matches(&hostname, "office.com")
+        || hostname_matches(&hostname, "outlook.live.com")
+}
+
+fn is_teams_service(url: &str) -> bool {
+    let hostname = extract_hostname(url)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    hostname_matches(&hostname, "teams.microsoft.com")
+        || hostname_matches(&hostname, "teams.cloud.microsoft")
+}
+
+fn should_skip_notification_shim(url: &str) -> bool {
+    is_microsoft_service(url)
+}
+
+pub(crate) fn user_agent_for_url(url: &str) -> Option<&'static str> {
+    if is_teams_service(url) {
+        Some(TEAMS_EDGE_USER_AGENT)
+    } else if is_microsoft_service(url) {
+        None
+    } else {
+        Some(SPOOFED_CHROME_USER_AGENT)
+    }
 }
 
 fn notification_script(allow_notifications: bool) -> &'static str {
@@ -233,9 +273,21 @@ fn injected_js_for_url(url: &str, allow_notifications: bool) -> String {
     let strategy_name = crate::badge_strategy_for_url(url);
     format!(
         "{}{}{}",
-        notification_script(allow_notifications),
-        common_webview_script(),
-        badge_engine_script(strategy_name)
+        if should_skip_notification_shim(url) {
+            ""
+        } else {
+            notification_script(allow_notifications)
+        },
+        if is_teams_service(url) {
+            ""
+        } else {
+            common_webview_script()
+        },
+        if is_microsoft_service(url) {
+            String::new()
+        } else {
+            badge_engine_script(strategy_name)
+        }
     )
 }
 
