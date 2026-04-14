@@ -63,6 +63,7 @@ fn emit_badge_update(app: &AppHandle, label: &str, payload: &str) {
 mod tests {
     use super::{
         badge_strategy_for_url, badge_update_event_payload, data_store_identifier_for_storage_key,
+        report_outlook_badge, AppHandle,
     };
     use crate::service_runtime::{
         extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
@@ -110,11 +111,13 @@ mod tests {
             panic!("expected valid outlook setup");
         };
 
-        assert!(script.contains("window.__TAURI_INTERNALS__?.invoke"));
         assert!(script.contains("payload = 'unknown'"));
         assert!(script.contains("payload = 'clear'"));
+        assert!(script.contains("console.info('Ferx Outlook badge payload', payload)"));
+        assert!(script.contains("window.__TAURI_INTERNALS__?.invoke"));
         assert!(script.contains("await invoke('report_outlook_badge', { payload })"));
-        assert!(!script.contains("https://ferx.notify/"));
+        assert!(!script.contains("ferx://notify/"));
+        assert!(!script.contains("await emitBadgeState('clear')"));
     }
 
     #[test]
@@ -132,6 +135,32 @@ mod tests {
             Some("outlook:0".to_string())
         );
         assert_eq!(badge_update_event_payload("outlook", "bogus"), None);
+    }
+
+    #[test]
+    fn report_outlook_badge_uses_child_webview_context_type() {
+        let _: fn(AppHandle, tauri::Webview, String) = report_outlook_badge;
+    }
+
+    #[test]
+    fn default_capability_allows_remote_outlook_origins() {
+        let capability = include_str!("../capabilities/default.json");
+
+        assert!(capability.contains("\"remote\""));
+        assert!(!capability.contains("allow-report-outlook-badge"));
+        assert!(capability.contains("https://outlook.office.com/*"));
+        assert!(capability.contains("https://office.com/*"));
+        assert!(capability.contains("https://www.office.com/*"));
+        assert!(capability.contains("https://outlook.live.com/*"));
+    }
+
+    #[test]
+    fn app_command_acl_experiment_is_not_present() {
+        let permission_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("permissions")
+            .join("report_outlook_badge.toml");
+
+        assert!(!permission_path.exists());
     }
 
     #[test]
@@ -282,7 +311,23 @@ mod tests {
         assert!(outlook_script.contains("window.__ferx_badge_strategy = 'outlook-folder-dom'"));
         assert!(outlook_script.contains("new MutationObserver"));
         assert!(outlook_script.contains("invoke('report_outlook_badge'"));
-        assert!(!outlook_script.contains("https://ferx.notify/"));
+        assert!(!outlook_script.contains("ferx://notify/"));
+    }
+
+    #[test]
+    fn outlook_badge_script_uses_screen_reader_and_folder_fallbacks() {
+        let Some((_, script)) = service_webview_setup("https://outlook.office.com/mail", false)
+        else {
+            panic!("expected valid outlook setup");
+        };
+
+        assert!(script.contains("span.screenReaderOnly"));
+        assert!(script.contains("div[role=tree]"));
+        assert!(script.contains("collectTreeCounts"));
+        assert!(script.contains("outlookScreenReaderState"));
+        assert!(script.contains("outlookFolderState"));
+        assert!(script.contains("outlookPageTextState"));
+        assert!(script.contains("console.info('Ferx Outlook state sources'"));
     }
 
     #[test]
@@ -316,7 +361,7 @@ mod tests {
 
         assert!(!teams_script.contains("https://ferx.notify/"));
         assert!(!teams_script.contains("new MutationObserver"));
-        assert!(!outlook_script.contains("https://ferx.notify/"));
+        assert!(outlook_script.contains("invoke('report_outlook_badge'"));
         assert!(outlook_script.contains("new MutationObserver"));
     }
 
@@ -470,10 +515,10 @@ async fn reload_webview(app: AppHandle, id: String) {
 #[tauri::command]
 fn report_outlook_badge(
     app: AppHandle,
-    webview_window: tauri::WebviewWindow,
+    webview: tauri::Webview,
     payload: String,
 ) {
-    emit_badge_update(&app, webview_window.label(), &payload);
+    emit_badge_update(&app, webview.label(), &payload);
 }
 
 #[tauri::command]
@@ -718,7 +763,6 @@ async fn open_service(
                 if url.host_str() == Some("ferx.download") {
                     let query = url.query_pairs().find(|(k, _)| k == "url");
                     if let Some((_, target_url)) = query {
-                        // THE FIX: Use the new OpenerExt to silence the deprecation warning
                         use tauri_plugin_opener::OpenerExt;
                         let _ = app_handle.opener().open_url(target_url.to_string(), None::<&str>);
                         let _ = app_handle.emit("show-toast", "Opening download in your browser...");
@@ -805,7 +849,6 @@ async fn load_service(
                 if url.host_str() == Some("ferx.download") {
                     let query = url.query_pairs().find(|(k, _)| k == "url");
                     if let Some((_, target_url)) = query {
-                        // THE FIX: Use the new OpenerExt here too
                         use tauri_plugin_opener::OpenerExt;
                         let _ = app_handle.opener().open_url(target_url.to_string(), None::<&str>);
                         let _ = app_handle.emit("show-toast", "Opening download in your browser...");

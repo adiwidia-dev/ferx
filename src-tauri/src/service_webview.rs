@@ -103,6 +103,9 @@ fn badge_engine_script(strategy_name: &str) -> String {
     format!(
         r#"
     (() => {{
+        const invoke = window.__TAURI_INTERNALS__?.invoke;
+        if (typeof invoke !== 'function') return;
+
         window.__ferx_badge_strategy = '{strategy_name}';
         window.__ferx_last_badge_state = window.__ferx_last_badge_state || '__ferx:init__';
         window.__ferx_badge_dom_timer = window.__ferx_badge_dom_timer || null;
@@ -134,6 +137,52 @@ fn badge_engine_script(strategy_name: &str) -> String {
             const collapsed = (text || '').replace(/\s+/g, ' ').trim();
             const escapedLabel = label.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
             const match = collapsed.match(new RegExp('(?:^|\\b)' + escapedLabel + '\\s*(\\d+)(?:\\b|$)', 'i'));
+            if (!match) return null;
+
+            const count = parseInt(match[1], 10);
+            return Number.isFinite(count) && count > 0 ? count : 0;
+        }};
+
+        const parseLooseFolderCount = (text, label) => {{
+            const collapsed = (text || '').replace(/\s+/g, ' ').trim();
+            const escapedLabel = label.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
+            const match = collapsed.match(new RegExp(escapedLabel + '.*?(\\d+)', 'i'))
+                || collapsed.match(new RegExp('(\\d+).*?' + escapedLabel, 'i'));
+            if (!match) return null;
+
+            const count = parseInt(match[1], 10);
+            return Number.isFinite(count) && count > 0 ? count : 0;
+        }};
+
+        const parseUnreadCount = (text, label) => {{
+            const collapsed = (text || '').replace(/\s+/g, ' ').trim();
+            const escapedLabel = label.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
+            const match = collapsed.match(new RegExp(escapedLabel + '.*?\\((\\d+)\\s*unread\\)', 'i'))
+                || collapsed.match(new RegExp(escapedLabel + '.*?(\\d+)\\s*unread', 'i'))
+                || collapsed.match(new RegExp('(\\d+)\\s*unread.*?' + escapedLabel, 'i'));
+            if (!match) return null;
+
+            const count = parseInt(match[1], 10);
+            return Number.isFinite(count) && count > 0 ? count : 0;
+        }};
+
+        const parseLooseFolderCount = (text, label) => {{
+            const collapsed = (text || '').replace(/\s+/g, ' ').trim();
+            const escapedLabel = label.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
+            const match = collapsed.match(new RegExp(escapedLabel + '.*?(\\d+)', 'i'))
+                || collapsed.match(new RegExp('(\\d+).*?' + escapedLabel, 'i'));
+            if (!match) return null;
+
+            const count = parseInt(match[1], 10);
+            return Number.isFinite(count) && count > 0 ? count : 0;
+        }};
+
+        const parseUnreadCount = (text, label) => {{
+            const collapsed = (text || '').replace(/\s+/g, ' ').trim();
+            const escapedLabel = label.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
+            const match = collapsed.match(new RegExp(escapedLabel + '.*?\\((\\d+)\\s*unread\\)', 'i'))
+                || collapsed.match(new RegExp(escapedLabel + '.*?(\\d+)\\s*unread', 'i'))
+                || collapsed.match(new RegExp('(\\d+)\\s*unread.*?' + escapedLabel, 'i'));
             if (!match) return null;
 
             const count = parseInt(match[1], 10);
@@ -286,43 +335,92 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
             return Number.isFinite(count) && count > 0 ? 'count:' + count : 'clear';
         }};
 
-        const parseFolderCount = (text, label) => {{
-            const collapsed = (text || '').replace(/\s+/g, ' ').trim();
-            const escapedLabel = label.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
-            const match = collapsed.match(new RegExp('(?:^|\\b)' + escapedLabel + '\\s*(\\d+)(?:\\b|$)', 'i'));
-            if (!match) return null;
-
-            const count = parseInt(match[1], 10);
-            return Number.isFinite(count) && count > 0 ? count : 0;
+        const safeParseInt = (text) => {{
+            const n = parseInt((text || '').trim(), 10);
+            return Number.isFinite(n) && n > 0 ? n : 0;
         }};
 
-        const isVisibleNode = (node) => {{
-            if (!node || typeof node.getBoundingClientRect !== 'function') return false;
-            const rect = node.getBoundingClientRect();
-            return rect.width > 0 && rect.height > 0;
+        const collectTreeCounts = (selector) => {{
+            let count = 0;
+            const el = document.querySelector(selector);
+            if (!el) return 0;
+            const spans = el.querySelectorAll('span.screenReaderOnly');
+            for (const span of spans) {{
+                if (span.previousSibling) {{
+                    count += safeParseInt(span.previousSibling.textContent);
+                }}
+            }}
+            return count;
+        }};
+
+        const outlookScreenReaderState = () => {{
+            let count = collectTreeCounts('div[role=tree]:nth-child(1)');
+            if (count > 0) return 'count:' + count;
+
+            count = collectTreeCounts('div[role=tree]:nth-child(2)');
+            if (count > 0) return 'count:' + count;
+
+            const trees = document.querySelectorAll('div[role=tree]');
+            let total = 0;
+            for (const tree of trees) {{
+                const spans = tree.querySelectorAll('span.screenReaderOnly');
+                for (const span of spans) {{
+                    if (span.previousSibling) {{
+                        total += safeParseInt(span.previousSibling.textContent);
+                    }}
+                }}
+            }}
+            return total > 0 ? 'count:' + total : null;
         }};
 
         const outlookFolderState = () => {{
-            const rows = Array.from(document.querySelectorAll('[role="treeitem"], [role="option"]'));
+            const items = document.querySelectorAll('[role="treeitem"], [role="option"]');
             let bestCount = null;
+            for (const item of items) {{
+                const texts = [
+                    item.getAttribute('aria-label'),
+                    item.getAttribute('title'),
+                    (item.innerText || item.textContent || ''),
+                ].filter((v) => typeof v === 'string' && v.trim());
 
-            for (const row of rows) {{
-                if (!isVisibleNode(row)) continue;
+                for (const text of texts) {{
+                    const lower = text.toLowerCase();
+                    if (!lower.includes('inbox') && !lower.includes('kotak masuk')) continue;
 
-                const text = (row.innerText || row.textContent || '').trim();
-                if (!text) continue;
+                    const match = text.match(/(\d+)/);
+                    if (match) {{
+                        const count = parseInt(match[1], 10);
+                        if (Number.isFinite(count) && count > 0) {{
+                            bestCount = Math.max(bestCount || 0, count);
+                        }}
+                    }}
+                }}
+            }}
+            return bestCount !== null ? 'count:' + bestCount : null;
+        }};
 
-                const lower = text.toLowerCase();
-                if (!lower.includes('inbox') && !lower.includes('kotak masuk')) continue;
+        const outlookPageTextState = () => {{
+            const bodyText = (document.body?.innerText || '').replace(/\s+/g, ' ').trim();
+            if (!bodyText) return null;
 
-                const count = parseFolderCount(text, 'Inbox') ?? parseFolderCount(text, 'Kotak Masuk');
-                if (count === null) continue;
+            const patterns = [
+                /\bInbox\s+(\d+)\b/i,
+                /\bKotak Masuk\s+(\d+)\b/i,
+                /\bInbox\s*\((\d+)\)/i,
+                /\bKotak Masuk\s*\((\d+)\)/i,
+                /\bInbox\b[^.]*?(\d+)\s*unread/i,
+                /\bKotak Masuk\b[^.]*?(\d+)\s*(?:belum dibaca|baru)/i,
+            ];
 
-                bestCount = Math.max(bestCount || 0, count);
+            for (const re of patterns) {{
+                const match = bodyText.match(re);
+                if (match) {{
+                    const count = parseInt(match[1], 10);
+                    if (Number.isFinite(count) && count > 0) return 'count:' + count;
+                }}
             }}
 
-            if (bestCount === null) return null;
-            return bestCount > 0 ? 'count:' + bestCount : 'clear';
+            return null;
         }};
 
         const emitBadgeState = async (nextState) => {{
@@ -338,19 +436,32 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
             if (payload === window.__ferx_last_badge_state) return;
 
             window.__ferx_last_badge_state = payload;
-            try {{
-                await invoke('report_outlook_badge', {{ payload }});
-            }} catch (_error) {{
-                window.__ferx_last_badge_state = '__ferx:error__';
-            }}
+            console.info('Ferx Outlook badge payload', payload);
+            await invoke('report_outlook_badge', {{ payload }});
         }};
 
         const evaluateBadgeState = async () => {{
+            let nextState = 'clear';
             try {{
-                await emitBadgeState(outlookFolderState() || titleCountState(document.title));
+                const screenReaderState = outlookScreenReaderState();
+                const folderState = outlookFolderState();
+                const pageTextState = outlookPageTextState();
+                const titleState = titleCountState(document.title);
+                console.info('Ferx Outlook state sources', {{
+                    screenReaderState,
+                    folderState,
+                    pageTextState,
+                    titleState,
+                    treesFound: document.querySelectorAll('div[role=tree]').length,
+                    screenReadersFound: document.querySelectorAll('span.screenReaderOnly').length,
+                }});
+
+                nextState = screenReaderState || folderState || pageTextState || titleState;
             }} catch (_error) {{
-                await emitBadgeState('clear');
+                nextState = 'clear';
             }}
+
+            await emitBadgeState(nextState);
         }};
 
         const scheduleDomEvaluation = () => {{
@@ -358,7 +469,7 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
             window.__ferx_badge_dom_timer = window.setTimeout(() => {{
                 window.__ferx_badge_dom_timer = null;
                 void evaluateBadgeState();
-            }}, 150);
+            }}, 250);
         }};
 
         const observeTitle = () => {{

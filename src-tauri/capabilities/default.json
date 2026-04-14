@@ -5,6 +5,14 @@
   "windows": [
     "main"
   ],
+  "remote": {
+    "urls": [
+      "https://outlook.office.com/*",
+      "https://office.com/*",
+      "https://www.office.com/*",
+      "https://outlook.live.com/*"
+    ]
+  },
   "permissions": [
     "core:default",
     "core:webview:allow-create-webview",
