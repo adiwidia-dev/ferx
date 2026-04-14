@@ -5,7 +5,7 @@ mod service_webview;
 use badge_payload::{parse_badge_payload, BadgePayload};
 use service_runtime::{extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind};
 use service_webview::{service_webview_setup, user_agent_for_url};
-use std::{path::PathBuf, sync::Mutex};
+use std::{path::PathBuf, sync::Mutex, sync::OnceLock};
 use tauri::{AppHandle, Emitter, Manager};
 
 struct ActiveWebview(Mutex<String>);
@@ -462,9 +462,48 @@ mod tests {
         assert_eq!(
             user_agent_for_url("https://discord.com/channels/@me"),
             Some(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
             )
         );
+    }
+
+    #[test]
+    fn youtube_music_setup_includes_google_auth_compat() {
+        let Some((_, script)) =
+            service_webview_setup("https://music.youtube.com/", false)
+        else {
+            panic!("expected valid youtube music setup");
+        };
+
+        assert!(script.contains("window.webkit"));
+        assert!(script.contains("messageHandlers"));
+        assert!(script.contains("'webdriver'"));
+        assert!(script.contains("Google Inc."));
+        assert!(script.contains("Google Chrome"));
+        assert!(script.contains("window.chrome"));
+        assert!(script.contains("navigator.userAgentData"));
+        assert!(script.contains("unhandledrejection"));
+    }
+
+    #[test]
+    fn google_services_use_chrome_user_agent() {
+        assert_eq!(
+            user_agent_for_url("https://music.youtube.com/"),
+            Some(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
+            )
+        );
+    }
+
+    #[test]
+    fn non_google_setup_omits_google_auth_compat() {
+        let Some((_, script)) =
+            service_webview_setup("https://discord.com/channels/@me", false)
+        else {
+            panic!("expected valid discord setup");
+        };
+
+        assert!(!script.contains("messageHandlers"));
     }
 
     #[test]
@@ -660,18 +699,27 @@ fn show_context_menu(app: tauri::AppHandle, window: tauri::Window, id: String, d
     let _ = window.popup_menu(&menu);
 }
 
+struct TrayIcons {
+    normal: tauri::image::Image<'static>,
+    unread: tauri::image::Image<'static>,
+}
+
+fn cached_tray_icons() -> &'static TrayIcons {
+    static ICONS: OnceLock<TrayIcons> = OnceLock::new();
+    ICONS.get_or_init(|| TrayIcons {
+        normal: tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))
+            .expect("Failed to decode tray.png"),
+        unread: tauri::image::Image::from_bytes(include_bytes!("../icons/tray-unread.png"))
+            .expect("Failed to decode tray-unread.png"),
+    })
+}
+
 #[tauri::command]
 fn update_tray_icon(app: tauri::AppHandle, has_unread: bool) {
     if let Some(tray) = app.tray_by_id("ferx_tray") {
-        let icon_bytes = if has_unread {
-            include_bytes!("../icons/tray-unread.png").as_slice()
-        } else {
-            include_bytes!("../icons/tray.png").as_slice()
-        };
-
-        if let Ok(image) = tauri::image::Image::from_bytes(icon_bytes) {
-            let _ = tray.set_icon(Some(image));
-        }
+        let icons = cached_tray_icons();
+        let icon = if has_unread { &icons.unread } else { &icons.normal };
+        let _ = tray.set_icon(Some(icon.clone()));
     }
 }
 
