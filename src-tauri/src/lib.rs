@@ -294,8 +294,8 @@ mod tests {
         };
 
         assert!(!initialization_script.contains("Object.defineProperty(window, 'Notification'"));
-        assert!(!initialization_script.contains("window.location.href = 'https://ferx.download/?url='"));
-        assert!(!initialization_script.contains("window.location.href = 'https://ferx.shortcut/' + key"));
+        assert!(initialization_script.contains("window.location.href = 'https://ferx.download/?url='"));
+        assert!(initialization_script.contains("window.location.href = 'https://ferx.shortcut/' + key"));
         assert!(!initialization_script.contains("window.__ferx_badge_strategy = 'teams-title'"));
         assert!(!initialization_script.contains("https://ferx.notify/"));
     }
@@ -366,14 +366,14 @@ mod tests {
     }
 
     #[test]
-    fn teams_setup_skips_common_navigation_hooks() {
+    fn teams_setup_keeps_common_navigation_hooks() {
         let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
         else {
             panic!("expected valid teams setup");
         };
 
-        assert!(!teams_script.contains("https://ferx.download/"));
-        assert!(!teams_script.contains("https://ferx.shortcut/"));
+        assert!(teams_script.contains("https://ferx.download/"));
+        assert!(teams_script.contains("https://ferx.shortcut/"));
     }
 
     #[test]
@@ -385,8 +385,8 @@ mod tests {
 
         assert!(!teams_script.contains("Object.defineProperty(window, 'Notification'"));
         assert!(!teams_script.contains("https://ferx.notify/"));
-        assert!(!teams_script.contains("https://ferx.download/"));
-        assert!(!teams_script.contains("https://ferx.shortcut/"));
+        assert!(teams_script.contains("https://ferx.download/"));
+        assert!(teams_script.contains("https://ferx.shortcut/"));
         assert_eq!(
             user_agent_for_url("https://teams.cloud.microsoft/"),
             Some(
@@ -439,7 +439,7 @@ mod tests {
     }
 
     #[test]
-    fn teams_cloud_setup_keeps_supported_edge_user_agent_and_no_badge_script() {
+    fn teams_cloud_setup_keeps_supported_edge_user_agent_and_common_script() {
         let Some((_, teams_script)) =
             service_webview_setup("https://teams.cloud.microsoft/", false)
         else {
@@ -452,7 +452,9 @@ mod tests {
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
             )
         );
-        assert!(teams_script.is_empty());
+        assert!(!teams_script.is_empty());
+        assert!(teams_script.contains("https://ferx.download/"));
+        assert!(!teams_script.contains("https://ferx.notify/"));
     }
 
     #[test]

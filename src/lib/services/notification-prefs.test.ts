@@ -130,4 +130,24 @@ describe("countTrayRelevantUnreadServices", () => {
 
     expect(count).toBe(1);
   });
+
+  it("excludes disabled services from the tray count", () => {
+    const count = countTrayRelevantUnreadServices([
+      {
+        id: "one",
+        name: "Slack",
+        url: "https://slack.com",
+        storageKey: "storage-one",
+        badge: 3,
+        disabled: true,
+        notificationPrefs: {
+          showBadge: true,
+          affectTray: true,
+          allowNotifications: true,
+        },
+      },
+    ]);
+
+    expect(count).toBe(0);
+  });
 });

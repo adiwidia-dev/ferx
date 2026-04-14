@@ -13,8 +13,29 @@ describe("resolveBadgeStrategy", () => {
     );
   });
 
+  it("resolves outlook.live.com to the outlook folder strategy", () => {
+    expect(resolveBadgeStrategy("https://outlook.live.com/mail/")).toBe(
+      "outlook-folder-dom",
+    );
+  });
+
+  it("resolves office.com to the outlook folder strategy", () => {
+    expect(resolveBadgeStrategy("https://office.com/mail")).toBe(
+      "outlook-folder-dom",
+    );
+    expect(resolveBadgeStrategy("https://www.office.com/mail")).toBe(
+      "outlook-folder-dom",
+    );
+  });
+
   it("resolves Teams URLs to the title numeric strategy", () => {
     expect(resolveBadgeStrategy("https://teams.microsoft.com/v2/")).toBe(
+      "teams-title",
+    );
+  });
+
+  it("resolves Teams cloud URLs to the title numeric strategy", () => {
+    expect(resolveBadgeStrategy("https://teams.cloud.microsoft/")).toBe(
       "teams-title",
     );
   });
@@ -44,6 +65,9 @@ describe("resolveBadgeStrategy", () => {
       "unsupported",
     );
     expect(resolveBadgeStrategy("https://fake-whatsapp.com.evil.test")).toBe(
+      "unsupported",
+    );
+    expect(resolveBadgeStrategy("https://config.office.com")).toBe(
       "unsupported",
     );
   });

@@ -33,15 +33,23 @@ export function resolveBadgeStrategy(url: string): BadgeStrategyName {
     return "unsupported";
   }
 
-  if (matchesHostname(hostname, "outlook.office.com")) {
+  if (
+    hostname === "outlook.office.com" ||
+    hostname === "outlook.live.com" ||
+    hostname === "office.com" ||
+    hostname === "www.office.com"
+  ) {
     return "outlook-folder-dom";
   }
 
-  if (matchesHostname(hostname, "teams.microsoft.com")) {
+  if (
+    matchesHostname(hostname, "teams.microsoft.com") ||
+    matchesHostname(hostname, "teams.cloud.microsoft")
+  ) {
     return "teams-title";
   }
 
-  if (matchesHostname(hostname, "whatsapp.com")) {
+  if (matchesHostname(hostname, "web.whatsapp.com")) {
     return "whatsapp-title";
   }
 

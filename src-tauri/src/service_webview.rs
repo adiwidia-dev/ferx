@@ -106,8 +106,11 @@ fn badge_engine_script(strategy_name: &str) -> String {
         const invoke = window.__TAURI_INTERNALS__?.invoke;
         if (typeof invoke !== 'function') return;
 
+        if (window.__ferx_badge_observers_active) return;
+        window.__ferx_badge_observers_active = true;
+
         window.__ferx_badge_strategy = '{strategy_name}';
-        window.__ferx_last_badge_state = window.__ferx_last_badge_state || '__ferx:init__';
+        window.__ferx_last_badge_state = '__ferx:init__';
         window.__ferx_badge_dom_timer = window.__ferx_badge_dom_timer || null;
 
         const normalizeTitle = (title) => (title || '').replace(/[\u200E\u200F\u200B-\u200D]/g, '').trim();
@@ -137,29 +140,6 @@ fn badge_engine_script(strategy_name: &str) -> String {
             const collapsed = (text || '').replace(/\s+/g, ' ').trim();
             const escapedLabel = label.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
             const match = collapsed.match(new RegExp('(?:^|\\b)' + escapedLabel + '\\s*(\\d+)(?:\\b|$)', 'i'));
-            if (!match) return null;
-
-            const count = parseInt(match[1], 10);
-            return Number.isFinite(count) && count > 0 ? count : 0;
-        }};
-
-        const parseLooseFolderCount = (text, label) => {{
-            const collapsed = (text || '').replace(/\s+/g, ' ').trim();
-            const escapedLabel = label.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
-            const match = collapsed.match(new RegExp(escapedLabel + '.*?(\\d+)', 'i'))
-                || collapsed.match(new RegExp('(\\d+).*?' + escapedLabel, 'i'));
-            if (!match) return null;
-
-            const count = parseInt(match[1], 10);
-            return Number.isFinite(count) && count > 0 ? count : 0;
-        }};
-
-        const parseUnreadCount = (text, label) => {{
-            const collapsed = (text || '').replace(/\s+/g, ' ').trim();
-            const escapedLabel = label.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
-            const match = collapsed.match(new RegExp(escapedLabel + '.*?\\((\\d+)\\s*unread\\)', 'i'))
-                || collapsed.match(new RegExp(escapedLabel + '.*?(\\d+)\\s*unread', 'i'))
-                || collapsed.match(new RegExp('(\\d+)\\s*unread.*?' + escapedLabel, 'i'));
             if (!match) return null;
 
             const count = parseInt(match[1], 10);
@@ -321,14 +301,17 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
         const invoke = window.__TAURI_INTERNALS__?.invoke;
         if (typeof invoke !== 'function') return;
 
+        if (window.__ferx_badge_observers_active) return;
+        window.__ferx_badge_observers_active = true;
+
         window.__ferx_badge_strategy = '{strategy_name}';
-        window.__ferx_last_badge_state = window.__ferx_last_badge_state || '__ferx:init__';
+        window.__ferx_last_badge_state = '__ferx:init__';
         window.__ferx_badge_dom_timer = window.__ferx_badge_dom_timer || null;
 
         const normalizeTitle = (title) => (title || '').replace(/[\u200E\u200F\u200B-\u200D]/g, '').trim();
         const titleCountState = (title) => {{
             const normalized = normalizeTitle(title);
-            const match = normalized.match(/\((\d+)\)/) || normalized.match(/\[(\d+)\]/);
+            const match = normalized.match(/\((\d+)\)/) || normalized.match(/\[(\d+)\]/) || normalized.match(/^(\d+)\s*(?:unread|baru|new|messages?)/i);
             if (!match) return 'clear';
 
             const count = parseInt(match[1], 10);
@@ -526,24 +509,20 @@ fn injected_js_for_url(url: &str, allow_notifications: bool) -> String {
     let strategy_name = crate::badge_strategy_for_url(url);
     let microsoft_service = microsoft_service_kind(url);
 
-    if matches!(microsoft_service, Some(MicrosoftServiceKind::Teams)) {
-        String::new()
-    } else {
-        format!(
-            "{}{}{}",
-            if should_skip_notification_shim(url) {
-                ""
-            } else {
-                notification_script(allow_notifications)
-            },
-            common_webview_script(),
-            match microsoft_service {
-                Some(MicrosoftServiceKind::Outlook) => outlook_badge_engine_script(strategy_name),
-                Some(MicrosoftServiceKind::Teams) => String::new(),
-                None => badge_engine_script(strategy_name),
-            }
-        )
-    }
+    format!(
+        "{}{}{}",
+        if should_skip_notification_shim(url) {
+            ""
+        } else {
+            notification_script(allow_notifications)
+        },
+        common_webview_script(),
+        match microsoft_service {
+            Some(MicrosoftServiceKind::Outlook) => outlook_badge_engine_script(strategy_name),
+            Some(MicrosoftServiceKind::Teams) => String::new(),
+            None => badge_engine_script(strategy_name),
+        }
+    )
 }
 
 #[cfg(test)]

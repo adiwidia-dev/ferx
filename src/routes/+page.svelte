@@ -25,7 +25,10 @@
     toastMessage: string;
   } {
     const { services, recoveredFromCorruption } = readPageStoredServices(saved);
-    const startupServices = services as PageService[];
+    const startupServices = (services as PageService[]).map((s) => ({
+      ...s,
+      badge: undefined,
+    }));
     const firstEnabled = startupServices.find((service) => !service.disabled);
 
     return {

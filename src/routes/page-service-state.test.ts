@@ -66,6 +66,7 @@ describe("readStartupState", () => {
             storageKey: "storage/broken",
           }),
           storageKey: "storage-88888888",
+          badge: undefined,
         },
       ],
       activeId: "broken",

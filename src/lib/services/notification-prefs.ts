@@ -66,6 +66,9 @@ export function countTrayRelevantUnreadServices(
 ) {
   return services.filter(
     (service) =>
-      service.notificationPrefs.affectTray && !!service.badge && service.badge !== 0,
+      !service.disabled &&
+      service.notificationPrefs.affectTray &&
+      !!service.badge &&
+      service.badge !== 0,
   ).length;
 }
