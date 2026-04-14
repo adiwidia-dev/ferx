@@ -462,9 +462,48 @@ mod tests {
         assert_eq!(
             user_agent_for_url("https://discord.com/channels/@me"),
             Some(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
             )
         );
+    }
+
+    #[test]
+    fn youtube_music_setup_includes_google_auth_compat() {
+        let Some((_, script)) =
+            service_webview_setup("https://music.youtube.com/", false)
+        else {
+            panic!("expected valid youtube music setup");
+        };
+
+        assert!(script.contains("window.webkit"));
+        assert!(script.contains("messageHandlers"));
+        assert!(script.contains("'webdriver'"));
+        assert!(script.contains("Google Inc."));
+        assert!(script.contains("Google Chrome"));
+        assert!(script.contains("window.chrome"));
+        assert!(script.contains("navigator.userAgentData"));
+        assert!(script.contains("unhandledrejection"));
+    }
+
+    #[test]
+    fn google_services_use_chrome_user_agent() {
+        assert_eq!(
+            user_agent_for_url("https://music.youtube.com/"),
+            Some(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
+            )
+        );
+    }
+
+    #[test]
+    fn non_google_setup_omits_google_auth_compat() {
+        let Some((_, script)) =
+            service_webview_setup("https://discord.com/channels/@me", false)
+        else {
+            panic!("expected valid discord setup");
+        };
+
+        assert!(!script.contains("messageHandlers"));
     }
 
     #[test]
