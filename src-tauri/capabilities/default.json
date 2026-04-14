@@ -24,6 +24,7 @@
     "core:default",
     "core:webview:allow-create-webview",
     "core:webview:allow-webview-hide",
-    "core:webview:allow-webview-show"
+    "core:webview:allow-webview-show",
+    "mcp-bridge:default"
   ]
 }
