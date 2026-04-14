@@ -731,10 +731,10 @@ axobject-query@^4.1.0:
   resolved "https://registry.npmmirror.com/axobject-query/-/axobject-query-4.1.0.tgz"
   integrity sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==
 
-bits-ui@^2.16.3:
-  version "2.17.2"
-  resolved "https://registry.npmmirror.com/bits-ui/-/bits-ui-2.17.2.tgz"
-  integrity sha512-Xbmrlf3ft/5RtMgUL/uam+rcrWYM4LoIGosklV34iSE6GGsPFWgaivzzX60rnWjWlG5F7ZuXXZ4iag949UekMA==
+bits-ui@^2.17.3:
+  version "2.17.3"
+  resolved "https://registry.yarnpkg.com/bits-ui/-/bits-ui-2.17.3.tgz#6ddf48b722a9de3c3a3ba816c9bf254f317b0d2a"
+  integrity sha512-Bef41uY9U2jaBJHPhcPvmBNkGec5Wx2z6eioDsTmsaR2vH4QoaOcPi75gzCG3+/2TNr6v/qBwzgWNPYCxNtrEA==
   dependencies:
     "@floating-ui/core" "^1.7.1"
     "@floating-ui/dom" "^1.7.1"
