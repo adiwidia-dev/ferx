@@ -1,7 +1,7 @@
 export type BadgeStrategyName =
   | "title-numeric"
   | "whatsapp-title"
-  | "teams-title"
+  | "teams-dom"
   | "outlook-folder-dom"
   | "unsupported";
 
@@ -46,7 +46,7 @@ export function resolveBadgeStrategy(url: string): BadgeStrategyName {
     matchesHostname(hostname, "teams.microsoft.com") ||
     matchesHostname(hostname, "teams.cloud.microsoft")
   ) {
-    return "teams-title";
+    return "teams-dom";
   }
 
   if (matchesHostname(hostname, "web.whatsapp.com")) {
@@ -67,7 +67,13 @@ export function getBadgeCapability(
         usesTitleObserver: true,
         usesFallbackPolling: false,
       };
-    case "teams-title":
+    case "teams-dom":
+      return {
+        kind: "hybrid-title-dom",
+        usesMutationObserver: true,
+        usesTitleObserver: true,
+        usesFallbackPolling: false,
+      };
     case "whatsapp-title":
       return {
         kind: "title-numeric",

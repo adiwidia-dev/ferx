@@ -25,8 +25,13 @@ pub(crate) fn microsoft_service_kind(url: &str) -> Option<MicrosoftServiceKind> 
 
     if matches!(
         hostname.as_str(),
-        "outlook.office.com" | "outlook.live.com" | "office.com" | "www.office.com"
-    ) {
+        "outlook.office.com"
+            | "outlook.office365.com"
+            | "outlook.live.com"
+            | "office.com"
+            | "www.office.com"
+    ) || hostname_matches(&hostname, "outlook.cloud.microsoft")
+    {
         Some(MicrosoftServiceKind::Outlook)
     } else if hostname_matches(&hostname, "teams.microsoft.com")
         || hostname_matches(&hostname, "teams.cloud.microsoft")

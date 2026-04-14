@@ -28,15 +28,15 @@ describe("resolveBadgeStrategy", () => {
     );
   });
 
-  it("resolves Teams URLs to the title numeric strategy", () => {
+  it("resolves Teams URLs to the teams-dom strategy", () => {
     expect(resolveBadgeStrategy("https://teams.microsoft.com/v2/")).toBe(
-      "teams-title",
+      "teams-dom",
     );
   });
 
-  it("resolves Teams cloud URLs to the title numeric strategy", () => {
+  it("resolves Teams cloud URLs to the teams-dom strategy", () => {
     expect(resolveBadgeStrategy("https://teams.cloud.microsoft/")).toBe(
-      "teams-title",
+      "teams-dom",
     );
   });
 
@@ -86,6 +86,15 @@ describe("getBadgeCapability", () => {
   it("marks Outlook as a DOM-targeted observer strategy", () => {
     expect(getBadgeCapability("outlook-folder-dom")).toEqual({
       kind: "dom-targeted" satisfies BadgeStrategyKind,
+      usesMutationObserver: true,
+      usesTitleObserver: true,
+      usesFallbackPolling: false,
+    });
+  });
+
+  it("marks Teams as a hybrid title+DOM observer strategy", () => {
+    expect(getBadgeCapability("teams-dom")).toEqual({
+      kind: "hybrid-title-dom" satisfies BadgeStrategyKind,
       usesMutationObserver: true,
       usesTitleObserver: true,
       usesFallbackPolling: false,

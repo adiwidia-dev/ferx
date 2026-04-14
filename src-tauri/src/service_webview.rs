@@ -323,37 +323,35 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
             return Number.isFinite(n) && n > 0 ? n : 0;
         }};
 
-        const collectTreeCounts = (selector) => {{
-            let count = 0;
-            const el = document.querySelector(selector);
-            if (!el) return 0;
-            const spans = el.querySelectorAll('span.screenReaderOnly');
-            for (const span of spans) {{
-                if (span.previousSibling) {{
-                    count += safeParseInt(span.previousSibling.textContent);
-                }}
-            }}
-            return count;
-        }};
-
         const outlookScreenReaderState = () => {{
-            let count = collectTreeCounts('div[role=tree]:nth-child(1)');
-            if (count > 0) return 'count:' + count;
-
-            count = collectTreeCounts('div[role=tree]:nth-child(2)');
-            if (count > 0) return 'count:' + count;
-
             const trees = document.querySelectorAll('div[role=tree]');
-            let total = 0;
+            if (trees.length === 0) return null;
+
             for (const tree of trees) {{
-                const spans = tree.querySelectorAll('span.screenReaderOnly');
-                for (const span of spans) {{
-                    if (span.previousSibling) {{
-                        total += safeParseInt(span.previousSibling.textContent);
+                const children = tree.children;
+                for (const child of children) {{
+                    const childText = (child.textContent || '');
+                    const lower = childText.toLowerCase();
+                    if (!lower.includes('inbox') && !lower.includes('kotak masuk')) continue;
+
+                    const srSpans = child.querySelectorAll('span.screenReaderOnly');
+                    for (const sr of srSpans) {{
+                        if (!sr.previousSibling) continue;
+                        const count = safeParseInt(sr.previousSibling.textContent);
+                        if (count > 0) return 'count:' + count;
                     }}
+
+                    const match = childText.match(/(?:Inbox|Kotak Masuk)\D*?(\d+)/i);
+                    if (match) {{
+                        const count = parseInt(match[1], 10);
+                        if (Number.isFinite(count) && count > 0) return 'count:' + count;
+                    }}
+
+                    return 'clear';
                 }}
             }}
-            return total > 0 ? 'count:' + total : null;
+
+            return null;
         }};
 
         const outlookFolderState = () => {{
@@ -418,9 +416,13 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
 
             if (payload === window.__ferx_last_badge_state) return;
 
-            window.__ferx_last_badge_state = payload;
             console.info('Ferx Outlook badge payload', payload);
-            await invoke('report_outlook_badge', {{ payload }});
+            try {{
+                await invoke('report_outlook_badge', {{ payload }});
+                window.__ferx_last_badge_state = payload;
+            }} catch (e) {{
+                console.warn('Ferx: report_outlook_badge failed, will retry', e);
+            }}
         }};
 
         const evaluateBadgeState = async () => {{
@@ -505,6 +507,140 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
     )
 }
 
+fn teams_badge_engine_script() -> String {
+    r#"
+    (() => {
+        const invoke = window.__TAURI_INTERNALS__?.invoke;
+        if (typeof invoke !== 'function') return;
+
+        if (window.__ferx_badge_observers_active) return;
+        window.__ferx_badge_observers_active = true;
+
+        window.__ferx_last_badge_state = '__ferx:init__';
+        window.__ferx_badge_dom_timer = null;
+
+        const safeParseInt = (text) => {
+            const n = parseInt((text || '').trim(), 10);
+            return Number.isFinite(n) && n > 0 ? n : 0;
+        };
+
+        const normalizeTitle = (title) => (title || '').replace(/[\u200E\u200F\u200B-\u200D]/g, '').trim();
+
+        const titleCountState = (title) => {
+            const normalized = normalizeTitle(title);
+            const match = normalized.match(/\((\d+)\)/) || normalized.match(/\[(\d+)\]/);
+            if (!match) return null;
+
+            const count = parseInt(match[1], 10);
+            return Number.isFinite(count) && count > 0 ? count : null;
+        };
+
+        const teamsDomState = () => {
+            let total = 0;
+
+            const fuiBadges = document.querySelectorAll('.fui-Badge');
+            for (const badge of fuiBadges) {
+                total += safeParseInt(badge.textContent);
+            }
+
+            if (total > 0) return 'count:' + total;
+
+            const legacyBadges = document.querySelectorAll(
+                '.activity-badge.dot-activity-badge .activity-badge'
+            );
+            for (const badge of legacyBadges) {
+                total += safeParseInt(badge.textContent);
+            }
+
+            if (total > 0) return 'count:' + total;
+
+            return null;
+        };
+
+        const readState = () => {
+            const domState = teamsDomState();
+            if (domState) return domState;
+
+            const titleState = titleCountState(document.title);
+            if (titleState) return 'count:' + titleState;
+
+            return 'clear';
+        };
+
+        const emitBadgeState = async (nextState) => {
+            const payload = (typeof nextState === 'string' && nextState.startsWith('count:'))
+                ? nextState
+                : 'clear';
+
+            if (payload === window.__ferx_last_badge_state) return;
+
+            try {
+                await invoke('report_teams_badge', { payload });
+                window.__ferx_last_badge_state = payload;
+            } catch (e) {
+                console.warn('Ferx: report_teams_badge failed, will retry', e);
+            }
+        };
+
+        const evaluateBadgeState = async () => {
+            try {
+                await emitBadgeState(readState());
+            } catch (_error) {
+                await emitBadgeState('clear');
+            }
+        };
+
+        const scheduleDomEvaluation = () => {
+            if (window.__ferx_badge_dom_timer) clearTimeout(window.__ferx_badge_dom_timer);
+            window.__ferx_badge_dom_timer = setTimeout(() => {
+                window.__ferx_badge_dom_timer = null;
+                void evaluateBadgeState();
+            }, 250);
+        };
+
+        const observeTitle = () => {
+            const target = document.head || document.documentElement;
+            if (!target) return;
+
+            new MutationObserver(() => {
+                void evaluateBadgeState();
+            }).observe(target, {
+                childList: true,
+                subtree: true,
+                characterData: true
+            });
+        };
+
+        const observeDom = () => {
+            const target = document.body || document.documentElement;
+            if (!target) return;
+
+            new MutationObserver(() => scheduleDomEvaluation()).observe(target, {
+                childList: true,
+                subtree: true,
+                characterData: true
+            });
+        };
+
+        const start = () => {
+            observeTitle();
+            observeDom();
+            void evaluateBadgeState();
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', start, { once: true });
+        } else {
+            start();
+        }
+
+        window.addEventListener('focus', () => { void evaluateBadgeState(); });
+        window.addEventListener('hashchange', () => { void evaluateBadgeState(); });
+        window.addEventListener('popstate', () => { void evaluateBadgeState(); });
+    })();
+"#.to_string()
+}
+
 fn injected_js_for_url(url: &str, allow_notifications: bool) -> String {
     let strategy_name = crate::badge_strategy_for_url(url);
     let microsoft_service = microsoft_service_kind(url);
@@ -519,7 +655,7 @@ fn injected_js_for_url(url: &str, allow_notifications: bool) -> String {
         common_webview_script(),
         match microsoft_service {
             Some(MicrosoftServiceKind::Outlook) => outlook_badge_engine_script(strategy_name),
-            Some(MicrosoftServiceKind::Teams) => String::new(),
+            Some(MicrosoftServiceKind::Teams) => teams_badge_engine_script(),
             None => badge_engine_script(strategy_name),
         }
     )

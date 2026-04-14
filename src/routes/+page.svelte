@@ -315,7 +315,7 @@
 
   $effect(() => {
     if (isInitialized) {
-      invoke("update_tray_icon", { has_unread: hasUnreadNotifications });
+      invoke("update_tray_icon", { hasUnread: hasUnreadNotifications });
     }
   });
 

@@ -63,7 +63,7 @@ fn emit_badge_update(app: &AppHandle, label: &str, payload: &str) {
 mod tests {
     use super::{
         badge_strategy_for_url, badge_update_event_payload, data_store_identifier_for_storage_key,
-        report_outlook_badge, AppHandle,
+        report_outlook_badge, report_teams_badge, AppHandle,
     };
     use crate::service_runtime::{
         extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
@@ -116,6 +116,7 @@ mod tests {
         assert!(script.contains("console.info('Ferx Outlook badge payload', payload)"));
         assert!(script.contains("window.__TAURI_INTERNALS__?.invoke"));
         assert!(script.contains("await invoke('report_outlook_badge', { payload })"));
+        assert!(script.contains("report_outlook_badge failed, will retry"));
         assert!(!script.contains("ferx://notify/"));
         assert!(!script.contains("await emitBadgeState('clear')"));
     }
@@ -143,15 +144,24 @@ mod tests {
     }
 
     #[test]
-    fn default_capability_allows_remote_outlook_origins() {
+    fn report_teams_badge_uses_child_webview_context_type() {
+        let _: fn(AppHandle, tauri::Webview, String) = report_teams_badge;
+    }
+
+    #[test]
+    fn default_capability_allows_remote_microsoft_origins() {
         let capability = include_str!("../capabilities/default.json");
 
         assert!(capability.contains("\"remote\""));
         assert!(!capability.contains("allow-report-outlook-badge"));
         assert!(capability.contains("https://outlook.office.com/*"));
+        assert!(capability.contains("https://outlook.office365.com/*"));
+        assert!(capability.contains("https://outlook.cloud.microsoft/*"));
         assert!(capability.contains("https://office.com/*"));
         assert!(capability.contains("https://www.office.com/*"));
         assert!(capability.contains("https://outlook.live.com/*"));
+        assert!(capability.contains("https://teams.microsoft.com/*"));
+        assert!(capability.contains("https://teams.cloud.microsoft/*"));
     }
 
     #[test]
@@ -167,6 +177,14 @@ mod tests {
     fn microsoft_service_kind_centralizes_outlook_and_teams_host_matching() {
         assert_eq!(
             microsoft_service_kind("https://outlook.office.com/mail"),
+            Some(MicrosoftServiceKind::Outlook)
+        );
+        assert_eq!(
+            microsoft_service_kind("https://outlook.office365.com/mail"),
+            Some(MicrosoftServiceKind::Outlook)
+        );
+        assert_eq!(
+            microsoft_service_kind("https://outlook.cloud.microsoft/mail"),
             Some(MicrosoftServiceKind::Outlook)
         );
         assert_eq!(
@@ -191,12 +209,20 @@ mod tests {
             "outlook-folder-dom"
         );
         assert_eq!(
+            badge_strategy_for_url("https://outlook.office365.com/mail"),
+            "outlook-folder-dom"
+        );
+        assert_eq!(
+            badge_strategy_for_url("https://outlook.cloud.microsoft/mail"),
+            "outlook-folder-dom"
+        );
+        assert_eq!(
             badge_strategy_for_url("https://office.com/mail"),
             "outlook-folder-dom"
         );
         assert_eq!(
             badge_strategy_for_url("https://teams.microsoft.com"),
-            "teams-title"
+            "teams-dom"
         );
         assert_eq!(
             badge_strategy_for_url("https://web.whatsapp.com"),
@@ -296,7 +322,8 @@ mod tests {
         assert!(!initialization_script.contains("Object.defineProperty(window, 'Notification'"));
         assert!(initialization_script.contains("window.location.href = 'https://ferx.download/?url='"));
         assert!(initialization_script.contains("window.location.href = 'https://ferx.shortcut/' + key"));
-        assert!(!initialization_script.contains("window.__ferx_badge_strategy = 'teams-title'"));
+        assert!(initialization_script.contains("invoke('report_teams_badge'"));
+        assert!(initialization_script.contains(".fui-Badge"));
         assert!(!initialization_script.contains("https://ferx.notify/"));
     }
 
@@ -323,7 +350,6 @@ mod tests {
 
         assert!(script.contains("span.screenReaderOnly"));
         assert!(script.contains("div[role=tree]"));
-        assert!(script.contains("collectTreeCounts"));
         assert!(script.contains("outlookScreenReaderState"));
         assert!(script.contains("outlookFolderState"));
         assert!(script.contains("outlookPageTextState"));
@@ -360,7 +386,8 @@ mod tests {
         };
 
         assert!(!teams_script.contains("https://ferx.notify/"));
-        assert!(!teams_script.contains("new MutationObserver"));
+        assert!(teams_script.contains("new MutationObserver"));
+        assert!(teams_script.contains("invoke('report_teams_badge'"));
         assert!(outlook_script.contains("invoke('report_outlook_badge'"));
         assert!(outlook_script.contains("new MutationObserver"));
     }
@@ -393,7 +420,7 @@ mod tests {
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
             )
         );
-        assert_eq!(badge_strategy_for_url("https://teams.cloud.microsoft/"), "teams-title");
+        assert_eq!(badge_strategy_for_url("https://teams.cloud.microsoft/"), "teams-dom");
     }
 
     #[test]
@@ -410,6 +437,8 @@ mod tests {
     #[test]
     fn microsoft_apps_do_not_use_spoofed_chrome_user_agent() {
         assert_eq!(user_agent_for_url("https://outlook.office.com/mail"), None);
+        assert_eq!(user_agent_for_url("https://outlook.office365.com/mail"), None);
+        assert_eq!(user_agent_for_url("https://outlook.cloud.microsoft/mail"), None);
     }
 
     #[test]
@@ -439,7 +468,7 @@ mod tests {
     }
 
     #[test]
-    fn teams_cloud_setup_keeps_supported_edge_user_agent_and_common_script() {
+    fn teams_cloud_setup_keeps_supported_edge_user_agent_and_badge_detection() {
         let Some((_, teams_script)) =
             service_webview_setup("https://teams.cloud.microsoft/", false)
         else {
@@ -455,6 +484,8 @@ mod tests {
         assert!(!teams_script.is_empty());
         assert!(teams_script.contains("https://ferx.download/"));
         assert!(!teams_script.contains("https://ferx.notify/"));
+        assert!(teams_script.contains("invoke('report_teams_badge'"));
+        assert!(teams_script.contains(".fui-Badge"));
     }
 
     #[test]
@@ -516,6 +547,15 @@ async fn reload_webview(app: AppHandle, id: String) {
 
 #[tauri::command]
 fn report_outlook_badge(
+    app: AppHandle,
+    webview: tauri::Webview,
+    payload: String,
+) {
+    emit_badge_update(&app, webview.label(), &payload);
+}
+
+#[tauri::command]
+fn report_teams_badge(
     app: AppHandle,
     webview: tauri::Webview,
     payload: String,
@@ -645,7 +685,7 @@ fn badge_strategy_for_url(url: &str) -> &'static str {
         microsoft_service_kind(url),
         Some(MicrosoftServiceKind::Teams)
     ) {
-        "teams-title"
+        "teams-dom"
     } else if hostname_matches(
         &extract_hostname(url)
             .unwrap_or_default()
@@ -979,6 +1019,7 @@ pub fn run() {
             hide_all_webviews,
             reload_webview,
             report_outlook_badge,
+            report_teams_badge,
             delete_webview,
             show_context_menu,
             load_service,
