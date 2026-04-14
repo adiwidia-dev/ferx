@@ -296,6 +296,15 @@
 
   let isAddModalOpen = $state(false);
   let isDnd = $state(false);
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function scheduleSave() {
+    if (saveTimer) return;
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      localStorage.setItem("ferx-workspace-services", JSON.stringify(services));
+    }, 500);
+  }
   let editingServiceId = $state<string | null>(null);
   let newServiceName = $state("");
   let newServiceUrl = $state("");
@@ -307,6 +316,7 @@
   let pointerStartX = 0;
   let pointerStartY = 0;
   let isPointerDragging = $state(false);
+  let dragRafPending = false;
 
   let activeService = $derived(services.find((s) => s.id === activeId));
   let hasUnreadNotifications = $derived(
@@ -353,17 +363,18 @@
     }
 
     if (services.length > 0) {
-      // Give the main active service 1 full second to completely boot up and grab focus
+      const MAX_PRELOAD = 4;
       setTimeout(async () => {
+        let preloaded = 0;
         for (const s of services) {
+          if (preloaded >= MAX_PRELOAD) break;
           if (shouldPreloadService(s, activeId)) {
-            // Tell Rust to load the next service off-screen
             await invoke("load_service", createServiceLoadPayload(s));
-            // Wait 250ms before spawning the next one to keep CPU usage buttery smooth
-            await new Promise((r) => setTimeout(r, 250));
+            preloaded++;
+            await new Promise((r) => setTimeout(r, 800));
           }
         }
-      }, 1000);
+      }, 2000);
     }
 
     const unlistenPromise = listen("menu-action", (event) => {
@@ -406,9 +417,10 @@
         return;
       }
 
-      services = services.map((s) =>
-        s.id === targetId ? { ...s, badge: count } : s,
-      );
+      const target = services.find((s) => s.id === targetId);
+      if (target && target.badge !== count) {
+        target.badge = count;
+      }
     });
 
     const unlistenShortcutPromise = listen("switch-shortcut", (event) => {
@@ -424,6 +436,10 @@
     isInitialized = true;
 
     return () => {
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        localStorage.setItem("ferx-workspace-services", JSON.stringify(services));
+      }
       cleanupPageListeners({
         unlistenToastPromise,
         unlistenMenuPromise: unlistenPromise,
@@ -436,7 +452,8 @@
 
   $effect(() => {
     if (isInitialized) {
-      localStorage.setItem("ferx-workspace-services", JSON.stringify(services));
+      void services;
+      scheduleSave();
     }
   });
 
@@ -494,7 +511,14 @@
       return;
     }
 
-    updatePointerTarget(e.clientX, e.clientY);
+    if (dragRafPending) return;
+    const cx = e.clientX;
+    const cy = e.clientY;
+    dragRafPending = true;
+    requestAnimationFrame(() => {
+      dragRafPending = false;
+      updatePointerTarget(cx, cy);
+    });
   }
 
   function handlePointerUp(e: PointerEvent) {
@@ -621,10 +645,10 @@
 />
 
 <div
-  class="flex h-screen w-screen overflow-hidden bg-background text-foreground antialiased"
+  class="flex h-screen w-screen overflow-hidden bg-background text-foreground"
 >
   <aside
-    class="w-20 border-r flex flex-col items-center pt-14 pb-6 gap-4 bg-background/50 backdrop-blur-xl shrink-0"
+    class="w-20 border-r flex flex-col items-center pt-14 pb-6 gap-4 bg-background shrink-0"
     data-tauri-drag-region
   >
     <div class="flex flex-col items-center gap-4 w-full px-2">
@@ -830,7 +854,7 @@
         </p>
 
         <div
-          class="w-full p-8 rounded-3xl border bg-card/80 backdrop-blur-md text-card-foreground shadow-xl ring-1 ring-black/5 flex flex-col items-center gap-5"
+          class="w-full p-8 rounded-3xl border bg-card text-card-foreground shadow-xl ring-1 ring-black/5 flex flex-col items-center gap-5"
         >
           <h3 class="text-xl font-semibold text-foreground">
             Let's build your workspace
