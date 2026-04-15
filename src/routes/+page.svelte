@@ -46,6 +46,29 @@
   let editingServiceId = $state<string | null>(null);
   let newServiceName = $state("");
   let newServiceUrl = $state("");
+  let newIconBgColor = $state("");
+  let customHexInput = $state("");
+
+  const PRESET_COLORS = [
+    { label: "None", value: "" },
+    { label: "Red", value: "#EF4444" },
+    { label: "Blue", value: "#3B82F6" },
+    { label: "Green", value: "#22C55E" },
+    { label: "Amber", value: "#F59E0B" },
+    { label: "Purple", value: "#A855F7" },
+  ];
+
+  function selectPresetColor(value: string) {
+    newIconBgColor = value;
+    customHexInput = "";
+  }
+
+  function applyCustomHex() {
+    const hex = customHexInput.trim();
+    if (/^#?[0-9A-Fa-f]{6}$/.test(hex)) {
+      newIconBgColor = hex.startsWith("#") ? hex : `#${hex}`;
+    }
+  }
 
   // --- BULLETPROOF DRAG STATE (Tracking IDs instead of Indexes) ---
   let draggedId = $state<string | null>(null);
@@ -335,6 +358,10 @@
     editingServiceId = service.id;
     newServiceName = service.name;
     newServiceUrl = service.url;
+    const color = service.iconBgColor ?? "";
+    newIconBgColor = color;
+    const isCustomColor = color && !PRESET_COLORS.some((p) => p.value === color);
+    customHexInput = isCustomColor ? color : "";
     setTimeout(() => {
       isAddModalOpen = true;
     }, 50);
@@ -344,6 +371,8 @@
     editingServiceId = null;
     newServiceName = "";
     newServiceUrl = "";
+    newIconBgColor = "";
+    customHexInput = "";
     setTimeout(() => {
       isAddModalOpen = true;
     }, 50);
@@ -356,6 +385,7 @@
       editingServiceId,
       newServiceName,
       newServiceUrl,
+      newIconBgColor,
       createServiceId: () => crypto.randomUUID().slice(0, 8),
     });
 
@@ -410,9 +440,10 @@
               variant="ghost"
               class="h-12 w-12 rounded-2xl p-2 transition-all relative overflow-visible
                      {activeId === s.id
-                ? 'bg-foreground/10 ring-1 ring-border shadow-sm'
-                : 'hover:bg-foreground/5'}
+                ? (s.iconBgColor ? 'ring-1 ring-border shadow-sm' : 'bg-foreground/10 ring-1 ring-border shadow-sm')
+                : (s.iconBgColor ? '' : 'hover:bg-foreground/5')}
                      {s.disabled ? 'opacity-40 grayscale' : ''}"
+              style={s.iconBgColor ? `background-color: ${s.iconBgColor};` : ""}
               onclick={() => switchService(s.id)}
               oncontextmenu={(e) => {
                 e.preventDefault();
@@ -552,6 +583,47 @@
             class="col-span-3"
             onkeydown={(e) => e.key === "Enter" && saveService()}
           />
+        </div>
+        <div class="rounded-xl border bg-muted/30 p-3 flex flex-col gap-3">
+          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Icon Background</span>
+          <div class="flex items-center gap-2.5">
+            {#each PRESET_COLORS as preset}
+              <button
+                type="button"
+                title={preset.label}
+                class="h-8 w-8 rounded-full transition-all shrink-0 flex items-center justify-center
+                       {newIconBgColor === preset.value ? 'ring-2 ring-offset-2 ring-primary scale-110' : 'hover:scale-110 opacity-80 hover:opacity-100'}"
+                style="background-color: {preset.value || 'hsl(var(--muted))'};"
+                onclick={() => selectPresetColor(preset.value)}
+              >
+                {#if !preset.value}
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="5" y1="5" x2="19" y2="19" />
+                  </svg>
+                {/if}
+              </button>
+            {/each}
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="relative flex items-center flex-1">
+              <span class="absolute left-3 text-xs text-muted-foreground font-mono pointer-events-none">#</span>
+              <input
+                type="text"
+                placeholder="Custom hex, e.g. FF5733"
+                bind:value={customHexInput}
+                class="h-8 w-full rounded-lg bg-background border text-xs font-mono pl-7 pr-3 outline-none focus:ring-2 focus:ring-primary transition-all"
+                maxlength="7"
+                oninput={() => applyCustomHex()}
+                onkeydown={(e) => e.key === "Enter" && saveService()}
+              />
+            </div>
+            {#if newIconBgColor && !PRESET_COLORS.some((p) => p.value === newIconBgColor)}
+              <div
+                class="h-8 w-8 rounded-full shrink-0 ring-2 ring-offset-2 ring-primary"
+                style="background-color: {newIconBgColor};"
+              ></div>
+            {/if}
+          </div>
         </div>
       </div>
       <Dialog.Footer>
