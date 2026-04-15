@@ -8,6 +8,7 @@ type StoredService = {
   storageKey?: string;
   disabled?: boolean;
   badge?: number;
+  iconBgColor?: string;
   notificationPrefs?: {
     showBadge?: boolean;
     affectTray?: boolean;
@@ -50,6 +51,7 @@ function parseStoredService(value: unknown): StoredService | null {
     typeof candidate.url !== "string" ||
     (candidate.disabled !== undefined && typeof candidate.disabled !== "boolean") ||
     (candidate.badge !== undefined && typeof candidate.badge !== "number") ||
+    (candidate.iconBgColor !== undefined && typeof candidate.iconBgColor !== "string") ||
     (candidate.notificationPrefs !== undefined &&
       !isNotificationPrefs(candidate.notificationPrefs))
   ) {
@@ -68,6 +70,7 @@ function parseStoredService(value: unknown): StoredService | null {
         url: candidate.url,
         disabled: candidate.disabled,
         badge: candidate.badge,
+        iconBgColor: candidate.iconBgColor,
         notificationPrefs: candidate.notificationPrefs,
       };
     }
@@ -80,6 +83,7 @@ function parseStoredService(value: unknown): StoredService | null {
     storageKey: candidate.storageKey,
     disabled: candidate.disabled,
     badge: candidate.badge,
+    iconBgColor: candidate.iconBgColor,
     notificationPrefs: candidate.notificationPrefs,
   };
 }

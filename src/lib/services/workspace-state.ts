@@ -17,6 +17,7 @@ export interface PageService {
   notificationPrefs: NotificationPrefs;
   disabled?: boolean;
   badge?: number;
+  iconBgColor?: string;
 }
 
 export function readStartupState(saved: string | null): {
@@ -44,6 +45,7 @@ export function saveServiceState({
   editingServiceId,
   newServiceName,
   newServiceUrl,
+  newIconBgColor,
   createServiceId,
 }: {
   services: PageService[];
@@ -51,6 +53,7 @@ export function saveServiceState({
   editingServiceId: string | null;
   newServiceName: string;
   newServiceUrl: string;
+  newIconBgColor?: string;
   createServiceId: () => string;
 }): {
   services: PageService[];
@@ -96,6 +99,7 @@ export function saveServiceState({
       ...existingService,
       name: newServiceName,
       url: normalized.url,
+      iconBgColor: newIconBgColor || undefined,
     };
     const existingNormalized = normalizeServiceUrl(existingService.url);
     const effectiveUrlChanged = !existingNormalized.ok || existingNormalized.url !== normalized.url;
@@ -122,6 +126,7 @@ export function saveServiceState({
     url: normalized.url,
     storageKey: createStorageKey(),
     notificationPrefs: { ...DEFAULT_NOTIFICATION_PREFS },
+    iconBgColor: newIconBgColor || undefined,
   };
 
   return {
