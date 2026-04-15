@@ -1,273 +1,3 @@
-<script lang="ts" module>
-  import {
-    DEFAULT_NOTIFICATION_PREFS as DEFAULT_PAGE_NOTIFICATION_PREFS,
-  } from "$lib/services/notification-prefs";
-  import { createStorageKey as createPageStorageKey } from "$lib/services/storage-key";
-  import { createDeletePayload as createServiceDeletePayload } from "$lib/services/service-runtime";
-  import {
-    normalizeServiceUrl as normalizePageServiceUrl,
-    readStoredServices as readPageStoredServices,
-  } from "$lib/services/service-config";
-
-  export interface PageService {
-    id: string;
-    name: string;
-    url: string;
-    storageKey: string;
-    notificationPrefs: import("$lib/services/notification-prefs").NotificationPrefs;
-    disabled?: boolean;
-    badge?: number;
-  }
-
-  export function readStartupState(saved: string | null): {
-    services: PageService[];
-    activeId: string;
-    toastMessage: string;
-  } {
-    const { services, recoveredFromCorruption } = readPageStoredServices(saved);
-    const startupServices = (services as PageService[]).map((s) => ({
-      ...s,
-      badge: undefined,
-    }));
-    const firstEnabled = startupServices.find((service) => !service.disabled);
-
-    return {
-      services: startupServices,
-      activeId: firstEnabled?.id ?? "",
-      toastMessage: recoveredFromCorruption ? "Saved services were reset." : "",
-    };
-  }
-
-  export function saveServiceState({
-    services,
-    activeId,
-    editingServiceId,
-    newServiceName,
-    newServiceUrl,
-    createServiceId,
-  }: {
-    services: PageService[];
-    activeId: string;
-    editingServiceId: string | null;
-    newServiceName: string;
-    newServiceUrl: string;
-    createServiceId: () => string;
-  }): {
-    services: PageService[];
-    activeId: string;
-    toastMessage: string;
-    shouldCloseModal: boolean;
-    loadService?: PageService;
-    deleteWebview?: { id: string; storageKey: string };
-  } {
-    if (!newServiceName || !newServiceUrl) {
-      return {
-        services,
-        activeId,
-        toastMessage: "",
-        shouldCloseModal: false,
-      };
-    }
-
-    const normalized = normalizePageServiceUrl(newServiceUrl);
-
-    if (!normalized.ok) {
-      return {
-        services,
-        activeId,
-        toastMessage: normalized.message,
-        shouldCloseModal: false,
-      };
-    }
-
-    if (editingServiceId) {
-      const existingService = services.find((service) => service.id === editingServiceId);
-
-      if (!existingService) {
-        return {
-          services,
-          activeId,
-          toastMessage: "",
-          shouldCloseModal: false,
-        };
-      }
-
-      const updatedService = {
-        ...existingService,
-        name: newServiceName,
-        url: normalized.url,
-      };
-      const existingNormalized = normalizePageServiceUrl(existingService.url);
-      const effectiveUrlChanged =
-        !existingNormalized.ok || existingNormalized.url !== normalized.url;
-
-      return {
-        services: services.map((service) =>
-          service.id === editingServiceId ? updatedService : service,
-        ),
-        activeId,
-        toastMessage: "",
-        shouldCloseModal: true,
-        deleteWebview:
-          effectiveUrlChanged
-            ? {
-                id: existingService.id,
-                storageKey: existingService.storageKey,
-              }
-            : undefined,
-      };
-    }
-
-    const newService: PageService = {
-      id: createServiceId(),
-      name: newServiceName,
-      url: normalized.url,
-      storageKey: createPageStorageKey(),
-      notificationPrefs: { ...DEFAULT_PAGE_NOTIFICATION_PREFS },
-    };
-
-    return {
-      services: [...services, newService],
-      activeId: newService.id,
-      toastMessage: "",
-      shouldCloseModal: true,
-      loadService: newService,
-    };
-  }
-
-  export async function applySaveServiceResult({
-    nextState,
-    editingServiceId,
-    currentActiveId,
-    showToast,
-    setState,
-    deleteWebview,
-    loadService,
-  }: {
-    nextState: ReturnType<typeof saveServiceState>;
-    editingServiceId: string | null;
-    currentActiveId: string;
-    showToast: (message: string) => void;
-    setState: (state: {
-      services: PageService[];
-      activeId: string;
-      isAddModalOpen: boolean;
-    }) => void;
-    deleteWebview: (payload: { id: string; storageKey: string }) => Promise<unknown>;
-    loadService: (service: PageService) => Promise<unknown>;
-  }) {
-    if (nextState.toastMessage) {
-      showToast(nextState.toastMessage);
-    }
-
-    if (!nextState.shouldCloseModal) {
-      return;
-    }
-
-    const shouldRecreateActiveEditedService =
-      !!editingServiceId &&
-      !!nextState.deleteWebview &&
-      currentActiveId === nextState.deleteWebview.id;
-    const editedService = editingServiceId
-      ? nextState.services.find((service) => service.id === editingServiceId)
-      : undefined;
-
-    if (shouldRecreateActiveEditedService && nextState.deleteWebview) {
-      await deleteWebview(nextState.deleteWebview);
-    }
-
-    setState({
-      services: nextState.services,
-      activeId: nextState.activeId,
-      isAddModalOpen: false,
-    });
-
-    if (!shouldRecreateActiveEditedService && nextState.deleteWebview) {
-      await deleteWebview(nextState.deleteWebview);
-
-      if (editedService && editedService.id !== currentActiveId && !editedService.disabled) {
-        await loadService(editedService);
-      }
-    }
-
-    if (nextState.loadService) {
-      await loadService(nextState.loadService);
-    }
-  }
-
-  export function toggleServiceDisabled(
-    services: PageService[],
-    activeId: string,
-    id: string,
-  ): {
-    services: PageService[];
-    activeId: string;
-    deleteWebview?: { id: string; storageKey: string };
-  } {
-    const targetService = services.find((service) => service.id === id);
-
-    if (!targetService) {
-      return { services, activeId };
-    }
-
-    const nextDisabledState = !targetService.disabled;
-    const nextServices = services.map((service) =>
-      service.id === id ? { ...service, disabled: nextDisabledState } : service,
-    );
-
-    if (!nextDisabledState) {
-      return {
-        services: nextServices,
-        activeId,
-      };
-    }
-
-    const nextActiveId =
-      activeId === id
-        ? nextServices.find((service) => service.id !== id && !service.disabled)?.id ?? ""
-        : activeId;
-
-    return {
-      services: nextServices,
-      activeId: nextActiveId,
-      deleteWebview: createServiceDeletePayload(targetService),
-    };
-  }
-
-  export async function cleanupPageListeners({
-    unlistenToastPromise,
-    unlistenMenuPromise,
-    unlistenBadgePromise,
-    unlistenShortcutPromise,
-    toastTimeout,
-    clearTimeoutImpl = clearTimeout,
-  }: {
-    unlistenToastPromise: Promise<() => void>;
-    unlistenMenuPromise: Promise<() => void>;
-    unlistenBadgePromise: Promise<() => void>;
-    unlistenShortcutPromise: Promise<() => void>;
-    toastTimeout: ReturnType<typeof setTimeout> | null;
-    clearTimeoutImpl?: (timeout: ReturnType<typeof setTimeout>) => void;
-  }) {
-    if (toastTimeout) {
-      clearTimeoutImpl(toastTimeout);
-    }
-
-    const [unlistenToast, unlistenMenu, unlistenBadge, unlistenShortcut] =
-      await Promise.all([
-        unlistenToastPromise,
-        unlistenMenuPromise,
-        unlistenBadgePromise,
-        unlistenShortcutPromise,
-      ]);
-
-    unlistenToast();
-    unlistenMenu();
-    unlistenBadge();
-    unlistenShortcut();
-  }
-</script>
-
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
@@ -285,6 +15,14 @@
     countTrayRelevantUnreadServices,
     type NotificationPrefs,
   } from "$lib/services/notification-prefs";
+  import {
+    applySaveServiceResult,
+    cleanupPageListeners,
+    readStartupState,
+    saveServiceState,
+    toggleServiceDisabled,
+    type PageService,
+  } from "$lib/services/workspace-state";
   import { onMount } from "svelte";
 
   type Service = PageService;
@@ -756,6 +494,29 @@
         onclick={openAddModal}
       >
         +
+      </Button>
+
+      <Button
+        title="Settings"
+        variant="ghost"
+        size="icon-lg"
+        href="/settings"
+        class="h-10 w-10 rounded-full p-2 transition-all text-muted-foreground hover:bg-foreground/5"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
       </Button>
     </div>
   </aside>
