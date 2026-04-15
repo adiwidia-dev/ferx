@@ -8,7 +8,7 @@ import {
   saveServiceState,
   toggleServiceDisabled,
   type PageService,
-} from "./+page.svelte";
+} from "$lib/services/workspace-state";
 
 function createService(overrides: Partial<PageService> = {}): PageService {
   return {
