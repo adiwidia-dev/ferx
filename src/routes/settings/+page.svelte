@@ -63,9 +63,9 @@
           variant="ghost"
           href="/"
           class="h-12 w-12 rounded-2xl p-2 transition-all relative overflow-visible
-                 {service.iconBgColor ? '' : 'hover:bg-foreground/5'}
+                 hover:bg-foreground/5
                  {service.disabled ? 'opacity-40 grayscale' : ''}"
-          style={service.iconBgColor ? `background-color: ${service.iconBgColor};` : ""}
+          style={service.iconBgColor ? `box-shadow: inset 0 0 0 2.5px ${service.iconBgColor};` : ""}
         >
           <img
             src={getFaviconUrl(service.url)}
