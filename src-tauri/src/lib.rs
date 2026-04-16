@@ -3,6 +3,7 @@ mod service_runtime;
 mod service_webview;
 
 use badge_payload::{parse_badge_payload, BadgePayload};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use service_runtime::{extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind};
 use service_webview::{service_webview_setup, user_agent_for_url};
 use std::{path::PathBuf, sync::Mutex, sync::OnceLock};
@@ -544,6 +545,119 @@ mod tests {
     fn service_webview_setup_rejects_invalid_external_urls() {
         assert!(service_webview_setup("not a url", false).is_none());
     }
+
+    #[test]
+    fn mime_type_from_path_detects_common_image_types() {
+        use super::mime_type_from_path;
+        use std::path::Path;
+
+        assert_eq!(mime_type_from_path(Path::new("photo.png")), "image/png");
+        assert_eq!(mime_type_from_path(Path::new("photo.jpg")), "image/jpeg");
+        assert_eq!(mime_type_from_path(Path::new("photo.JPEG")), "image/jpeg");
+        assert_eq!(mime_type_from_path(Path::new("anim.gif")), "image/gif");
+        assert_eq!(mime_type_from_path(Path::new("img.webp")), "image/webp");
+    }
+
+    #[test]
+    fn mime_type_from_path_detects_document_types() {
+        use super::mime_type_from_path;
+        use std::path::Path;
+
+        assert_eq!(mime_type_from_path(Path::new("doc.pdf")), "application/pdf");
+        assert_eq!(mime_type_from_path(Path::new("file.txt")), "text/plain");
+        assert_eq!(mime_type_from_path(Path::new("data.csv")), "text/csv");
+        assert_eq!(mime_type_from_path(Path::new("report.docx")),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    }
+
+    #[test]
+    fn mime_type_from_path_falls_back_to_octet_stream() {
+        use super::mime_type_from_path;
+        use std::path::Path;
+
+        assert_eq!(
+            mime_type_from_path(Path::new("archive.xyz")),
+            "application/octet-stream"
+        );
+        assert_eq!(
+            mime_type_from_path(Path::new("noext")),
+            "application/octet-stream"
+        );
+    }
+
+    #[test]
+    fn js_escape_filename_handles_special_characters() {
+        use super::js_escape_filename;
+
+        assert_eq!(js_escape_filename("simple.png"), "simple.png");
+        assert_eq!(js_escape_filename("it's a file.png"), "it\\'s a file.png");
+        assert_eq!(js_escape_filename("back\\slash.png"), "back\\\\slash.png");
+        assert_eq!(js_escape_filename("new\nline.png"), "new\\nline.png");
+    }
+
+    #[test]
+    fn build_drag_event_js_uses_viewport_center() {
+        use super::build_drag_event_js;
+
+        let js = build_drag_event_js("dragenter");
+
+        assert!(js.contains("dragenter"));
+        assert!(js.contains("window.innerWidth/2"));
+        assert!(js.contains("window.innerHeight/2"));
+        assert!(js.contains("DragEvent"));
+        assert!(js.contains("DataTransfer"));
+        assert!(js.contains("elementFromPoint"));
+    }
+
+    #[test]
+    fn build_drag_event_js_supports_all_event_types() {
+        use super::build_drag_event_js;
+
+        assert!(build_drag_event_js("dragenter").contains("dragenter"));
+        assert!(build_drag_event_js("dragover").contains("dragover"));
+    }
+
+    #[test]
+    fn build_file_drop_js_returns_none_for_empty_paths() {
+        use super::build_file_drop_js;
+
+        let result = build_file_drop_js(&[]);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn build_file_drop_js_returns_none_for_nonexistent_paths() {
+        use super::build_file_drop_js;
+
+        let result = build_file_drop_js(
+            &[std::path::PathBuf::from("/nonexistent/file.png")],
+        );
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn build_file_drop_js_generates_drop_sequence_at_viewport_center() {
+        use super::build_file_drop_js;
+
+        let dir = std::env::temp_dir().join("ferx_test_drop");
+        let _ = std::fs::create_dir_all(&dir);
+        let test_file = dir.join("test.png");
+        std::fs::write(&test_file, b"fake png data").unwrap();
+
+        let result = build_file_drop_js(&[test_file.clone()]);
+        let _ = std::fs::remove_file(&test_file);
+        let _ = std::fs::remove_dir(&dir);
+
+        let js = result.expect("should produce JS for a valid file");
+        assert!(js.contains("dragenter"));
+        assert!(js.contains("dragover"));
+        assert!(js.contains("drop"));
+        assert!(js.contains("test.png"));
+        assert!(js.contains("image/png"));
+        assert!(js.contains("atob"));
+        assert!(js.contains("window.innerWidth/2"));
+        assert!(js.contains("window.innerHeight/2"));
+    }
 }
 
 #[tauri::command]
@@ -746,6 +860,174 @@ fn badge_strategy_for_url(url: &str) -> &'static str {
     }
 }
 
+const MAX_DROP_FILE_SIZE: u64 = 50 * 1024 * 1024;
+
+fn mime_type_from_path(path: &std::path::Path) -> &'static str {
+    match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        Some("svg") => "image/svg+xml",
+        Some("bmp") => "image/bmp",
+        Some("ico") => "image/x-icon",
+        Some("pdf") => "application/pdf",
+        Some("doc") => "application/msword",
+        Some("docx") => {
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        }
+        Some("xls") => "application/vnd.ms-excel",
+        Some("xlsx") => {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+        Some("ppt") => "application/vnd.ms-powerpoint",
+        Some("pptx") => {
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        }
+        Some("zip") => "application/zip",
+        Some("rar") => "application/x-rar-compressed",
+        Some("7z") => "application/x-7z-compressed",
+        Some("txt") => "text/plain",
+        Some("csv") => "text/csv",
+        Some("json") => "application/json",
+        Some("xml") => "application/xml",
+        Some("html" | "htm") => "text/html",
+        Some("mp4") => "video/mp4",
+        Some("webm") => "video/webm",
+        Some("mov") => "video/quicktime",
+        Some("avi") => "video/x-msvideo",
+        Some("mp3") => "audio/mpeg",
+        Some("wav") => "audio/wav",
+        Some("ogg") => "audio/ogg",
+        Some("m4a") => "audio/mp4",
+        _ => "application/octet-stream",
+    }
+}
+
+fn js_escape_filename(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '\'' => out.push_str("\\'"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+fn build_drag_event_js(event_type: &str) -> String {
+    format!(
+        concat!(
+            "(function(){{",
+            "var cx=window.innerWidth/2,cy=window.innerHeight/2,",
+            "t=document.elementFromPoint(cx,cy)||document.body,",
+            "d=new DataTransfer();",
+            "d.items.add(new File([''],'file',{{type:'application/octet-stream'}}));",
+            "t.dispatchEvent(new DragEvent('{evt}',",
+            "{{dataTransfer:d,bubbles:true,cancelable:true,clientX:cx,clientY:cy}}))}})()"
+        ),
+        evt = event_type,
+    )
+}
+
+fn build_file_drop_js(paths: &[PathBuf]) -> Option<String> {
+    let mut file_entries = Vec::new();
+
+    for path in paths {
+        let metadata = match std::fs::metadata(path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        if !metadata.is_file() || metadata.len() > MAX_DROP_FILE_SIZE {
+            continue;
+        }
+        let data = match std::fs::read(path) {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+        let filename = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n,
+            None => continue,
+        };
+        let mime = mime_type_from_path(path);
+        let b64 = BASE64.encode(&data);
+
+        file_entries.push(format!(
+            "{{n:'{}',t:'{}',d:'{}'}}",
+            js_escape_filename(filename),
+            mime,
+            b64,
+        ));
+    }
+
+    if file_entries.is_empty() {
+        return None;
+    }
+
+    let files_js = file_entries.join(",");
+
+    Some(format!(
+        r#"(function(){{
+var cx=window.innerWidth/2,cy=window.innerHeight/2;
+var t=document.elementFromPoint(cx,cy)||document.body;
+var fs=[{files}];
+var dt=new DataTransfer();
+fs.forEach(function(f){{
+var b=atob(f.d),u=new Uint8Array(b.length);
+for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
+dt.items.add(new File([u],f.n,{{type:f.t,lastModified:Date.now()}}));
+}});
+var o={{dataTransfer:dt,bubbles:true,cancelable:true,clientX:cx,clientY:cy,screenX:cx,screenY:cy}};
+t.dispatchEvent(new DragEvent('dragenter',o));
+t.dispatchEvent(new DragEvent('dragover',o));
+setTimeout(function(){{
+var dropTarget=document.elementFromPoint(cx,cy)||t;
+dropTarget.dispatchEvent(new DragEvent('drop',o));
+}},100);
+}})()"#,
+        files = files_js,
+    ))
+}
+
+fn handle_file_drop(webview: &tauri::Webview, event: &tauri::DragDropEvent) {
+    match event {
+        tauri::DragDropEvent::Enter { .. } => {
+            let _ = webview.eval(&build_drag_event_js("dragenter"));
+        }
+        tauri::DragDropEvent::Over { .. } => {
+            let _ = webview.eval(&build_drag_event_js("dragover"));
+        }
+        tauri::DragDropEvent::Drop { paths, .. } => {
+            if let Some(js) = build_file_drop_js(paths) {
+                let _ = webview.eval(&js);
+            }
+        }
+        tauri::DragDropEvent::Leave => {
+            let _ = webview.eval(
+                "(function(){document.body.dispatchEvent(new DragEvent('dragleave',{bubbles:true,cancelable:true}))})()",
+            );
+        }
+        _ => {}
+    }
+}
+
+fn register_file_drop_handler(webview: &tauri::Webview) {
+    let wv = webview.clone();
+    webview.on_webview_event(move |event| {
+        if let tauri::WebviewEvent::DragDrop(ref dd_event) = *event {
+            handle_file_drop(&wv, dd_event);
+        }
+    });
+}
+
 #[tauri::command]
 async fn open_service(
     app: tauri::AppHandle,
@@ -862,9 +1144,9 @@ async fn open_service(
                 true
             });
 
-        let result = window.add_child(builder, active_pos, active_size);
-        if let Err(e) = result {
-            println!("Webview failed: {}", e);
+        match window.add_child(builder, active_pos, active_size) {
+            Ok(webview) => register_file_drop_handler(&webview),
+            Err(e) => println!("Webview failed: {}", e),
         }
     }
 }
@@ -952,14 +1234,16 @@ async fn load_service(
         let physical_size = window.inner_size().unwrap_or_default();
         let sidebar_width = (79.0 * scale_factor) as u32;
 
-        let _ = window.add_child(
+        if let Ok(webview) = window.add_child(
             builder,
             PhysicalPosition::new(-10000, -10000),
             PhysicalSize::new(
                 physical_size.width.saturating_sub(sidebar_width),
                 physical_size.height,
             ),
-        );
+        ) {
+            register_file_drop_handler(&webview);
+        }
     }
 }
 
