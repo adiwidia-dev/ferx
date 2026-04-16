@@ -6,10 +6,14 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  openUrl: vi.fn(),
+}));
+
 import SettingsPage from "./+page.svelte";
 
 describe("settings page", () => {
-  it("renders readonly app info and a check update button", () => {
+  it("renders app info and a check for updates button", () => {
     const component = mount(SettingsPage, {
       target: document.body,
     });
@@ -21,7 +25,7 @@ describe("settings page", () => {
     expect(document.body.textContent).toContain("0.1.0");
 
     const checkUpdateButton = Array.from(document.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("Check Update"),
+      (button) => button.textContent?.includes("Check for Updates"),
     );
 
     expect(checkUpdateButton).toBeTruthy();

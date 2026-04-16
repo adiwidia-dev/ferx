@@ -440,10 +440,10 @@
               variant="ghost"
               class="h-12 w-12 rounded-2xl p-2 transition-all relative overflow-visible
                      {activeId === s.id
-                ? (s.iconBgColor ? 'ring-1 ring-border shadow-sm' : 'bg-foreground/10 ring-1 ring-border shadow-sm')
-                : (s.iconBgColor ? '' : 'hover:bg-foreground/5')}
+                ? 'bg-foreground/10 ring-1 ring-border shadow-sm'
+                : 'hover:bg-foreground/5'}
                      {s.disabled ? 'opacity-40 grayscale' : ''}"
-              style={s.iconBgColor ? `background-color: ${s.iconBgColor};` : ""}
+              style={s.iconBgColor ? `box-shadow: inset 0 0 0 2.5px ${s.iconBgColor};` : ""}
               onclick={() => switchService(s.id)}
               oncontextmenu={(e) => {
                 e.preventDefault();
@@ -585,7 +585,7 @@
           />
         </div>
         <div class="rounded-xl border bg-muted/30 p-3 flex flex-col gap-3">
-          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Icon Background</span>
+          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Icon Color Ring</span>
           <div class="flex items-center gap-2.5">
             {#each PRESET_COLORS as preset}
               <button
