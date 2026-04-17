@@ -17,17 +17,35 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+# Enabled automatically by `yarn tauri dev` via the package.json script.
+# Release builds (`yarn tauri build ...`) never pass this flag, so the
+# dev-only MCP bridge is completely absent from the shipped binary.
+devtools = ["dep:tauri-plugin-mcp-bridge"]
+
 [dependencies]
 tauri = { version = "2", features = ["macos-private-api", "unstable", "tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tauri-plugin-shell = "2.3.5"
-tauri-plugin-mcp-bridge = "0.11"
 base64 = "0.22"
+tauri-plugin-mcp-bridge = { version = "0.11", optional = true }
 
 [profile.release]
-lto = true
+panic = "abort"
+lto = "fat"
 codegen-units = 1
-strip = true
-opt-level = 3
+strip = "symbols"
+opt-level = "s"
+debug = false
+incremental = false
+overflow-checks = false
+
+# Optimise build-scripts and proc-macros so release builds stay reasonable.
+[profile.release.build-override]
+opt-level = 0
+codegen-units = 16
+
+# Also optimise every transitive dependency for size; saves a few MB in the
+# final universal-apple-darwin bundle without hurting correctness.
+[profile.release.package."*"]
+opt-level = "s"
+codegen-units = 1

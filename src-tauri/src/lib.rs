@@ -8,6 +8,7 @@ use service_runtime::{extract_hostname, hostname_matches, microsoft_service_kind
 use service_webview::{service_webview_setup, user_agent_for_url};
 use std::{path::PathBuf, sync::Mutex, sync::OnceLock};
 use tauri::{AppHandle, Emitter, Manager};
+use tauri::webview::Color;
 
 struct ActiveWebview(Mutex<String>);
 
@@ -114,12 +115,12 @@ mod tests {
 
         assert!(script.contains("payload = 'unknown'"));
         assert!(script.contains("payload = 'clear'"));
-        assert!(script.contains("console.info('Ferx Outlook badge payload', payload)"));
         assert!(script.contains("window.__TAURI_INTERNALS__?.invoke"));
         assert!(script.contains("await invoke('report_outlook_badge', { payload })"));
-        assert!(script.contains("report_outlook_badge failed, will retry"));
         assert!(!script.contains("ferx://notify/"));
         assert!(!script.contains("await emitBadgeState('clear')"));
+        assert!(!script.contains("console.info"));
+        assert!(!script.contains("console.warn"));
     }
 
     #[test]
@@ -354,7 +355,7 @@ mod tests {
         assert!(script.contains("outlookScreenReaderState"));
         assert!(script.contains("outlookFolderState"));
         assert!(script.contains("outlookPageTextState"));
-        assert!(script.contains("console.info('Ferx Outlook state sources'"));
+        assert!(!script.contains("console.info"));
     }
 
     #[test]
@@ -1090,7 +1091,8 @@ async fn open_service(
 
         let app_handle = app.clone();
         let service_id = id.clone();
-        let mut builder = tauri::WebviewBuilder::new(&id, webview_url);
+        let mut builder = tauri::WebviewBuilder::new(&id, webview_url)
+            .background_color(Color(255, 255, 255, 255));
 
         #[cfg(target_os = "macos")]
         {
@@ -1176,7 +1178,8 @@ async fn load_service(
             let _ = app.emit("show-toast", "Invalid service URL");
             return;
         };
-        let mut builder = tauri::WebviewBuilder::new(&id, webview_url);
+        let mut builder = tauri::WebviewBuilder::new(&id, webview_url)
+            .background_color(Color(255, 255, 255, 255));
 
         #[cfg(target_os = "macos")]
         {
@@ -1251,11 +1254,10 @@ async fn load_service(
 pub fn run() {
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_opener::init()) // NEW: Register the opener plugin!
+        .plugin(tauri_plugin_opener::init())
         .manage(ActiveWebview(Mutex::new(String::new())));
 
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "devtools")]
     {
         builder = builder.plugin(tauri_plugin_mcp_bridge::init());
     }
@@ -1281,10 +1283,7 @@ pub fn run() {
             let _tray = TrayIconBuilder::with_id("ferx_tray")
                 .menu(&tray_menu)
                 .show_menu_on_left_click(false)
-                .icon(
-                    tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))
-                        .expect("Failed to load icon"),
-                )
+                .icon(cached_tray_icons().normal.clone())
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "quit_app" => {
                         app.exit(0);

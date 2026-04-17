@@ -495,43 +495,39 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
         }};
 
         const emitBadgeState = async (nextState) => {{
-            let payload = nextState;
-            if (payload === 'unknown') {{
+            let payload;
+            if (nextState === 'unknown') {{
                 payload = 'unknown';
-            }} else if (typeof payload === 'string' && payload.startsWith('count:')) {{
-                payload = payload;
+            }} else if (typeof nextState === 'string' && nextState.startsWith('count:')) {{
+                payload = nextState;
             }} else {{
                 payload = 'clear';
             }}
 
             if (payload === window.__ferx_last_badge_state) return;
 
-            console.info('Ferx Outlook badge payload', payload);
             try {{
                 await invoke('report_outlook_badge', {{ payload }});
                 window.__ferx_last_badge_state = payload;
-            }} catch (e) {{
-                console.warn('Ferx: report_outlook_badge failed, will retry', e);
+            }} catch (_e) {{
+                // Swallow; next MutationObserver tick will retry.
             }}
         }};
 
         const evaluateBadgeState = async () => {{
             let nextState = 'clear';
             try {{
-                const screenReaderState = outlookScreenReaderState();
-                const folderState = outlookFolderState();
-                const pageTextState = outlookPageTextState();
-                const titleState = titleCountState(document.title);
-                console.info('Ferx Outlook state sources', {{
-                    screenReaderState,
-                    folderState,
-                    pageTextState,
-                    titleState,
-                    treesFound: document.querySelectorAll('div[role=tree]').length,
-                    screenReadersFound: document.querySelectorAll('span.screenReaderOnly').length,
-                }});
-
-                nextState = screenReaderState || folderState || pageTextState || titleState;
+                // Short-circuit from cheapest to most expensive.
+                // `outlookPageTextState` reads `document.body.innerText`,
+                // which forces a full layout and can pin CPU on large
+                // mailboxes, so only run it when the fast paths fail.
+                nextState =
+                    outlookScreenReaderState()
+                    || outlookFolderState()
+                    || titleCountState(document.title);
+                if (nextState === 'clear') {{
+                    nextState = outlookPageTextState() || 'clear';
+                }}
             }} catch (_error) {{
                 nextState = 'clear';
             }}
@@ -667,8 +663,8 @@ fn teams_badge_engine_script() -> String {
             try {
                 await invoke('report_teams_badge', { payload });
                 window.__ferx_last_badge_state = payload;
-            } catch (e) {
-                console.warn('Ferx: report_teams_badge failed, will retry', e);
+            } catch (_e) {
+                // Swallow; the next observer tick will retry.
             }
         };
 

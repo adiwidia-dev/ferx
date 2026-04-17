@@ -16,6 +16,21 @@ export default defineConfig(async () => ({
 
   resolve: isVitest ? { conditions: ["browser"] } : undefined,
 
+  build: {
+    // Tauri on macOS runs inside WKWebView (Safari 16+). Target a single
+    // engine so esbuild can emit the smallest JS possible.
+    target: ['safari15', 'es2021'],
+    // Source maps bloat the bundle and leak internal paths in production.
+    sourcemap: false,
+    // Default minifier (esbuild) is fine and much faster than terser.
+    minify: 'esbuild',
+    cssMinify: true,
+    // Computing gzip sizes on every build slows down tauri build noticeably.
+    reportCompressedSize: false,
+    // Keep asset inlining modest so we don't blow up the entry chunk.
+    assetsInlineLimit: 4096,
+  },
+
   test: {
     environmentMatchGlobs: [
       ["**/*.svelte.test.ts", "jsdom"],

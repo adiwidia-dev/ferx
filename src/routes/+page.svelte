@@ -124,7 +124,7 @@
     }
 
     if (services.length > 0) {
-      const MAX_PRELOAD = 4;
+      const MAX_PRELOAD = 3;
       setTimeout(async () => {
         let preloaded = 0;
         for (const s of services) {
@@ -132,10 +132,10 @@
           if (shouldPreloadService(s, activeId)) {
             await invoke("load_service", createServiceLoadPayload(s));
             preloaded++;
-            await new Promise((r) => setTimeout(r, 800));
+            await new Promise((r) => setTimeout(r, 1500));
           }
         }
-      }, 2000);
+      }, 3000);
     }
 
     const unlistenPromise = listen("menu-action", (event) => {
