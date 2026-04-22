@@ -39,7 +39,7 @@ The current build intentionally targets direct distribution rather than the Mac 
 
 - Updates are delivered via `tauri-plugin-updater` against a static `latest.json` manifest hosted on GitHub Releases (`/releases/latest/download/latest.json`).
 - Artifact integrity is verified with a **minisign** keypair, not an Apple Developer ID certificate. The public key lives in `src-tauri/tauri.conf.json` under `plugins.updater.pubkey`; the private key lives only in CI as `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
-- Release builds are **ad-hoc code signed** (`codesign --sign -`) so the bundle's code-signature identifier stays stable across versions. This keeps Gatekeeper from re-prompting on every update, but does not provide Developer ID trust or notarization.
+- Release builds are ad-hoc signed during bundling via `bundle.macOS.signingIdentity = "-"` in `src-tauri/tauri.conf.json`. This keeps the shipped app identity stable across versions, but does not provide Developer ID trust or notarization.
 - First-run Gatekeeper friction is expected. Ferx intentionally does not target notarization or the Mac App Store (see the top-level note about distribution).
 - The updater download stage uses `bundle.createUpdaterArtifacts: true` in `tauri.conf.json` to emit `Ferx.app.tar.gz` + `.sig` alongside the DMG. The DMG is for first-time installs; the tarball is what the updater consumes.
 - When changing the updater UI, mock `@tauri-apps/plugin-updater` and `@tauri-apps/plugin-process` in tests — both are wrapped in `src/lib/services/updater.ts` to keep the Svelte components free of direct plugin imports.

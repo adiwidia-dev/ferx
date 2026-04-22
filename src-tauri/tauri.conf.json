@@ -63,6 +63,9 @@
       "app",
       "dmg"
     ],
+    "macOS": {
+      "signingIdentity": "-"
+    },
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
