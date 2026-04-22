@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: macos-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Activate Yarn classic
+        run: corepack prepare yarn@1.22.22 --activate
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Install JavaScript dependencies
+        run: yarn install --frozen-lockfile
+
+      # tauri-action builds the app, signs the updater artifacts with our
+      # minisign key (not Apple's Developer ID), uploads the DMG + tarball +
+      # signature to a draft GitHub Release, and emits `latest.json`
+      # next to them. The updater endpoint in tauri.conf.json points at
+      # `/releases/latest/download/latest.json`, so promoting the draft
+      # release to "latest" is what rolls the update out to users.
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Ferx ${{ github.ref_name }}"
+          releaseDraft: true
+          prerelease: false
+          args: --target universal-apple-darwin
+
+      # Ad-hoc sign the bundle that tauri-action produced so the code
+      # signature identifier is stable across updates. This keeps
+      # Gatekeeper from re-prompting every new version. It does NOT give
+      # Developer ID trust and is not a substitute for notarization.
+      - name: Ad-hoc sign bundle
+        run: |
+          APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/Ferx.app"
+          if [ -d "$APP_PATH" ]; then
+            codesign --force --deep --sign - "$APP_PATH"
+          fi
