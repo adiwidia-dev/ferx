@@ -10,7 +10,7 @@
     "frontendDist": "../build"
   },
   "app": {
-    "withGlobalTauri": true,
+    "withGlobalTauri": false,
     "macOSPrivateApi": true,
     "windows": [
       {
@@ -21,11 +21,37 @@
         "minHeight": 600,
         "center": true,
         "titleBarStyle": "Overlay",
-        "hiddenTitle": true
+        "hiddenTitle": true,
+        "backgroundColor": "#ffffff"
       }
     ],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": [
+          "'self'",
+          "ipc:",
+          "http://ipc.localhost",
+          "https://github.com",
+          "https://*.githubusercontent.com",
+          "https://objects.githubusercontent.com"
+        ],
+        "img-src": [
+          "'self'",
+          "data:",
+          "blob:",
+          "asset:",
+          "http://asset.localhost"
+        ],
+        "style-src": [
+          "'self'",
+          "'unsafe-inline'"
+        ],
+        "font-src": [
+          "'self'",
+          "data:"
+        ]
+      }
     }
   },
   "bundle": {
@@ -34,6 +60,7 @@
       "app",
       "dmg"
     ],
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -41,5 +68,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE2QUNCNTc4MzdFNzk4QjkKUldTNW1PYzNlTFdzRnF4YUlTelFuaStzQzljNWNzT1MyYW0vT0N0bHczcTI3dVFjeHk3bG9TT20K",
+      "endpoints": [
+        "https://github.com/adiwidia-dev/ferx/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

@@ -1,94 +1,33 @@
 mod badge_payload;
+mod desktop_ui;
+mod file_drop;
+mod navigation_bridge;
 mod service_runtime;
+mod service_storage;
 mod service_webview;
 
-use badge_payload::{parse_badge_payload, BadgePayload};
-use service_runtime::{extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind};
+use file_drop::register_file_drop_handler;
+use navigation_bridge::{emit_badge_update, handle_special_navigation};
+use service_runtime::{
+    extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
+};
+use service_storage::{data_store_identifier_for_storage_key, session_dir_for_storage_key};
 use service_webview::{service_webview_setup, user_agent_for_url};
-use std::{path::PathBuf, sync::Mutex, sync::OnceLock};
+use std::sync::Mutex;
+use tauri::webview::Color;
 use tauri::{AppHandle, Emitter, Manager};
 
 struct ActiveWebview(Mutex<String>);
 
-fn session_dir_for_storage_key(app: &AppHandle, storage_key: &str) -> Option<PathBuf> {
-    if storage_key.is_empty()
-        || !storage_key
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
-    {
-        return None;
-    }
-
-    app.path()
-        .app_local_data_dir()
-        .ok()
-        .map(|dir| dir.join("sessions").join(storage_key))
-}
-
-fn data_store_identifier_for_storage_key(storage_key: &str) -> [u8; 16] {
-    let mut state_a: u64 = 0xcbf29ce484222325;
-    let mut state_b: u64 = 0x84222325cbf29ce4;
-
-    for byte in storage_key.bytes() {
-        state_a ^= u64::from(byte);
-        state_a = state_a.wrapping_mul(0x100000001b3);
-
-        state_b ^= u64::from(byte).wrapping_add(0x9e3779b97f4a7c15);
-        state_b = state_b.wrapping_mul(0x100000001b3);
-    }
-
-    let mut identifier = [0u8; 16];
-    identifier[..8].copy_from_slice(&state_a.to_be_bytes());
-    identifier[8..].copy_from_slice(&state_b.to_be_bytes());
-    identifier
-}
-
-fn badge_update_event_payload(label: &str, payload: &str) -> Option<String> {
-    let normalized = match parse_badge_payload(payload)? {
-        BadgePayload::Count(count) => count.to_string(),
-        BadgePayload::Unknown => "-1".to_string(),
-        BadgePayload::Clear => "0".to_string(),
-    };
-
-    Some(format!("{}:{}", label, normalized))
-}
-
-fn emit_badge_update(app: &AppHandle, label: &str, payload: &str) {
-    if let Some(event_payload) = badge_update_event_payload(label, payload) {
-        let _ = app.emit("update-badge", event_payload);
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        badge_strategy_for_url, badge_update_event_payload, data_store_identifier_for_storage_key,
-        report_outlook_badge, report_teams_badge, AppHandle,
-    };
+    use super::{badge_strategy_for_url, report_outlook_badge, report_teams_badge, AppHandle};
     use crate::service_runtime::{
         extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
     };
     use crate::service_webview::{
         external_webview_url, injected_js, service_webview_setup, user_agent_for_url,
     };
-
-    #[test]
-    fn data_store_identifier_is_stable_for_same_storage_key() {
-        let identifier = data_store_identifier_for_storage_key("storage-11111111");
-
-        assert_eq!(
-            identifier,
-            data_store_identifier_for_storage_key("storage-11111111")
-        );
-    }
-
-    #[test]
-    fn data_store_identifier_differs_for_different_storage_keys() {
-        assert_ne!(
-            data_store_identifier_for_storage_key("storage-11111111"),
-            data_store_identifier_for_storage_key("storage-22222222")
-        );
-    }
 
     #[test]
     fn extract_hostname_returns_hostname_without_port() {
@@ -113,29 +52,12 @@ mod tests {
 
         assert!(script.contains("payload = 'unknown'"));
         assert!(script.contains("payload = 'clear'"));
-        assert!(script.contains("console.info('Ferx Outlook badge payload', payload)"));
         assert!(script.contains("window.__TAURI_INTERNALS__?.invoke"));
         assert!(script.contains("await invoke('report_outlook_badge', { payload })"));
-        assert!(script.contains("report_outlook_badge failed, will retry"));
         assert!(!script.contains("ferx://notify/"));
         assert!(!script.contains("await emitBadgeState('clear')"));
-    }
-
-    #[test]
-    fn badge_update_event_payload_normalizes_reported_badges() {
-        assert_eq!(
-            badge_update_event_payload("outlook", "count:7"),
-            Some("outlook:7".to_string())
-        );
-        assert_eq!(
-            badge_update_event_payload("outlook", "unknown"),
-            Some("outlook:-1".to_string())
-        );
-        assert_eq!(
-            badge_update_event_payload("outlook", "clear"),
-            Some("outlook:0".to_string())
-        );
-        assert_eq!(badge_update_event_payload("outlook", "bogus"), None);
+        assert!(!script.contains("console.info"));
+        assert!(!script.contains("console.warn"));
     }
 
     #[test]
@@ -171,6 +93,36 @@ mod tests {
             .join("report_outlook_badge.toml");
 
         assert!(!permission_path.exists());
+    }
+
+    #[test]
+    fn tauri_conf_keeps_csp_enabled_and_global_api_disabled() {
+        let config = include_str!("../tauri.conf.json");
+
+        assert!(config.contains("\"withGlobalTauri\": false"));
+        assert!(!config.contains("\"csp\": null"));
+        assert!(config.contains("\"default-src\""));
+        assert!(config.contains("\"ipc:\""));
+    }
+
+    #[test]
+    fn tauri_conf_enables_updater_with_github_endpoint() {
+        let config = include_str!("../tauri.conf.json");
+
+        assert!(config.contains("\"createUpdaterArtifacts\": true"));
+        assert!(config.contains("\"updater\""));
+        assert!(config.contains("\"pubkey\""));
+        assert!(config.contains("github.com/adiwidia-dev/ferx/releases"));
+        assert!(config.contains("latest.json"));
+    }
+
+    #[test]
+    fn default_capability_grants_updater_and_process_restart() {
+        let capability = include_str!("../capabilities/default.json");
+
+        assert!(capability.contains("updater:default"));
+        assert!(capability.contains("process:default"));
+        assert!(capability.contains("process:allow-restart"));
     }
 
     #[test]
@@ -245,10 +197,7 @@ mod tests {
 
     #[test]
     fn unrelated_office_host_does_not_resolve_as_outlook() {
-        assert_eq!(
-            microsoft_service_kind("https://config.office.com"),
-            None
-        );
+        assert_eq!(microsoft_service_kind("https://config.office.com"), None);
         assert_eq!(
             badge_strategy_for_url("https://config.office.com"),
             "unsupported"
@@ -273,6 +222,7 @@ mod tests {
 
         assert!(script.contains("window.__ferx_badge_strategy = 'unsupported'"));
         assert!(script.contains("window.__ferx_last_badge_state"));
+        assert!(script.contains("window.__ferxSetBadgeMonitoring = (enabled) =>"));
         assert!(script.contains("new MutationObserver"));
         assert!(script.contains("document.title"));
         assert!(script.contains("outlook-folder-dom"));
@@ -320,8 +270,12 @@ mod tests {
         };
 
         assert!(!initialization_script.contains("Object.defineProperty(window, 'Notification'"));
-        assert!(initialization_script.contains("window.location.href = 'https://ferx.download/?url='"));
-        assert!(initialization_script.contains("window.location.href = 'https://ferx.shortcut/' + key"));
+        assert!(
+            initialization_script.contains("window.location.href = 'https://ferx.download/?url='")
+        );
+        assert!(
+            initialization_script.contains("window.location.href = 'https://ferx.shortcut/' + key")
+        );
         assert!(initialization_script.contains("invoke('report_teams_badge'"));
         assert!(initialization_script.contains(".fui-Badge"));
         assert!(!initialization_script.contains("https://ferx.notify/"));
@@ -353,7 +307,7 @@ mod tests {
         assert!(script.contains("outlookScreenReaderState"));
         assert!(script.contains("outlookFolderState"));
         assert!(script.contains("outlookPageTextState"));
-        assert!(script.contains("console.info('Ferx Outlook state sources'"));
+        assert!(!script.contains("console.info"));
     }
 
     #[test]
@@ -405,7 +359,8 @@ mod tests {
 
     #[test]
     fn cloud_teams_setup_uses_teams_safeguards() {
-        let Some((_, teams_script)) = service_webview_setup("https://teams.cloud.microsoft/", false)
+        let Some((_, teams_script)) =
+            service_webview_setup("https://teams.cloud.microsoft/", false)
         else {
             panic!("expected valid cloud teams setup");
         };
@@ -420,7 +375,10 @@ mod tests {
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
             )
         );
-        assert_eq!(badge_strategy_for_url("https://teams.cloud.microsoft/"), "teams-dom");
+        assert_eq!(
+            badge_strategy_for_url("https://teams.cloud.microsoft/"),
+            "teams-dom"
+        );
     }
 
     #[test]
@@ -437,8 +395,14 @@ mod tests {
     #[test]
     fn microsoft_apps_do_not_use_spoofed_chrome_user_agent() {
         assert_eq!(user_agent_for_url("https://outlook.office.com/mail"), None);
-        assert_eq!(user_agent_for_url("https://outlook.office365.com/mail"), None);
-        assert_eq!(user_agent_for_url("https://outlook.cloud.microsoft/mail"), None);
+        assert_eq!(
+            user_agent_for_url("https://outlook.office365.com/mail"),
+            None
+        );
+        assert_eq!(
+            user_agent_for_url("https://outlook.cloud.microsoft/mail"),
+            None
+        );
     }
 
     #[test]
@@ -469,9 +433,7 @@ mod tests {
 
     #[test]
     fn youtube_music_setup_includes_google_auth_compat() {
-        let Some((_, script)) =
-            service_webview_setup("https://music.youtube.com/", false)
-        else {
+        let Some((_, script)) = service_webview_setup("https://music.youtube.com/", false) else {
             panic!("expected valid youtube music setup");
         };
 
@@ -497,8 +459,7 @@ mod tests {
 
     #[test]
     fn non_google_setup_omits_google_auth_compat() {
-        let Some((_, script)) =
-            service_webview_setup("https://discord.com/channels/@me", false)
+        let Some((_, script)) = service_webview_setup("https://discord.com/channels/@me", false)
         else {
             panic!("expected valid discord setup");
         };
@@ -544,15 +505,18 @@ mod tests {
     fn service_webview_setup_rejects_invalid_external_urls() {
         assert!(service_webview_setup("not a url", false).is_none());
     }
+
 }
 
 #[tauri::command]
 async fn hide_all_webviews(app: AppHandle) {
-    use tauri::{Manager, PhysicalPosition, PhysicalSize};
+    use tauri::{PhysicalPosition, PhysicalSize};
 
     {
         let state = app.state::<ActiveWebview>();
-        *state.0.lock().unwrap() = String::new();
+        if let Ok(mut active) = state.0.lock() {
+            *active = String::new();
+        };
     }
 
     if let Some(window) = app.get_window("main") {
@@ -585,20 +549,12 @@ async fn reload_webview(app: AppHandle, id: String) {
 }
 
 #[tauri::command]
-fn report_outlook_badge(
-    app: AppHandle,
-    webview: tauri::Webview,
-    payload: String,
-) {
+fn report_outlook_badge(app: AppHandle, webview: tauri::Webview, payload: String) {
     emit_badge_update(&app, webview.label(), &payload);
 }
 
 #[tauri::command]
-fn report_teams_badge(
-    app: AppHandle,
-    webview: tauri::Webview,
-    payload: String,
-) {
+fn report_teams_badge(app: AppHandle, webview: tauri::Webview, payload: String) {
     emit_badge_update(&app, webview.label(), &payload);
 }
 
@@ -633,94 +589,12 @@ async fn delete_webview(app: AppHandle, id: String, storage_key: String) {
 
 #[tauri::command]
 fn show_context_menu(app: tauri::AppHandle, window: tauri::Window, id: String, disabled: bool) {
-    use tauri::menu::{Menu, MenuItem};
-
-    let reload =
-        MenuItem::with_id(&app, format!("reload:{}", id), "Reload", true, None::<&str>).unwrap();
-    let edit = MenuItem::with_id(&app, format!("edit:{}", id), "Edit", true, None::<&str>).unwrap();
-    let toggle_badge = MenuItem::with_id(
-        &app,
-        format!("toggle-badge:{}", id),
-        "Toggle unread badge",
-        true,
-        None::<&str>,
-    )
-    .unwrap();
-    let toggle_tray = MenuItem::with_id(
-        &app,
-        format!("toggle-tray:{}", id),
-        "Toggle tray unread",
-        true,
-        None::<&str>,
-    )
-    .unwrap();
-    let toggle_notifications = MenuItem::with_id(
-        &app,
-        format!("toggle-notifications:{}", id),
-        "Toggle notifications",
-        true,
-        None::<&str>,
-    )
-    .unwrap();
-    let toggle = MenuItem::with_id(
-        &app,
-        format!("toggle:{}", id),
-        if disabled {
-            "Enable service"
-        } else {
-            "Disable service"
-        },
-        true,
-        None::<&str>,
-    )
-    .unwrap();
-    let delete = MenuItem::with_id(
-        &app,
-        format!("delete:{}", id),
-        "Delete service",
-        true,
-        None::<&str>,
-    )
-    .unwrap();
-
-    let menu = Menu::with_items(
-        &app,
-        &[
-            &reload,
-            &edit,
-            &toggle_badge,
-            &toggle_tray,
-            &toggle_notifications,
-            &toggle,
-            &delete,
-        ],
-    )
-    .unwrap();
-    let _ = window.popup_menu(&menu);
-}
-
-struct TrayIcons {
-    normal: tauri::image::Image<'static>,
-    unread: tauri::image::Image<'static>,
-}
-
-fn cached_tray_icons() -> &'static TrayIcons {
-    static ICONS: OnceLock<TrayIcons> = OnceLock::new();
-    ICONS.get_or_init(|| TrayIcons {
-        normal: tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))
-            .expect("Failed to decode tray.png"),
-        unread: tauri::image::Image::from_bytes(include_bytes!("../icons/tray-unread.png"))
-            .expect("Failed to decode tray-unread.png"),
-    })
+    desktop_ui::show_context_menu(app, window, id, disabled);
 }
 
 #[tauri::command]
 fn update_tray_icon(app: tauri::AppHandle, has_unread: bool) {
-    if let Some(tray) = app.tray_by_id("ferx_tray") {
-        let icons = cached_tray_icons();
-        let icon = if has_unread { &icons.unread } else { &icons.normal };
-        let _ = tray.set_icon(Some(icon.clone()));
-    }
+    desktop_ui::update_tray_icon(app, has_unread);
 }
 
 fn badge_strategy_for_url(url: &str) -> &'static str {
@@ -754,7 +628,7 @@ async fn open_service(
     storage_key: String,
     allow_notifications: bool,
 ) {
-    use tauri::{Manager, PhysicalPosition, PhysicalSize};
+    use tauri::{PhysicalPosition, PhysicalSize};
 
     let Some((webview_url, initialization_script)) =
         service_webview_setup(&url, allow_notifications)
@@ -766,7 +640,9 @@ async fn open_service(
 
     {
         let state = app.state::<ActiveWebview>();
-        *state.0.lock().unwrap() = id.clone();
+        if let Ok(mut active) = state.0.lock() {
+            *active = id.clone();
+        };
     }
 
     if let Some(window) = app.get_window("main") {
@@ -808,7 +684,8 @@ async fn open_service(
 
         let app_handle = app.clone();
         let service_id = id.clone();
-        let mut builder = tauri::WebviewBuilder::new(&id, webview_url);
+        let mut builder = tauri::WebviewBuilder::new(&id, webview_url)
+            .background_color(Color(255, 255, 255, 255));
 
         #[cfg(target_os = "macos")]
         {
@@ -837,34 +714,11 @@ async fn open_service(
             builder
         }
         .initialization_script(&initialization_script)
-        .on_navigation(move |url| {
-                if url.host_str() == Some("ferx.notify") {
-                    if let Some(payload_str) = url.path().strip_prefix('/') {
-                        emit_badge_update(&app_handle, &service_id, payload_str);
-                    }
-                    return false;
-                }
-                if url.host_str() == Some("ferx.shortcut") {
-                    if let Some(key_str) = url.path().strip_prefix('/') {
-                        let _ = app_handle.emit("switch-shortcut", key_str);
-                    }
-                    return false;
-                }
-                if url.host_str() == Some("ferx.download") {
-                    let query = url.query_pairs().find(|(k, _)| k == "url");
-                    if let Some((_, target_url)) = query {
-                        use tauri_plugin_opener::OpenerExt;
-                        let _ = app_handle.opener().open_url(target_url.to_string(), None::<&str>);
-                        let _ = app_handle.emit("show-toast", "Opening download in your browser...");
-                    }
-                    return false;
-                }
-                true
-            });
+        .on_navigation(move |url| handle_special_navigation(&app_handle, &service_id, url));
 
-        let result = window.add_child(builder, active_pos, active_size);
-        if let Err(e) = result {
-            println!("Webview failed: {}", e);
+        match window.add_child(builder, active_pos, active_size) {
+            Ok(webview) => register_file_drop_handler(&webview),
+            Err(e) => println!("Webview failed: {}", e),
         }
     }
 }
@@ -877,7 +731,7 @@ async fn load_service(
     storage_key: String,
     allow_notifications: bool,
 ) {
-    use tauri::{Manager, PhysicalPosition, PhysicalSize};
+    use tauri::{PhysicalPosition, PhysicalSize};
 
     if app.get_webview(&id).is_some() {
         return;
@@ -894,7 +748,8 @@ async fn load_service(
             let _ = app.emit("show-toast", "Invalid service URL");
             return;
         };
-        let mut builder = tauri::WebviewBuilder::new(&id, webview_url);
+        let mut builder = tauri::WebviewBuilder::new(&id, webview_url)
+            .background_color(Color(255, 255, 255, 255));
 
         #[cfg(target_os = "macos")]
         {
@@ -923,43 +778,22 @@ async fn load_service(
             builder
         }
         .initialization_script(&initialization_script)
-        .on_navigation(move |url| {
-                if url.host_str() == Some("ferx.notify") {
-                    if let Some(payload_str) = url.path().strip_prefix('/') {
-                        emit_badge_update(&app_handle, &service_id, payload_str);
-                    }
-                    return false;
-                }
-                if url.host_str() == Some("ferx.shortcut") {
-                    if let Some(key_str) = url.path().strip_prefix('/') {
-                        let _ = app_handle.emit("switch-shortcut", key_str);
-                    }
-                    return false;
-                }
-                if url.host_str() == Some("ferx.download") {
-                    let query = url.query_pairs().find(|(k, _)| k == "url");
-                    if let Some((_, target_url)) = query {
-                        use tauri_plugin_opener::OpenerExt;
-                        let _ = app_handle.opener().open_url(target_url.to_string(), None::<&str>);
-                        let _ = app_handle.emit("show-toast", "Opening download in your browser...");
-                    }
-                    return false;
-                }
-                true
-            });
+        .on_navigation(move |url| handle_special_navigation(&app_handle, &service_id, url));
 
         let scale_factor = window.scale_factor().unwrap_or(1.0);
         let physical_size = window.inner_size().unwrap_or_default();
         let sidebar_width = (79.0 * scale_factor) as u32;
 
-        let _ = window.add_child(
+        if let Ok(webview) = window.add_child(
             builder,
             PhysicalPosition::new(-10000, -10000),
             PhysicalSize::new(
                 physical_size.width.saturating_sub(sidebar_width),
                 physical_size.height,
             ),
-        );
+        ) {
+            register_file_drop_handler(&webview);
+        }
     }
 }
 
@@ -967,11 +801,12 @@ async fn load_service(
 pub fn run() {
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_opener::init()) // NEW: Register the opener plugin!
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(ActiveWebview(Mutex::new(String::new())));
 
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "devtools")]
     {
         builder = builder.plugin(tauri_plugin_mcp_bridge::init());
     }
@@ -997,24 +832,13 @@ pub fn run() {
             let _tray = TrayIconBuilder::with_id("ferx_tray")
                 .menu(&tray_menu)
                 .show_menu_on_left_click(false)
-                .icon(
-                    tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))
-                        .expect("Failed to load icon"),
-                )
+                .icon(desktop_ui::tray_icon(false))
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "quit_app" => {
                         app.exit(0);
                     }
                     "toggle_window" => {
-                        if let Some(window) = app.get_window("main") {
-                            let is_visible = window.is_visible().unwrap_or(false);
-                            if is_visible {
-                                let _ = window.hide();
-                            } else {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                        }
+                        desktop_ui::toggle_main_window_visibility(&app);
                     }
                     _ => {}
                 })
@@ -1026,15 +850,7 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        if let Some(window) = app.get_window("main") {
-                            let is_visible = window.is_visible().unwrap_or(false);
-                            if is_visible {
-                                let _ = window.hide();
-                            } else {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                        }
+                        desktop_ui::toggle_main_window_visibility(&app);
                     }
                 })
                 .build(app)?;
@@ -1044,7 +860,11 @@ pub fn run() {
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::Resized(physical_size) => {
                 let state = window.state::<ActiveWebview>();
-                let active_id = state.0.lock().unwrap().clone();
+                let active_id = state
+                    .0
+                    .lock()
+                    .map(|active| active.clone())
+                    .unwrap_or_default();
 
                 if !active_id.is_empty() {
                     let scale_factor = window.scale_factor().unwrap_or(1.0);

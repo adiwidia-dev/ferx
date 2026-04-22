@@ -24,9 +24,13 @@ Ferx is a lightweight desktop application for running services like WhatsApp, Sl
 
 Ferx is usable today and still early in its public release, with core desktop workflows already in place.
 
+Application updates are installed in-app. The updater checks GitHub Releases, verifies the download with a minisign signature, and swaps the bundle on relaunch. Because Ferx is not notarized with an Apple Developer ID, macOS will still ask you to approve the app the first time you install it; subsequent in-app updates do not re-prompt.
+
 ## Platform Support
 
 Current development and support are macOS-focused. Other platforms may build with additional work, but they are not yet treated as first-class supported targets.
+
+The current desktop implementation also relies on Tauri multiwebview support and macOS private APIs for the intended UX. App Store distribution is not a target for the current build.
 
 ## Prerequisites
 
@@ -46,6 +50,7 @@ yarn tauri dev
 
 - [Contributing](./CONTRIBUTING.md)
 - [Architecture Notes](./docs/architecture.md)
+- [Release Process](./docs/release-process.md)
 - [Project Structure](./docs/project-structure.md)
 - [GitHub Issues](https://github.com/adiwidia-dev/ferx/issues)
 - [Repository](https://github.com/adiwidia-dev/ferx)
