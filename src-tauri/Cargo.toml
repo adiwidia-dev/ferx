@@ -1,6 +1,6 @@
 [package]
 name = "ferx"
-version = "0.2.2"
+version = "0.2.3"
 description = "Desktop workspace for messaging and productivity web apps."
 authors = ["adiwidia-dev"]
 edition = "2021"
