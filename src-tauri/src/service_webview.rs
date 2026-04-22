@@ -203,7 +203,6 @@ fn badge_engine_script(strategy_name: &str) -> String {
         window.__ferx_last_badge_state = '__ferx:init__';
         window.__ferx_badge_dom_timer = window.__ferx_badge_dom_timer || null;
         window.__ferx_badge_monitoring_enabled = window.__ferx_badge_monitoring_enabled ?? true;
-        window.__ferx_badge_monitoring_enabled = window.__ferx_badge_monitoring_enabled ?? true;
 
         const normalizeTitle = (title) => (title || '').replace(/[\u200E\u200F\u200B-\u200D]/g, '').trim();
         const unsupportedTitleState = (title) => {{
@@ -427,6 +426,7 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
         window.__ferx_badge_strategy = '{strategy_name}';
         window.__ferx_last_badge_state = '__ferx:init__';
         window.__ferx_badge_dom_timer = window.__ferx_badge_dom_timer || null;
+        window.__ferx_badge_monitoring_enabled = window.__ferx_badge_monitoring_enabled ?? true;
 
         const normalizeTitle = (title) => (title || '').replace(/[\u200E\u200F\u200B-\u200D]/g, '').trim();
         const titleCountState = (title) => {{
