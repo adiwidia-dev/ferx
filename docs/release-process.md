@@ -126,10 +126,10 @@ If the workflow fails, the two common causes are:
 On success, the workflow has:
 
 1. Built a universal (aarch64 + x86_64) `Ferx.app`.
-2. Produced `Ferx.app.tar.gz` + `Ferx.app.tar.gz.sig` (signed with the minisign key).
-3. Generated `latest.json` with the tarball URL and signature contents.
-4. Created a **draft** GitHub Release and attached the DMG, tarball, `.sig`, and `latest.json`.
-5. Ad-hoc signed the local bundle so future release runs keep a stable code signature identifier.
+2. Applied ad-hoc signing during bundling via `src-tauri/tauri.conf.json` (`bundle.macOS.signingIdentity = "-"`), so the shipped DMG and updater tarball contain the same signed app identity.
+3. Produced `Ferx.app.tar.gz` + `Ferx.app.tar.gz.sig` (signed with the minisign key).
+4. Generated `latest.json` with the tarball URL and signature contents.
+5. Created a **draft** GitHub Release and attached the DMG, tarball, `.sig`, and `latest.json`.
 
 ### Step 8 — Fill in release notes and publish
 
@@ -171,6 +171,16 @@ After v0.2.0 is in the wild, this caveat no longer applies.
 ### Hotfix on top of a release
 
 Treat it as another release: branch from `main`, bump to `X.Y.(Z+1)`, follow the checklist. There is no "amend a published release" flow — the updater only understands forward version motion.
+
+### Repeated "WebCrypto Master Key" keychain prompt
+
+If users see a repeated keychain password prompt after every in-app update, check these first:
+
+1. `src-tauri/tauri.conf.json` still contains `"bundle": { "macOS": { "signingIdentity": "-" } }` at release time.
+2. The release workflow still bundles with `tauri-action` and does not rely on post-upload signing.
+3. App identifier and install path are stable (`com.ferx.dev` at `/Applications/Ferx.app`).
+
+Without Apple Developer ID + notarization, occasional prompts may still happen on some systems. Stable ad-hoc signing reduces frequency but is not equivalent to notarized trust.
 
 ### Pulling a bad release back
 

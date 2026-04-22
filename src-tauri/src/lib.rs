@@ -110,6 +110,7 @@ mod tests {
         let config = include_str!("../tauri.conf.json");
 
         assert!(config.contains("\"createUpdaterArtifacts\": true"));
+        assert!(config.contains("\"signingIdentity\": \"-\""));
         assert!(config.contains("\"updater\""));
         assert!(config.contains("\"pubkey\""));
         assert!(config.contains("github.com/adiwidia-dev/ferx/releases"));
