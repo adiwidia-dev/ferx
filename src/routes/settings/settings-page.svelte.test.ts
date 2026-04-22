@@ -10,10 +10,18 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: vi.fn(),
 }));
 
+vi.mock("@tauri-apps/plugin-updater", () => ({
+  check: vi.fn(),
+}));
+
+vi.mock("@tauri-apps/plugin-process", () => ({
+  relaunch: vi.fn(),
+}));
+
 import SettingsPage from "./+page.svelte";
 
 describe("settings page", () => {
-  it("renders app info and a check for updates button", () => {
+  it("renders app info and a check for updates button in the idle state", () => {
     const component = mount(SettingsPage, {
       target: document.body,
     });
@@ -23,13 +31,14 @@ describe("settings page", () => {
     expect(document.body.textContent).toContain("Settings");
     expect(document.body.textContent).toContain("Ferx");
     expect(document.body.textContent).toContain("0.1.0");
+    expect(document.body.textContent).toContain("Automatic updates");
+    expect(document.body.textContent).not.toContain("Manual updates");
 
     const checkUpdateButton = Array.from(document.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("View Latest Release"),
+      (button) => button.textContent?.includes("Check for Updates"),
     );
 
     expect(checkUpdateButton).toBeTruthy();
-    expect(document.body.textContent).toContain("Manual updates");
 
     unmount(component);
   });
