@@ -24,10 +24,14 @@ tauri-build = { version = "2", features = [] }
 devtools = ["dep:tauri-plugin-mcp-bridge"]
 
 [dependencies]
+# Ferx relies on child webviews, which are still gated behind Tauri's unstable
+# multiwebview surface. The macOS private API flag is also intentional for the
+# current desktop UX; App Store distribution is not a target for this build.
 tauri = { version = "2", features = ["macos-private-api", "unstable", "tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
 base64 = "0.22"
 tauri-plugin-mcp-bridge = { version = "0.11", optional = true }
+url = "2"
 
 [profile.release]
 panic = "abort"

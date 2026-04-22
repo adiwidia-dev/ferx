@@ -6,6 +6,7 @@ import {
   cleanupPageListeners,
   readStartupState,
   saveServiceState,
+  serializeServicesForStorage,
   toggleServiceDisabled,
   type PageService,
 } from "$lib/services/workspace-state";
@@ -372,6 +373,31 @@ describe("saveServiceState", () => {
     });
 
     expect(events).toEqual(["delete:disabled"]);
+  });
+});
+
+describe("serializeServicesForStorage", () => {
+  it("strips runtime badge state before persisting services", () => {
+    expect(
+      serializeServicesForStorage([
+        createService({
+          id: "chat",
+          badge: 9,
+          disabled: true,
+        }),
+      ]),
+    ).toBe(
+      JSON.stringify([
+        {
+          ...createService({
+            id: "chat",
+            badge: 9,
+            disabled: true,
+          }),
+          badge: undefined,
+        },
+      ]),
+    );
   });
 });
 

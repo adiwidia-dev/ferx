@@ -24,9 +24,13 @@ Ferx is a lightweight desktop application for running services like WhatsApp, Sl
 
 Ferx is usable today and still early in its public release, with core desktop workflows already in place.
 
+Application updates are currently manual through GitHub releases. Ferx does not install updates in-app.
+
 ## Platform Support
 
 Current development and support are macOS-focused. Other platforms may build with additional work, but they are not yet treated as first-class supported targets.
+
+The current desktop implementation also relies on Tauri multiwebview support and macOS private APIs for the intended UX. App Store distribution is not a target for the current build.
 
 ## Prerequisites
 

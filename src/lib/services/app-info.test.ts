@@ -9,6 +9,7 @@ describe("getAppInfo", () => {
     expect(appInfo).toEqual({
       name: "Ferx",
       version: "0.1.0",
+      releasesUrl: "https://github.com/adiwidia-dev/ferx/releases",
     });
     expect(Object.isFrozen(appInfo)).toBe(true);
   });

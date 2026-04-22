@@ -16,10 +16,9 @@ const MCP_BRIDGE_CAPABILITY: &str = r#"{
 "#;
 
 fn main() {
-    let capability_path =
-        Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".into()))
-            .join("capabilities")
-            .join("mcp-bridge.json");
+    let capability_path = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".into()))
+        .join("capabilities")
+        .join("mcp-bridge.json");
 
     // `CARGO_FEATURE_*` env vars are set by cargo for each enabled feature.
     // When the `devtools` feature is active, the mcp-bridge plugin is

@@ -4,7 +4,7 @@
   import { onMount } from "svelte";
   import { Button } from "$lib/components/ui/button";
   import { getAppInfo } from "$lib/services/app-info";
-  import { checkForUpdate, type UpdateCheckResult } from "$lib/services/update-check";
+  import { getServiceFaviconUrl, getServiceMonogram } from "$lib/services/service-icon";
   import { readStartupState, type PageService } from "$lib/services/workspace-state";
 
   const appInfo = getAppInfo();
@@ -12,9 +12,7 @@
   let services = $state<PageService[]>([]);
   let activeId = $state("");
   let isDnd = $state(false);
-
-  let updateResult = $state<UpdateCheckResult | null>(null);
-  let isChecking = $state(false);
+  let failedIcons = $state<Record<string, boolean>>({});
 
   onMount(() => {
     invoke("hide_all_webviews");
@@ -23,28 +21,6 @@
     services = startup.services;
     activeId = startup.activeId;
   });
-
-  function getFaviconUrl(url: string) {
-    try {
-      const hostname = new URL(url).hostname.replace(/^(web\.|app\.)/, "");
-      return `https://www.google.com/s2/favicons?domain=${hostname}&sz=128`;
-    } catch {
-      return "";
-    }
-  }
-
-  async function handleCheckUpdate() {
-    isChecking = true;
-    updateResult = null;
-    updateResult = await checkForUpdate(appInfo.version);
-    isChecking = false;
-  }
-
-  async function handleDownload() {
-    if (updateResult?.status === "update-available" && updateResult.release.dmgDownloadUrl) {
-      await openUrl(updateResult.release.dmgDownloadUrl);
-    }
-  }
 </script>
 
 <svelte:head>
@@ -67,11 +43,26 @@
                  {service.disabled ? 'opacity-40 grayscale' : ''}"
           style={service.iconBgColor ? `box-shadow: inset 0 0 0 2.5px ${service.iconBgColor};` : ""}
         >
-          <img
-            src={getFaviconUrl(service.url)}
-            alt={service.name}
-            class="w-full h-full object-contain pointer-events-none"
-          />
+          <div
+            aria-hidden="true"
+            class="flex h-full w-full items-center justify-center rounded-xl bg-muted/60 text-sm font-semibold tracking-wide text-foreground/80 pointer-events-none"
+          >
+            {#if !failedIcons[service.id]}
+              <img
+                src={getServiceFaviconUrl(service.url)}
+                alt={`${service.name} icon`}
+                class="h-7 w-7 rounded-lg object-contain"
+                onerror={() => {
+                  failedIcons = {
+                    ...failedIcons,
+                    [service.id]: true,
+                  };
+                }}
+              />
+            {:else}
+              {getServiceMonogram(service.name)}
+            {/if}
+          </div>
         </Button>
       {/each}
     </div>
@@ -171,99 +162,30 @@
         </div>
 
         <div class="px-6 py-5">
-          {#if updateResult?.status === "update-available"}
-            <div class="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 mb-4 text-left animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div class="flex items-start gap-3">
-                <div class="h-8 w-8 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-semibold text-foreground">
-                    {appInfo.name} {updateResult.release.version} is available
-                  </p>
-                  <p class="text-xs text-muted-foreground mt-0.5">
-                    You're currently on v{appInfo.version}
-                  </p>
-                </div>
+          <div class="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 mb-4 text-left">
+            <div class="flex items-start gap-3">
+              <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-500/10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
               </div>
-
-              {#if updateResult.release.dmgDownloadUrl}
-                <Button
-                  class="w-full rounded-xl h-10 mt-4 transition-all hover:scale-[1.01] shadow-sm"
-                  onclick={handleDownload}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  Download Update
-                </Button>
-              {:else}
-                <Button
-                  variant="outline"
-                  class="w-full rounded-xl h-10 mt-4"
-                  onclick={() => updateResult?.status === "update-available" && openUrl(updateResult.release.htmlUrl)}
-                >
-                  View Release Page
-                </Button>
-              {/if}
-            </div>
-          {:else if updateResult?.status === "up-to-date"}
-            <div class="rounded-2xl border border-green-500/20 bg-green-500/5 p-4 mb-4 text-left animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div class="flex items-center gap-3">
-                <div class="h-8 w-8 rounded-xl bg-green-500/10 flex items-center justify-center shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-500">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-sm font-semibold text-foreground">You're up to date</p>
-                  <p class="text-xs text-muted-foreground mt-0.5">
-                    {appInfo.name} v{appInfo.version} is the latest version
-                  </p>
-                </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-foreground">Manual updates</p>
+                <p class="mt-0.5 text-xs text-muted-foreground">
+                  {appInfo.name} does not install updates in-app. Check the latest GitHub release and
+                  download it manually when you want to upgrade from v{appInfo.version}.
+                </p>
               </div>
             </div>
-          {:else if updateResult?.status === "error"}
-            <div class="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 mb-4 text-left animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div class="flex items-center gap-3">
-                <div class="h-8 w-8 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-sm font-semibold text-foreground">Update check failed</p>
-                  <p class="text-xs text-muted-foreground mt-0.5">{updateResult.message}</p>
-                </div>
-              </div>
-            </div>
-          {/if}
+          </div>
 
           <Button
-            variant={updateResult ? "outline" : "default"}
-            class="w-full rounded-xl h-10 transition-all {!updateResult ? 'hover:scale-[1.01] shadow-sm' : ''}"
-            disabled={isChecking}
-            onclick={handleCheckUpdate}
+            class="w-full rounded-xl h-10 transition-all hover:scale-[1.01] shadow-sm"
+            onclick={() => appInfo.releasesUrl && openUrl(appInfo.releasesUrl)}
           >
-            {#if isChecking}
-              <svg class="animate-spin mr-2" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-              </svg>
-              Checking...
-            {:else if updateResult}
-              Check Again
-            {:else}
-              Check for Updates
-            {/if}
+            View Latest Release
           </Button>
         </div>
       </div>

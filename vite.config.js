@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from '@tailwindcss/vite';
@@ -8,7 +9,7 @@ const host = process.env.TAURI_DEV_HOST;
 const isVitest = !!process.env.VITEST;
 
 // https://vite.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig({
   plugins: [
     tailwindcss(),
     sveltekit()
@@ -29,12 +30,6 @@ export default defineConfig(async () => ({
     reportCompressedSize: false,
     // Keep asset inlining modest so we don't blow up the entry chunk.
     assetsInlineLimit: 4096,
-  },
-
-  test: {
-    environmentMatchGlobs: [
-      ["**/*.svelte.test.ts", "jsdom"],
-    ],
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
@@ -58,4 +53,4 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
-}));
+});

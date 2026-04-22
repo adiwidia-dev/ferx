@@ -25,10 +25,11 @@ describe("settings page", () => {
     expect(document.body.textContent).toContain("0.1.0");
 
     const checkUpdateButton = Array.from(document.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("Check for Updates"),
+      (button) => button.textContent?.includes("View Latest Release"),
     );
 
     expect(checkUpdateButton).toBeTruthy();
+    expect(document.body.textContent).toContain("Manual updates");
 
     unmount(component);
   });

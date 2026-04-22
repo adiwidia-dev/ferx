@@ -4,6 +4,8 @@ These notes are for contributors and maintainers working on Ferx internals.
 
 Ferx relies on native webviews and a few deliberate platform-specific workarounds. Read this document before changing Rust windowing logic, badge plumbing, permission shims, or webview sizing behavior.
 
+The current build intentionally targets direct distribution rather than the Mac App Store. Ferx depends on Tauri multiwebview support and macOS private APIs for the current UX, so do not remove those flags casually without re-evaluating the windowing model.
+
 ## 1. Native Context Menus And Webview Layering
 
 - Do not replace sidebar context menus with HTML overlays.

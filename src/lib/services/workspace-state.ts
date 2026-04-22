@@ -20,6 +20,12 @@ export interface PageService {
   iconBgColor?: string;
 }
 
+export function serializeServicesForStorage(services: PageService[]): string {
+  return JSON.stringify(
+    services.map(({ badge: _badge, ...service }) => service),
+  );
+}
+
 export function readStartupState(saved: string | null): {
   services: PageService[];
   activeId: string;
@@ -169,9 +175,6 @@ export async function applySaveServiceResult({
 
   const shouldRecreateActiveEditedService =
     !!editingServiceId && !!nextState.deleteWebview && currentActiveId === nextState.deleteWebview.id;
-  const editedService = editingServiceId
-    ? nextState.services.find((service) => service.id === editingServiceId)
-    : undefined;
 
   if (shouldRecreateActiveEditedService && nextState.deleteWebview) {
     await deleteWebview(nextState.deleteWebview);
@@ -185,6 +188,10 @@ export async function applySaveServiceResult({
 
   if (!shouldRecreateActiveEditedService && nextState.deleteWebview) {
     await deleteWebview(nextState.deleteWebview);
+
+    const editedService = editingServiceId
+      ? nextState.services.find((service) => service.id === editingServiceId)
+      : undefined;
 
     if (editedService && editedService.id !== currentActiveId && !editedService.disabled) {
       await loadService(editedService);

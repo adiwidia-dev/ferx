@@ -1,96 +1,33 @@
 mod badge_payload;
+mod desktop_ui;
+mod file_drop;
+mod navigation_bridge;
 mod service_runtime;
+mod service_storage;
 mod service_webview;
 
-use badge_payload::{parse_badge_payload, BadgePayload};
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
-use service_runtime::{extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind};
+use file_drop::register_file_drop_handler;
+use navigation_bridge::{emit_badge_update, handle_special_navigation};
+use service_runtime::{
+    extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
+};
+use service_storage::{data_store_identifier_for_storage_key, session_dir_for_storage_key};
 use service_webview::{service_webview_setup, user_agent_for_url};
-use std::{path::PathBuf, sync::Mutex, sync::OnceLock};
-use tauri::{AppHandle, Emitter, Manager};
+use std::sync::Mutex;
 use tauri::webview::Color;
+use tauri::{AppHandle, Emitter, Manager};
 
 struct ActiveWebview(Mutex<String>);
 
-fn session_dir_for_storage_key(app: &AppHandle, storage_key: &str) -> Option<PathBuf> {
-    if storage_key.is_empty()
-        || !storage_key
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
-    {
-        return None;
-    }
-
-    app.path()
-        .app_local_data_dir()
-        .ok()
-        .map(|dir| dir.join("sessions").join(storage_key))
-}
-
-fn data_store_identifier_for_storage_key(storage_key: &str) -> [u8; 16] {
-    let mut state_a: u64 = 0xcbf29ce484222325;
-    let mut state_b: u64 = 0x84222325cbf29ce4;
-
-    for byte in storage_key.bytes() {
-        state_a ^= u64::from(byte);
-        state_a = state_a.wrapping_mul(0x100000001b3);
-
-        state_b ^= u64::from(byte).wrapping_add(0x9e3779b97f4a7c15);
-        state_b = state_b.wrapping_mul(0x100000001b3);
-    }
-
-    let mut identifier = [0u8; 16];
-    identifier[..8].copy_from_slice(&state_a.to_be_bytes());
-    identifier[8..].copy_from_slice(&state_b.to_be_bytes());
-    identifier
-}
-
-fn badge_update_event_payload(label: &str, payload: &str) -> Option<String> {
-    let normalized = match parse_badge_payload(payload)? {
-        BadgePayload::Count(count) => count.to_string(),
-        BadgePayload::Unknown => "-1".to_string(),
-        BadgePayload::Clear => "0".to_string(),
-    };
-
-    Some(format!("{}:{}", label, normalized))
-}
-
-fn emit_badge_update(app: &AppHandle, label: &str, payload: &str) {
-    if let Some(event_payload) = badge_update_event_payload(label, payload) {
-        let _ = app.emit("update-badge", event_payload);
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        badge_strategy_for_url, badge_update_event_payload, data_store_identifier_for_storage_key,
-        report_outlook_badge, report_teams_badge, AppHandle,
-    };
+    use super::{badge_strategy_for_url, report_outlook_badge, report_teams_badge, AppHandle};
     use crate::service_runtime::{
         extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
     };
     use crate::service_webview::{
         external_webview_url, injected_js, service_webview_setup, user_agent_for_url,
     };
-
-    #[test]
-    fn data_store_identifier_is_stable_for_same_storage_key() {
-        let identifier = data_store_identifier_for_storage_key("storage-11111111");
-
-        assert_eq!(
-            identifier,
-            data_store_identifier_for_storage_key("storage-11111111")
-        );
-    }
-
-    #[test]
-    fn data_store_identifier_differs_for_different_storage_keys() {
-        assert_ne!(
-            data_store_identifier_for_storage_key("storage-11111111"),
-            data_store_identifier_for_storage_key("storage-22222222")
-        );
-    }
 
     #[test]
     fn extract_hostname_returns_hostname_without_port() {
@@ -121,23 +58,6 @@ mod tests {
         assert!(!script.contains("await emitBadgeState('clear')"));
         assert!(!script.contains("console.info"));
         assert!(!script.contains("console.warn"));
-    }
-
-    #[test]
-    fn badge_update_event_payload_normalizes_reported_badges() {
-        assert_eq!(
-            badge_update_event_payload("outlook", "count:7"),
-            Some("outlook:7".to_string())
-        );
-        assert_eq!(
-            badge_update_event_payload("outlook", "unknown"),
-            Some("outlook:-1".to_string())
-        );
-        assert_eq!(
-            badge_update_event_payload("outlook", "clear"),
-            Some("outlook:0".to_string())
-        );
-        assert_eq!(badge_update_event_payload("outlook", "bogus"), None);
     }
 
     #[test]
@@ -173,6 +93,16 @@ mod tests {
             .join("report_outlook_badge.toml");
 
         assert!(!permission_path.exists());
+    }
+
+    #[test]
+    fn tauri_conf_keeps_csp_enabled_and_global_api_disabled() {
+        let config = include_str!("../tauri.conf.json");
+
+        assert!(config.contains("\"withGlobalTauri\": false"));
+        assert!(!config.contains("\"csp\": null"));
+        assert!(config.contains("\"default-src\""));
+        assert!(config.contains("\"ipc:\""));
     }
 
     #[test]
@@ -247,10 +177,7 @@ mod tests {
 
     #[test]
     fn unrelated_office_host_does_not_resolve_as_outlook() {
-        assert_eq!(
-            microsoft_service_kind("https://config.office.com"),
-            None
-        );
+        assert_eq!(microsoft_service_kind("https://config.office.com"), None);
         assert_eq!(
             badge_strategy_for_url("https://config.office.com"),
             "unsupported"
@@ -275,6 +202,7 @@ mod tests {
 
         assert!(script.contains("window.__ferx_badge_strategy = 'unsupported'"));
         assert!(script.contains("window.__ferx_last_badge_state"));
+        assert!(script.contains("window.__ferxSetBadgeMonitoring = (enabled) =>"));
         assert!(script.contains("new MutationObserver"));
         assert!(script.contains("document.title"));
         assert!(script.contains("outlook-folder-dom"));
@@ -322,8 +250,12 @@ mod tests {
         };
 
         assert!(!initialization_script.contains("Object.defineProperty(window, 'Notification'"));
-        assert!(initialization_script.contains("window.location.href = 'https://ferx.download/?url='"));
-        assert!(initialization_script.contains("window.location.href = 'https://ferx.shortcut/' + key"));
+        assert!(
+            initialization_script.contains("window.location.href = 'https://ferx.download/?url='")
+        );
+        assert!(
+            initialization_script.contains("window.location.href = 'https://ferx.shortcut/' + key")
+        );
         assert!(initialization_script.contains("invoke('report_teams_badge'"));
         assert!(initialization_script.contains(".fui-Badge"));
         assert!(!initialization_script.contains("https://ferx.notify/"));
@@ -407,7 +339,8 @@ mod tests {
 
     #[test]
     fn cloud_teams_setup_uses_teams_safeguards() {
-        let Some((_, teams_script)) = service_webview_setup("https://teams.cloud.microsoft/", false)
+        let Some((_, teams_script)) =
+            service_webview_setup("https://teams.cloud.microsoft/", false)
         else {
             panic!("expected valid cloud teams setup");
         };
@@ -422,7 +355,10 @@ mod tests {
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
             )
         );
-        assert_eq!(badge_strategy_for_url("https://teams.cloud.microsoft/"), "teams-dom");
+        assert_eq!(
+            badge_strategy_for_url("https://teams.cloud.microsoft/"),
+            "teams-dom"
+        );
     }
 
     #[test]
@@ -439,8 +375,14 @@ mod tests {
     #[test]
     fn microsoft_apps_do_not_use_spoofed_chrome_user_agent() {
         assert_eq!(user_agent_for_url("https://outlook.office.com/mail"), None);
-        assert_eq!(user_agent_for_url("https://outlook.office365.com/mail"), None);
-        assert_eq!(user_agent_for_url("https://outlook.cloud.microsoft/mail"), None);
+        assert_eq!(
+            user_agent_for_url("https://outlook.office365.com/mail"),
+            None
+        );
+        assert_eq!(
+            user_agent_for_url("https://outlook.cloud.microsoft/mail"),
+            None
+        );
     }
 
     #[test]
@@ -471,9 +413,7 @@ mod tests {
 
     #[test]
     fn youtube_music_setup_includes_google_auth_compat() {
-        let Some((_, script)) =
-            service_webview_setup("https://music.youtube.com/", false)
-        else {
+        let Some((_, script)) = service_webview_setup("https://music.youtube.com/", false) else {
             panic!("expected valid youtube music setup");
         };
 
@@ -499,8 +439,7 @@ mod tests {
 
     #[test]
     fn non_google_setup_omits_google_auth_compat() {
-        let Some((_, script)) =
-            service_webview_setup("https://discord.com/channels/@me", false)
+        let Some((_, script)) = service_webview_setup("https://discord.com/channels/@me", false)
         else {
             panic!("expected valid discord setup");
         };
@@ -547,127 +486,17 @@ mod tests {
         assert!(service_webview_setup("not a url", false).is_none());
     }
 
-    #[test]
-    fn mime_type_from_path_detects_common_image_types() {
-        use super::mime_type_from_path;
-        use std::path::Path;
-
-        assert_eq!(mime_type_from_path(Path::new("photo.png")), "image/png");
-        assert_eq!(mime_type_from_path(Path::new("photo.jpg")), "image/jpeg");
-        assert_eq!(mime_type_from_path(Path::new("photo.JPEG")), "image/jpeg");
-        assert_eq!(mime_type_from_path(Path::new("anim.gif")), "image/gif");
-        assert_eq!(mime_type_from_path(Path::new("img.webp")), "image/webp");
-    }
-
-    #[test]
-    fn mime_type_from_path_detects_document_types() {
-        use super::mime_type_from_path;
-        use std::path::Path;
-
-        assert_eq!(mime_type_from_path(Path::new("doc.pdf")), "application/pdf");
-        assert_eq!(mime_type_from_path(Path::new("file.txt")), "text/plain");
-        assert_eq!(mime_type_from_path(Path::new("data.csv")), "text/csv");
-        assert_eq!(mime_type_from_path(Path::new("report.docx")),
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    }
-
-    #[test]
-    fn mime_type_from_path_falls_back_to_octet_stream() {
-        use super::mime_type_from_path;
-        use std::path::Path;
-
-        assert_eq!(
-            mime_type_from_path(Path::new("archive.xyz")),
-            "application/octet-stream"
-        );
-        assert_eq!(
-            mime_type_from_path(Path::new("noext")),
-            "application/octet-stream"
-        );
-    }
-
-    #[test]
-    fn js_escape_filename_handles_special_characters() {
-        use super::js_escape_filename;
-
-        assert_eq!(js_escape_filename("simple.png"), "simple.png");
-        assert_eq!(js_escape_filename("it's a file.png"), "it\\'s a file.png");
-        assert_eq!(js_escape_filename("back\\slash.png"), "back\\\\slash.png");
-        assert_eq!(js_escape_filename("new\nline.png"), "new\\nline.png");
-    }
-
-    #[test]
-    fn build_drag_event_js_uses_viewport_center() {
-        use super::build_drag_event_js;
-
-        let js = build_drag_event_js("dragenter");
-
-        assert!(js.contains("dragenter"));
-        assert!(js.contains("window.innerWidth/2"));
-        assert!(js.contains("window.innerHeight/2"));
-        assert!(js.contains("DragEvent"));
-        assert!(js.contains("DataTransfer"));
-        assert!(js.contains("elementFromPoint"));
-    }
-
-    #[test]
-    fn build_drag_event_js_supports_all_event_types() {
-        use super::build_drag_event_js;
-
-        assert!(build_drag_event_js("dragenter").contains("dragenter"));
-        assert!(build_drag_event_js("dragover").contains("dragover"));
-    }
-
-    #[test]
-    fn build_file_drop_js_returns_none_for_empty_paths() {
-        use super::build_file_drop_js;
-
-        let result = build_file_drop_js(&[]);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn build_file_drop_js_returns_none_for_nonexistent_paths() {
-        use super::build_file_drop_js;
-
-        let result = build_file_drop_js(
-            &[std::path::PathBuf::from("/nonexistent/file.png")],
-        );
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn build_file_drop_js_generates_drop_sequence_at_viewport_center() {
-        use super::build_file_drop_js;
-
-        let dir = std::env::temp_dir().join("ferx_test_drop");
-        let _ = std::fs::create_dir_all(&dir);
-        let test_file = dir.join("test.png");
-        std::fs::write(&test_file, b"fake png data").unwrap();
-
-        let result = build_file_drop_js(&[test_file.clone()]);
-        let _ = std::fs::remove_file(&test_file);
-        let _ = std::fs::remove_dir(&dir);
-
-        let js = result.expect("should produce JS for a valid file");
-        assert!(js.contains("dragenter"));
-        assert!(js.contains("dragover"));
-        assert!(js.contains("drop"));
-        assert!(js.contains("test.png"));
-        assert!(js.contains("image/png"));
-        assert!(js.contains("atob"));
-        assert!(js.contains("window.innerWidth/2"));
-        assert!(js.contains("window.innerHeight/2"));
-    }
 }
 
 #[tauri::command]
 async fn hide_all_webviews(app: AppHandle) {
-    use tauri::{Manager, PhysicalPosition, PhysicalSize};
+    use tauri::{PhysicalPosition, PhysicalSize};
 
     {
         let state = app.state::<ActiveWebview>();
-        *state.0.lock().unwrap() = String::new();
+        if let Ok(mut active) = state.0.lock() {
+            *active = String::new();
+        };
     }
 
     if let Some(window) = app.get_window("main") {
@@ -700,20 +529,12 @@ async fn reload_webview(app: AppHandle, id: String) {
 }
 
 #[tauri::command]
-fn report_outlook_badge(
-    app: AppHandle,
-    webview: tauri::Webview,
-    payload: String,
-) {
+fn report_outlook_badge(app: AppHandle, webview: tauri::Webview, payload: String) {
     emit_badge_update(&app, webview.label(), &payload);
 }
 
 #[tauri::command]
-fn report_teams_badge(
-    app: AppHandle,
-    webview: tauri::Webview,
-    payload: String,
-) {
+fn report_teams_badge(app: AppHandle, webview: tauri::Webview, payload: String) {
     emit_badge_update(&app, webview.label(), &payload);
 }
 
@@ -748,94 +569,12 @@ async fn delete_webview(app: AppHandle, id: String, storage_key: String) {
 
 #[tauri::command]
 fn show_context_menu(app: tauri::AppHandle, window: tauri::Window, id: String, disabled: bool) {
-    use tauri::menu::{Menu, MenuItem};
-
-    let reload =
-        MenuItem::with_id(&app, format!("reload:{}", id), "Reload", true, None::<&str>).unwrap();
-    let edit = MenuItem::with_id(&app, format!("edit:{}", id), "Edit", true, None::<&str>).unwrap();
-    let toggle_badge = MenuItem::with_id(
-        &app,
-        format!("toggle-badge:{}", id),
-        "Toggle unread badge",
-        true,
-        None::<&str>,
-    )
-    .unwrap();
-    let toggle_tray = MenuItem::with_id(
-        &app,
-        format!("toggle-tray:{}", id),
-        "Toggle tray unread",
-        true,
-        None::<&str>,
-    )
-    .unwrap();
-    let toggle_notifications = MenuItem::with_id(
-        &app,
-        format!("toggle-notifications:{}", id),
-        "Toggle notifications",
-        true,
-        None::<&str>,
-    )
-    .unwrap();
-    let toggle = MenuItem::with_id(
-        &app,
-        format!("toggle:{}", id),
-        if disabled {
-            "Enable service"
-        } else {
-            "Disable service"
-        },
-        true,
-        None::<&str>,
-    )
-    .unwrap();
-    let delete = MenuItem::with_id(
-        &app,
-        format!("delete:{}", id),
-        "Delete service",
-        true,
-        None::<&str>,
-    )
-    .unwrap();
-
-    let menu = Menu::with_items(
-        &app,
-        &[
-            &reload,
-            &edit,
-            &toggle_badge,
-            &toggle_tray,
-            &toggle_notifications,
-            &toggle,
-            &delete,
-        ],
-    )
-    .unwrap();
-    let _ = window.popup_menu(&menu);
-}
-
-struct TrayIcons {
-    normal: tauri::image::Image<'static>,
-    unread: tauri::image::Image<'static>,
-}
-
-fn cached_tray_icons() -> &'static TrayIcons {
-    static ICONS: OnceLock<TrayIcons> = OnceLock::new();
-    ICONS.get_or_init(|| TrayIcons {
-        normal: tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))
-            .expect("Failed to decode tray.png"),
-        unread: tauri::image::Image::from_bytes(include_bytes!("../icons/tray-unread.png"))
-            .expect("Failed to decode tray-unread.png"),
-    })
+    desktop_ui::show_context_menu(app, window, id, disabled);
 }
 
 #[tauri::command]
 fn update_tray_icon(app: tauri::AppHandle, has_unread: bool) {
-    if let Some(tray) = app.tray_by_id("ferx_tray") {
-        let icons = cached_tray_icons();
-        let icon = if has_unread { &icons.unread } else { &icons.normal };
-        let _ = tray.set_icon(Some(icon.clone()));
-    }
+    desktop_ui::update_tray_icon(app, has_unread);
 }
 
 fn badge_strategy_for_url(url: &str) -> &'static str {
@@ -861,174 +600,6 @@ fn badge_strategy_for_url(url: &str) -> &'static str {
     }
 }
 
-const MAX_DROP_FILE_SIZE: u64 = 50 * 1024 * 1024;
-
-fn mime_type_from_path(path: &std::path::Path) -> &'static str {
-    match path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_ascii_lowercase())
-        .as_deref()
-    {
-        Some("png") => "image/png",
-        Some("jpg" | "jpeg") => "image/jpeg",
-        Some("gif") => "image/gif",
-        Some("webp") => "image/webp",
-        Some("svg") => "image/svg+xml",
-        Some("bmp") => "image/bmp",
-        Some("ico") => "image/x-icon",
-        Some("pdf") => "application/pdf",
-        Some("doc") => "application/msword",
-        Some("docx") => {
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        }
-        Some("xls") => "application/vnd.ms-excel",
-        Some("xlsx") => {
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        }
-        Some("ppt") => "application/vnd.ms-powerpoint",
-        Some("pptx") => {
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        }
-        Some("zip") => "application/zip",
-        Some("rar") => "application/x-rar-compressed",
-        Some("7z") => "application/x-7z-compressed",
-        Some("txt") => "text/plain",
-        Some("csv") => "text/csv",
-        Some("json") => "application/json",
-        Some("xml") => "application/xml",
-        Some("html" | "htm") => "text/html",
-        Some("mp4") => "video/mp4",
-        Some("webm") => "video/webm",
-        Some("mov") => "video/quicktime",
-        Some("avi") => "video/x-msvideo",
-        Some("mp3") => "audio/mpeg",
-        Some("wav") => "audio/wav",
-        Some("ogg") => "audio/ogg",
-        Some("m4a") => "audio/mp4",
-        _ => "application/octet-stream",
-    }
-}
-
-fn js_escape_filename(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for ch in s.chars() {
-        match ch {
-            '\\' => out.push_str("\\\\"),
-            '\'' => out.push_str("\\'"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            _ => out.push(ch),
-        }
-    }
-    out
-}
-
-fn build_drag_event_js(event_type: &str) -> String {
-    format!(
-        concat!(
-            "(function(){{",
-            "var cx=window.innerWidth/2,cy=window.innerHeight/2,",
-            "t=document.elementFromPoint(cx,cy)||document.body,",
-            "d=new DataTransfer();",
-            "d.items.add(new File([''],'file',{{type:'application/octet-stream'}}));",
-            "t.dispatchEvent(new DragEvent('{evt}',",
-            "{{dataTransfer:d,bubbles:true,cancelable:true,clientX:cx,clientY:cy}}))}})()"
-        ),
-        evt = event_type,
-    )
-}
-
-fn build_file_drop_js(paths: &[PathBuf]) -> Option<String> {
-    let mut file_entries = Vec::new();
-
-    for path in paths {
-        let metadata = match std::fs::metadata(path) {
-            Ok(m) => m,
-            Err(_) => continue,
-        };
-        if !metadata.is_file() || metadata.len() > MAX_DROP_FILE_SIZE {
-            continue;
-        }
-        let data = match std::fs::read(path) {
-            Ok(d) => d,
-            Err(_) => continue,
-        };
-        let filename = match path.file_name().and_then(|n| n.to_str()) {
-            Some(n) => n,
-            None => continue,
-        };
-        let mime = mime_type_from_path(path);
-        let b64 = BASE64.encode(&data);
-
-        file_entries.push(format!(
-            "{{n:'{}',t:'{}',d:'{}'}}",
-            js_escape_filename(filename),
-            mime,
-            b64,
-        ));
-    }
-
-    if file_entries.is_empty() {
-        return None;
-    }
-
-    let files_js = file_entries.join(",");
-
-    Some(format!(
-        r#"(function(){{
-var cx=window.innerWidth/2,cy=window.innerHeight/2;
-var t=document.elementFromPoint(cx,cy)||document.body;
-var fs=[{files}];
-var dt=new DataTransfer();
-fs.forEach(function(f){{
-var b=atob(f.d),u=new Uint8Array(b.length);
-for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
-dt.items.add(new File([u],f.n,{{type:f.t,lastModified:Date.now()}}));
-}});
-var o={{dataTransfer:dt,bubbles:true,cancelable:true,clientX:cx,clientY:cy,screenX:cx,screenY:cy}};
-t.dispatchEvent(new DragEvent('dragenter',o));
-t.dispatchEvent(new DragEvent('dragover',o));
-setTimeout(function(){{
-var dropTarget=document.elementFromPoint(cx,cy)||t;
-dropTarget.dispatchEvent(new DragEvent('drop',o));
-}},100);
-}})()"#,
-        files = files_js,
-    ))
-}
-
-fn handle_file_drop(webview: &tauri::Webview, event: &tauri::DragDropEvent) {
-    match event {
-        tauri::DragDropEvent::Enter { .. } => {
-            let _ = webview.eval(&build_drag_event_js("dragenter"));
-        }
-        tauri::DragDropEvent::Over { .. } => {
-            let _ = webview.eval(&build_drag_event_js("dragover"));
-        }
-        tauri::DragDropEvent::Drop { paths, .. } => {
-            if let Some(js) = build_file_drop_js(paths) {
-                let _ = webview.eval(&js);
-            }
-        }
-        tauri::DragDropEvent::Leave => {
-            let _ = webview.eval(
-                "(function(){document.body.dispatchEvent(new DragEvent('dragleave',{bubbles:true,cancelable:true}))})()",
-            );
-        }
-        _ => {}
-    }
-}
-
-fn register_file_drop_handler(webview: &tauri::Webview) {
-    let wv = webview.clone();
-    webview.on_webview_event(move |event| {
-        if let tauri::WebviewEvent::DragDrop(ref dd_event) = *event {
-            handle_file_drop(&wv, dd_event);
-        }
-    });
-}
-
 #[tauri::command]
 async fn open_service(
     app: tauri::AppHandle,
@@ -1037,7 +608,7 @@ async fn open_service(
     storage_key: String,
     allow_notifications: bool,
 ) {
-    use tauri::{Manager, PhysicalPosition, PhysicalSize};
+    use tauri::{PhysicalPosition, PhysicalSize};
 
     let Some((webview_url, initialization_script)) =
         service_webview_setup(&url, allow_notifications)
@@ -1049,7 +620,9 @@ async fn open_service(
 
     {
         let state = app.state::<ActiveWebview>();
-        *state.0.lock().unwrap() = id.clone();
+        if let Ok(mut active) = state.0.lock() {
+            *active = id.clone();
+        };
     }
 
     if let Some(window) = app.get_window("main") {
@@ -1121,30 +694,7 @@ async fn open_service(
             builder
         }
         .initialization_script(&initialization_script)
-        .on_navigation(move |url| {
-                if url.host_str() == Some("ferx.notify") {
-                    if let Some(payload_str) = url.path().strip_prefix('/') {
-                        emit_badge_update(&app_handle, &service_id, payload_str);
-                    }
-                    return false;
-                }
-                if url.host_str() == Some("ferx.shortcut") {
-                    if let Some(key_str) = url.path().strip_prefix('/') {
-                        let _ = app_handle.emit("switch-shortcut", key_str);
-                    }
-                    return false;
-                }
-                if url.host_str() == Some("ferx.download") {
-                    let query = url.query_pairs().find(|(k, _)| k == "url");
-                    if let Some((_, target_url)) = query {
-                        use tauri_plugin_opener::OpenerExt;
-                        let _ = app_handle.opener().open_url(target_url.to_string(), None::<&str>);
-                        let _ = app_handle.emit("show-toast", "Opening download in your browser...");
-                    }
-                    return false;
-                }
-                true
-            });
+        .on_navigation(move |url| handle_special_navigation(&app_handle, &service_id, url));
 
         match window.add_child(builder, active_pos, active_size) {
             Ok(webview) => register_file_drop_handler(&webview),
@@ -1161,7 +711,7 @@ async fn load_service(
     storage_key: String,
     allow_notifications: bool,
 ) {
-    use tauri::{Manager, PhysicalPosition, PhysicalSize};
+    use tauri::{PhysicalPosition, PhysicalSize};
 
     if app.get_webview(&id).is_some() {
         return;
@@ -1208,30 +758,7 @@ async fn load_service(
             builder
         }
         .initialization_script(&initialization_script)
-        .on_navigation(move |url| {
-                if url.host_str() == Some("ferx.notify") {
-                    if let Some(payload_str) = url.path().strip_prefix('/') {
-                        emit_badge_update(&app_handle, &service_id, payload_str);
-                    }
-                    return false;
-                }
-                if url.host_str() == Some("ferx.shortcut") {
-                    if let Some(key_str) = url.path().strip_prefix('/') {
-                        let _ = app_handle.emit("switch-shortcut", key_str);
-                    }
-                    return false;
-                }
-                if url.host_str() == Some("ferx.download") {
-                    let query = url.query_pairs().find(|(k, _)| k == "url");
-                    if let Some((_, target_url)) = query {
-                        use tauri_plugin_opener::OpenerExt;
-                        let _ = app_handle.opener().open_url(target_url.to_string(), None::<&str>);
-                        let _ = app_handle.emit("show-toast", "Opening download in your browser...");
-                    }
-                    return false;
-                }
-                true
-            });
+        .on_navigation(move |url| handle_special_navigation(&app_handle, &service_id, url));
 
         let scale_factor = window.scale_factor().unwrap_or(1.0);
         let physical_size = window.inner_size().unwrap_or_default();
@@ -1283,21 +810,13 @@ pub fn run() {
             let _tray = TrayIconBuilder::with_id("ferx_tray")
                 .menu(&tray_menu)
                 .show_menu_on_left_click(false)
-                .icon(cached_tray_icons().normal.clone())
+                .icon(desktop_ui::tray_icon(false))
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "quit_app" => {
                         app.exit(0);
                     }
                     "toggle_window" => {
-                        if let Some(window) = app.get_window("main") {
-                            let is_visible = window.is_visible().unwrap_or(false);
-                            if is_visible {
-                                let _ = window.hide();
-                            } else {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                        }
+                        desktop_ui::toggle_main_window_visibility(&app);
                     }
                     _ => {}
                 })
@@ -1309,15 +828,7 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        if let Some(window) = app.get_window("main") {
-                            let is_visible = window.is_visible().unwrap_or(false);
-                            if is_visible {
-                                let _ = window.hide();
-                            } else {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                        }
+                        desktop_ui::toggle_main_window_visibility(&app);
                     }
                 })
                 .build(app)?;
@@ -1327,7 +838,11 @@ pub fn run() {
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::Resized(physical_size) => {
                 let state = window.state::<ActiveWebview>();
-                let active_id = state.0.lock().unwrap().clone();
+                let active_id = state
+                    .0
+                    .lock()
+                    .map(|active| active.clone())
+                    .unwrap_or_default();
 
                 if !active_id.is_empty() {
                     let scale_factor = window.scale_factor().unwrap_or(1.0);

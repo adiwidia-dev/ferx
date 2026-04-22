@@ -202,6 +202,8 @@ fn badge_engine_script(strategy_name: &str) -> String {
         window.__ferx_badge_strategy = '{strategy_name}';
         window.__ferx_last_badge_state = '__ferx:init__';
         window.__ferx_badge_dom_timer = window.__ferx_badge_dom_timer || null;
+        window.__ferx_badge_monitoring_enabled = window.__ferx_badge_monitoring_enabled ?? true;
+        window.__ferx_badge_monitoring_enabled = window.__ferx_badge_monitoring_enabled ?? true;
 
         const normalizeTitle = (title) => (title || '').replace(/[\u200E\u200F\u200B-\u200D]/g, '').trim();
         const unsupportedTitleState = (title) => {{
@@ -325,6 +327,7 @@ fn badge_engine_script(strategy_name: &str) -> String {
         }};
 
         const evaluateBadgeState = () => {{
+            if (!window.__ferx_badge_monitoring_enabled) return;
             try {{
                 emitBadgeState(strategy.readState());
             }} catch (error) {{
@@ -333,6 +336,7 @@ fn badge_engine_script(strategy_name: &str) -> String {
         }};
         const scheduleDomEvaluation = () => {{
             if (!strategy.needsDomObservation) return;
+            if (!window.__ferx_badge_monitoring_enabled) return;
             if (window.__ferx_badge_dom_timer) clearTimeout(window.__ferx_badge_dom_timer);
             window.__ferx_badge_dom_timer = window.setTimeout(() => {{
                 window.__ferx_badge_dom_timer = null;
@@ -344,7 +348,10 @@ fn badge_engine_script(strategy_name: &str) -> String {
             const target = document.head || document.documentElement;
             if (!target) return;
 
-            new MutationObserver(() => evaluateBadgeState()).observe(target, {{
+            new MutationObserver(() => {{
+                if (!window.__ferx_badge_monitoring_enabled) return;
+                evaluateBadgeState();
+            }}).observe(target, {{
                 childList: true,
                 subtree: true,
                 characterData: true
@@ -357,11 +364,25 @@ fn badge_engine_script(strategy_name: &str) -> String {
             const target = document.body || document.documentElement;
             if (!target) return;
 
-            new MutationObserver(() => scheduleDomEvaluation()).observe(target, {{
+            new MutationObserver(() => {{
+                if (!window.__ferx_badge_monitoring_enabled) return;
+                scheduleDomEvaluation();
+            }}).observe(target, {{
                 childList: true,
                 subtree: true,
                 characterData: true
             }});
+        }};
+
+        window.__ferxSetBadgeMonitoring = (enabled) => {{
+            window.__ferx_badge_monitoring_enabled = enabled;
+            if (window.__ferx_badge_dom_timer) {{
+                clearTimeout(window.__ferx_badge_dom_timer);
+                window.__ferx_badge_dom_timer = null;
+            }}
+
+            if (!enabled) return;
+            evaluateBadgeState();
         }};
 
         const start = () => {{
@@ -376,9 +397,18 @@ fn badge_engine_script(strategy_name: &str) -> String {
             start();
         }}
 
-        window.addEventListener('focus', evaluateBadgeState);
-        window.addEventListener('hashchange', evaluateBadgeState);
-        window.addEventListener('popstate', evaluateBadgeState);
+        window.addEventListener('focus', () => {{
+            if (!window.__ferx_badge_monitoring_enabled) return;
+            evaluateBadgeState();
+        }});
+        window.addEventListener('hashchange', () => {{
+            if (!window.__ferx_badge_monitoring_enabled) return;
+            evaluateBadgeState();
+        }});
+        window.addEventListener('popstate', () => {{
+            if (!window.__ferx_badge_monitoring_enabled) return;
+            evaluateBadgeState();
+        }});
     }})();
 "#
     )
@@ -515,6 +545,7 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
         }};
 
         const evaluateBadgeState = async () => {{
+            if (!window.__ferx_badge_monitoring_enabled) return;
             let nextState = 'clear';
             try {{
                 // Short-circuit from cheapest to most expensive.
@@ -536,6 +567,7 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
         }};
 
         const scheduleDomEvaluation = () => {{
+            if (!window.__ferx_badge_monitoring_enabled) return;
             if (window.__ferx_badge_dom_timer) clearTimeout(window.__ferx_badge_dom_timer);
             window.__ferx_badge_dom_timer = window.setTimeout(() => {{
                 window.__ferx_badge_dom_timer = null;
@@ -548,6 +580,7 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
             if (!target) return;
 
             new MutationObserver(() => {{
+                if (!window.__ferx_badge_monitoring_enabled) return;
                 void evaluateBadgeState();
             }}).observe(target, {{
                 childList: true,
@@ -560,11 +593,25 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
             const target = document.body || document.documentElement;
             if (!target) return;
 
-            new MutationObserver(() => scheduleDomEvaluation()).observe(target, {{
+            new MutationObserver(() => {{
+                if (!window.__ferx_badge_monitoring_enabled) return;
+                scheduleDomEvaluation();
+            }}).observe(target, {{
                 childList: true,
                 subtree: true,
                 characterData: true
             }});
+        }};
+
+        window.__ferxSetBadgeMonitoring = (enabled) => {{
+            window.__ferx_badge_monitoring_enabled = enabled;
+            if (window.__ferx_badge_dom_timer) {{
+                clearTimeout(window.__ferx_badge_dom_timer);
+                window.__ferx_badge_dom_timer = null;
+            }}
+
+            if (!enabled) return;
+            void evaluateBadgeState();
         }};
 
         const start = () => {{
@@ -580,12 +627,15 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
         }}
 
         window.addEventListener('focus', () => {{
+            if (!window.__ferx_badge_monitoring_enabled) return;
             void evaluateBadgeState();
         }});
         window.addEventListener('hashchange', () => {{
+            if (!window.__ferx_badge_monitoring_enabled) return;
             void evaluateBadgeState();
         }});
         window.addEventListener('popstate', () => {{
+            if (!window.__ferx_badge_monitoring_enabled) return;
             void evaluateBadgeState();
         }});
     }})();
@@ -604,6 +654,7 @@ fn teams_badge_engine_script() -> String {
 
         window.__ferx_last_badge_state = '__ferx:init__';
         window.__ferx_badge_dom_timer = null;
+        window.__ferx_badge_monitoring_enabled = window.__ferx_badge_monitoring_enabled ?? true;
 
         const safeParseInt = (text) => {
             const n = parseInt((text || '').trim(), 10);
@@ -669,6 +720,7 @@ fn teams_badge_engine_script() -> String {
         };
 
         const evaluateBadgeState = async () => {
+            if (!window.__ferx_badge_monitoring_enabled) return;
             try {
                 await emitBadgeState(readState());
             } catch (_error) {
@@ -677,6 +729,7 @@ fn teams_badge_engine_script() -> String {
         };
 
         const scheduleDomEvaluation = () => {
+            if (!window.__ferx_badge_monitoring_enabled) return;
             if (window.__ferx_badge_dom_timer) clearTimeout(window.__ferx_badge_dom_timer);
             window.__ferx_badge_dom_timer = setTimeout(() => {
                 window.__ferx_badge_dom_timer = null;
@@ -689,6 +742,7 @@ fn teams_badge_engine_script() -> String {
             if (!target) return;
 
             new MutationObserver(() => {
+                if (!window.__ferx_badge_monitoring_enabled) return;
                 void evaluateBadgeState();
             }).observe(target, {
                 childList: true,
@@ -701,11 +755,25 @@ fn teams_badge_engine_script() -> String {
             const target = document.body || document.documentElement;
             if (!target) return;
 
-            new MutationObserver(() => scheduleDomEvaluation()).observe(target, {
+            new MutationObserver(() => {
+                if (!window.__ferx_badge_monitoring_enabled) return;
+                scheduleDomEvaluation();
+            }).observe(target, {
                 childList: true,
                 subtree: true,
                 characterData: true
             });
+        };
+
+        window.__ferxSetBadgeMonitoring = (enabled) => {
+            window.__ferx_badge_monitoring_enabled = enabled;
+            if (window.__ferx_badge_dom_timer) {
+                clearTimeout(window.__ferx_badge_dom_timer);
+                window.__ferx_badge_dom_timer = null;
+            }
+
+            if (!enabled) return;
+            void evaluateBadgeState();
         };
 
         const start = () => {
@@ -720,9 +788,18 @@ fn teams_badge_engine_script() -> String {
             start();
         }
 
-        window.addEventListener('focus', () => { void evaluateBadgeState(); });
-        window.addEventListener('hashchange', () => { void evaluateBadgeState(); });
-        window.addEventListener('popstate', () => { void evaluateBadgeState(); });
+        window.addEventListener('focus', () => {
+            if (!window.__ferx_badge_monitoring_enabled) return;
+            void evaluateBadgeState();
+        });
+        window.addEventListener('hashchange', () => {
+            if (!window.__ferx_badge_monitoring_enabled) return;
+            void evaluateBadgeState();
+        });
+        window.addEventListener('popstate', () => {
+            if (!window.__ferx_badge_monitoring_enabled) return;
+            void evaluateBadgeState();
+        });
     })();
 "#.to_string()
 }
