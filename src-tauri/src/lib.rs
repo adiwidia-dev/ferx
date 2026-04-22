@@ -307,6 +307,9 @@ mod tests {
         assert!(script.contains("outlookScreenReaderState"));
         assert!(script.contains("outlookFolderState"));
         assert!(script.contains("outlookPageTextState"));
+        assert!(script.contains(
+            "window.__ferx_badge_monitoring_enabled = window.__ferx_badge_monitoring_enabled ?? true;"
+        ));
         assert!(!script.contains("console.info"));
     }
 
