@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import packageJson from "../../../package.json";
 import { getAppInfo } from "./app-info";
 
 describe("getAppInfo", () => {
@@ -8,7 +9,7 @@ describe("getAppInfo", () => {
 
     expect(appInfo).toEqual({
       name: "Ferx",
-      version: "0.1.0",
+      version: packageJson.version,
       releasesUrl: "https://github.com/adiwidia-dev/ferx/releases",
     });
     expect(Object.isFrozen(appInfo)).toBe(true);
