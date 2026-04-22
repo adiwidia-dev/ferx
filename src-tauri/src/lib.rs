@@ -106,6 +106,26 @@ mod tests {
     }
 
     #[test]
+    fn tauri_conf_enables_updater_with_github_endpoint() {
+        let config = include_str!("../tauri.conf.json");
+
+        assert!(config.contains("\"createUpdaterArtifacts\": true"));
+        assert!(config.contains("\"updater\""));
+        assert!(config.contains("\"pubkey\""));
+        assert!(config.contains("github.com/adiwidia-dev/ferx/releases"));
+        assert!(config.contains("latest.json"));
+    }
+
+    #[test]
+    fn default_capability_grants_updater_and_process_restart() {
+        let capability = include_str!("../capabilities/default.json");
+
+        assert!(capability.contains("updater:default"));
+        assert!(capability.contains("process:default"));
+        assert!(capability.contains("process:allow-restart"));
+    }
+
+    #[test]
     fn microsoft_service_kind_centralizes_outlook_and_teams_host_matching() {
         assert_eq!(
             microsoft_service_kind("https://outlook.office.com/mail"),
@@ -782,6 +802,8 @@ pub fn run() {
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(ActiveWebview(Mutex::new(String::new())));
 
     #[cfg(feature = "devtools")]

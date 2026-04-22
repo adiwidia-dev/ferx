@@ -5,6 +5,13 @@
   import { Button } from "$lib/components/ui/button";
   import { getAppInfo } from "$lib/services/app-info";
   import { getServiceFaviconUrl, getServiceMonogram } from "$lib/services/service-icon";
+  import {
+    checkForUpdate,
+    downloadAndInstall,
+    formatErrorMessage,
+    relaunchApp,
+    type UpdaterState,
+  } from "$lib/services/updater";
   import { readStartupState, type PageService } from "$lib/services/workspace-state";
 
   const appInfo = getAppInfo();
@@ -13,6 +20,7 @@
   let activeId = $state("");
   let isDnd = $state(false);
   let failedIcons = $state<Record<string, boolean>>({});
+  let updater = $state<UpdaterState>({ status: "idle" });
 
   onMount(() => {
     invoke("hide_all_webviews");
@@ -21,6 +29,53 @@
     services = startup.services;
     activeId = startup.activeId;
   });
+
+  async function handleCheckForUpdates() {
+    updater = { status: "checking" };
+    try {
+      const update = await checkForUpdate();
+      if (!update) {
+        updater = { status: "up-to-date" };
+        return;
+      }
+      updater = {
+        status: "available",
+        version: update.version,
+        notes: update.body ?? null,
+        update,
+      };
+    } catch (error) {
+      updater = { status: "error", message: formatErrorMessage(error) };
+    }
+  }
+
+  async function handleDownloadAndInstall() {
+    if (updater.status !== "available") return;
+    const { update, version } = updater;
+    updater = { status: "downloading", version, downloaded: 0, total: null };
+    try {
+      await downloadAndInstall(update, (downloaded, total) => {
+        updater = { status: "downloading", version, downloaded, total };
+      });
+      updater = { status: "installed", version };
+    } catch (error) {
+      updater = { status: "error", message: formatErrorMessage(error) };
+    }
+  }
+
+  async function handleRelaunch() {
+    try {
+      await relaunchApp();
+    } catch (error) {
+      updater = { status: "error", message: formatErrorMessage(error) };
+    }
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
 </script>
 
 <svelte:head>
@@ -162,31 +217,132 @@
         </div>
 
         <div class="px-6 py-5">
-          <div class="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 mb-4 text-left">
-            <div class="flex items-start gap-3">
-              <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-500/10">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-              </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold text-foreground">Manual updates</p>
-                <p class="mt-0.5 text-xs text-muted-foreground">
-                  {appInfo.name} does not install updates in-app. Check the latest GitHub release and
-                  download it manually when you want to upgrade from v{appInfo.version}.
-                </p>
+          {#if updater.status === "idle"}
+            <div class="rounded-2xl border border-border bg-muted/30 p-4 mb-4 text-left">
+              <div class="flex items-start gap-3">
+                <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-foreground/5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-semibold text-foreground">Automatic updates</p>
+                  <p class="mt-0.5 text-xs text-muted-foreground">
+                    Check for a new release. Updates are verified with a signing key before they
+                    are applied.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <Button
-            class="w-full rounded-xl h-10 transition-all hover:scale-[1.01] shadow-sm"
-            onclick={() => appInfo.releasesUrl && openUrl(appInfo.releasesUrl)}
-          >
-            View Latest Release
-          </Button>
+            <Button
+              class="w-full rounded-xl h-10 transition-all hover:scale-[1.01] shadow-sm"
+              onclick={handleCheckForUpdates}
+            >
+              Check for Updates
+            </Button>
+          {:else if updater.status === "checking"}
+            <div class="rounded-2xl border border-border bg-muted/30 p-4 mb-4 text-left">
+              <p class="text-sm font-semibold text-foreground">Checking for updates…</p>
+              <p class="mt-0.5 text-xs text-muted-foreground">Contacting the release server.</p>
+            </div>
+
+            <Button class="w-full rounded-xl h-10 shadow-sm" disabled>Checking…</Button>
+          {:else if updater.status === "up-to-date"}
+            <div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 mb-4 text-left">
+              <p class="text-sm font-semibold text-foreground">You're up to date</p>
+              <p class="mt-0.5 text-xs text-muted-foreground">
+                {appInfo.name} v{appInfo.version} is the latest release.
+              </p>
+            </div>
+
+            <Button
+              class="w-full rounded-xl h-10 transition-all hover:scale-[1.01] shadow-sm"
+              onclick={handleCheckForUpdates}
+            >
+              Check Again
+            </Button>
+          {:else if updater.status === "available"}
+            <div class="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 mb-4 text-left">
+              <p class="text-sm font-semibold text-foreground">
+                Version {updater.version} is available
+              </p>
+              {#if updater.notes}
+                <p class="mt-1 text-xs text-muted-foreground whitespace-pre-line">{updater.notes}</p>
+              {:else}
+                <p class="mt-0.5 text-xs text-muted-foreground">
+                  Download and install to upgrade from v{appInfo.version}.
+                </p>
+              {/if}
+            </div>
+
+            <Button
+              class="w-full rounded-xl h-10 transition-all hover:scale-[1.01] shadow-sm"
+              onclick={handleDownloadAndInstall}
+            >
+              Download and Install
+            </Button>
+          {:else if updater.status === "downloading"}
+            <div class="rounded-2xl border border-border bg-muted/30 p-4 mb-4 text-left">
+              <p class="text-sm font-semibold text-foreground">Downloading v{updater.version}</p>
+              <p class="mt-0.5 text-xs text-muted-foreground">
+                {#if updater.total}
+                  {formatBytes(updater.downloaded)} / {formatBytes(updater.total)}
+                {:else}
+                  {formatBytes(updater.downloaded)} downloaded
+                {/if}
+              </p>
+              <div class="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-foreground/10">
+                <div
+                  class="h-full rounded-full bg-blue-500 transition-[width]"
+                  style={`width: ${
+                    updater.total ? Math.min(100, (updater.downloaded / updater.total) * 100) : 0
+                  }%`}
+                ></div>
+              </div>
+            </div>
+
+            <Button class="w-full rounded-xl h-10 shadow-sm" disabled>Installing…</Button>
+          {:else if updater.status === "installed"}
+            <div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 mb-4 text-left">
+              <p class="text-sm font-semibold text-foreground">
+                Update v{updater.version} installed
+              </p>
+              <p class="mt-0.5 text-xs text-muted-foreground">
+                Relaunch {appInfo.name} to start the new version.
+              </p>
+            </div>
+
+            <Button
+              class="w-full rounded-xl h-10 transition-all hover:scale-[1.01] shadow-sm"
+              onclick={handleRelaunch}
+            >
+              Relaunch Now
+            </Button>
+          {:else if updater.status === "error"}
+            <div class="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 mb-4 text-left">
+              <p class="text-sm font-semibold text-foreground">Update failed</p>
+              <p class="mt-0.5 text-xs text-muted-foreground break-words">{updater.message}</p>
+            </div>
+
+            <div class="flex gap-2">
+              <Button
+                class="flex-1 rounded-xl h-10 transition-all hover:scale-[1.01] shadow-sm"
+                onclick={handleCheckForUpdates}
+              >
+                Try Again
+              </Button>
+              <Button
+                variant="outline"
+                class="flex-1 rounded-xl h-10"
+                onclick={() => appInfo.releasesUrl && openUrl(appInfo.releasesUrl)}
+              >
+                View Releases
+              </Button>
+            </div>
+          {/if}
         </div>
       </div>
     </div>
