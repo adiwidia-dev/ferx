@@ -4,6 +4,11 @@
   import { onMount } from "svelte";
   import { Button } from "$lib/components/ui/button";
   import { getAppInfo } from "$lib/services/app-info";
+  import {
+    APP_SETTINGS_STORAGE_KEY,
+    readAppSettings,
+    serializeAppSettings,
+  } from "$lib/services/app-settings";
   import { getServiceFaviconUrl, getServiceMonogram } from "$lib/services/service-icon";
   import {
     checkForUpdate,
@@ -21,13 +26,25 @@
   let isDnd = $state(false);
   let failedIcons = $state<Record<string, boolean>>({});
   let updater = $state<UpdaterState>({ status: "idle" });
+  let spellCheckEnabled = $state(true);
+  let initialSpellCheckEnabled = $state(true);
+  let showRestartPrompt = $state(false);
+  let showRestartConfirm = $state(false);
+  let restartError = $state("");
+  let spellCheckRestartRequired = $derived(spellCheckEnabled !== initialSpellCheckEnabled);
 
   onMount(() => {
     void invoke("hide_all_webviews");
 
     const startup = readStartupState(localStorage.getItem("ferx-workspace-services"));
+    const settings = readAppSettings(localStorage.getItem(APP_SETTINGS_STORAGE_KEY));
     services = startup.services;
     activeId = startup.activeId;
+    spellCheckEnabled = settings.spellCheckEnabled;
+    initialSpellCheckEnabled = settings.spellCheckEnabled;
+    showRestartPrompt = false;
+    showRestartConfirm = false;
+    restartError = "";
   });
 
   async function handleCheckForUpdates() {
@@ -75,6 +92,35 @@
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function handleSpellCheckChange(enabled: boolean) {
+    spellCheckEnabled = enabled;
+    localStorage.setItem(
+      APP_SETTINGS_STORAGE_KEY,
+      serializeAppSettings({ spellCheckEnabled }),
+    );
+    showRestartPrompt = enabled !== initialSpellCheckEnabled;
+    restartError = "";
+  }
+
+  function requestRestartFerx() {
+    restartError = "";
+    showRestartConfirm = true;
+  }
+
+  function cancelRestartFerx() {
+    showRestartConfirm = false;
+    restartError = "";
+  }
+
+  async function handleRestartFerx() {
+    restartError = "";
+    try {
+      await relaunchApp();
+    } catch (error) {
+      restartError = formatErrorMessage(error);
+    }
   }
 </script>
 
@@ -176,6 +222,88 @@
   <main
     class="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col bg-background/50"
   >
+    {#if showRestartPrompt}
+      <div
+        data-testid="spell-check-restart-prompt-overlay"
+        class="absolute inset-0 z-50 flex items-start justify-center bg-background/45 px-4 pt-24 backdrop-blur-sm sm:pt-32"
+        role="presentation"
+      >
+        <div
+          data-testid="spell-check-restart-prompt"
+          class="w-full max-w-md rounded-2xl border bg-card p-5 text-left shadow-2xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-200"
+          role="status"
+        >
+          <p class="text-base font-semibold text-foreground">
+            Spell checking will update after restart.
+          </p>
+          <p class="mt-2 text-sm text-muted-foreground">
+            Restart Ferx now or use the restart button in Settings later.
+          </p>
+          <div class="mt-5 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              class="h-9 rounded-xl px-3 text-xs"
+              aria-label="Dismiss restart prompt"
+              onclick={() => (showRestartPrompt = false)}
+            >
+              Later
+            </Button>
+            <Button
+              class="h-9 rounded-xl px-3 text-xs"
+              data-testid="prompt-restart-button"
+              onclick={handleRestartFerx}
+            >
+              Restart Ferx
+            </Button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    {#if showRestartConfirm}
+      <div
+        class="absolute inset-0 z-[60] flex items-start justify-center bg-background/45 px-4 pt-24 backdrop-blur-sm sm:pt-32"
+        role="presentation"
+      >
+        <div
+          data-testid="restart-confirm-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="restart-confirm-title"
+          class="w-full max-w-md rounded-2xl border bg-card p-5 text-left shadow-2xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-200"
+        >
+          <p id="restart-confirm-title" class="text-base font-semibold text-foreground">
+            Restart Ferx?
+          </p>
+          <p class="mt-2 text-sm text-muted-foreground">
+            Are you sure you want to restart Ferx? The app will close and reopen.
+          </p>
+          {#if restartError}
+            <p class="mt-3 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs font-medium text-red-500">
+              {restartError}
+            </p>
+          {/if}
+          <div class="mt-5 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              class="h-9 rounded-xl px-3 text-xs"
+              data-testid="cancel-restart-button"
+              onclick={cancelRestartFerx}
+            >
+              Cancel
+            </Button>
+            <Button
+              class="h-9 rounded-xl px-3 text-xs"
+              data-testid="confirm-restart-button"
+              onclick={handleRestartFerx}
+            >
+              Restart Ferx
+            </Button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
     <div
       class="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-500/5 via-background to-background"
     ></div>
@@ -221,6 +349,64 @@
             <p class="text-sm font-semibold mt-0.5">{appInfo.version}</p>
           </div>
           <span class="text-xs font-medium text-muted-foreground bg-muted px-2.5 py-1 rounded-full">Current</span>
+        </div>
+
+        <div class="flex items-center justify-between gap-4 px-6 py-4 border-b">
+          <div class="text-left">
+            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Spell Checking
+            </p>
+            <p class="text-sm font-semibold mt-0.5">Enable Spell Checking</p>
+            {#if spellCheckRestartRequired}
+              <p class="mt-1 text-xs font-medium text-amber-600">
+                Restart Ferx to apply spell checking changes.
+              </p>
+            {/if}
+            <p class="mt-1 text-xs text-muted-foreground">
+              Uses the built-in spell checker for service inputs.
+            </p>
+          </div>
+
+          <label class="relative inline-flex cursor-pointer items-center">
+            <input
+              name="spell-check-enabled"
+              type="checkbox"
+              class="peer sr-only"
+              checked={spellCheckEnabled}
+              onchange={(event) =>
+                handleSpellCheckChange((event.currentTarget as HTMLInputElement).checked)}
+            />
+            <span
+              class="h-6 w-11 rounded-full bg-muted transition-colors peer-checked:bg-blue-500"
+            ></span>
+            <span
+              class="pointer-events-none absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-background shadow-sm transition-transform peer-checked:translate-x-5"
+            ></span>
+          </label>
+        </div>
+
+        <div class="flex items-center justify-between gap-4 px-6 py-4 border-b">
+          <div class="text-left">
+            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Restart
+            </p>
+            <p class="text-sm font-semibold mt-0.5">Restart Ferx</p>
+            <p class="mt-1 text-xs text-muted-foreground">
+              Relaunch the app to apply pending settings changes.
+            </p>
+            {#if restartError}
+              <p class="mt-1 text-xs font-medium text-red-500">{restartError}</p>
+            {/if}
+          </div>
+
+          <Button
+            variant="outline"
+            class="h-9 rounded-xl px-3 text-xs"
+            data-testid="manual-restart-button"
+            onclick={requestRestartFerx}
+          >
+            Restart Ferx
+          </Button>
         </div>
 
         <div class="px-6 py-5">

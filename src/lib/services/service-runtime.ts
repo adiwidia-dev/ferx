@@ -10,7 +10,10 @@ type ServiceRuntimeService = {
   };
 };
 
-export function createServiceLoadPayload(service: ServiceRuntimeService) {
+export function createServiceLoadPayload(
+  service: ServiceRuntimeService,
+  spellCheckEnabled: boolean,
+) {
   const badgeMonitoringEnabled =
     service.notificationPrefs.showBadge !== false ||
     service.notificationPrefs.affectTray !== false;
@@ -21,6 +24,7 @@ export function createServiceLoadPayload(service: ServiceRuntimeService) {
     storageKey: service.storageKey,
     allowNotifications: service.notificationPrefs.allowNotifications,
     badgeMonitoringEnabled,
+    spellCheckEnabled,
   };
 }
 

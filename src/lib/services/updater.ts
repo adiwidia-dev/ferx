@@ -1,5 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
 import { check, type Update } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
 
 export type UpdaterState =
   | { status: "idle" }
@@ -38,7 +38,7 @@ export async function downloadAndInstall(
 }
 
 export async function relaunchApp(): Promise<void> {
-  await relaunch();
+  await invoke("restart_app");
 }
 
 export function formatErrorMessage(error: unknown): string {

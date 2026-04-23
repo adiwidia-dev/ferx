@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const checkMock = vi.fn();
-const relaunchMock = vi.fn();
+const invokeMock = vi.fn();
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (...args: unknown[]) => invokeMock(...args),
+}));
 
 vi.mock("@tauri-apps/plugin-updater", () => ({
   check: (...args: unknown[]) => checkMock(...args),
-}));
-
-vi.mock("@tauri-apps/plugin-process", () => ({
-  relaunch: (...args: unknown[]) => relaunchMock(...args),
 }));
 
 import {
@@ -81,15 +81,16 @@ describe("downloadAndInstall", () => {
 
 describe("relaunchApp", () => {
   beforeEach(() => {
-    relaunchMock.mockReset();
+    invokeMock.mockReset();
   });
 
-  it("delegates to tauri-plugin-process", async () => {
-    relaunchMock.mockResolvedValueOnce(undefined);
+  it("delegates to the Tauri restart command", async () => {
+    invokeMock.mockResolvedValueOnce(undefined);
 
     await relaunchApp();
 
-    expect(relaunchMock).toHaveBeenCalledTimes(1);
+    expect(invokeMock).toHaveBeenCalledTimes(1);
+    expect(invokeMock).toHaveBeenCalledWith("restart_app");
   });
 });
 

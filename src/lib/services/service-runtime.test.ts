@@ -38,6 +38,7 @@ describe("createServiceLoadPayload", () => {
           storageKey: "storage-docs",
           allowNotifications: false,
         }),
+        true,
       ),
     ).toEqual({
       id: "docs",
@@ -45,6 +46,7 @@ describe("createServiceLoadPayload", () => {
       storageKey: "storage-docs",
       allowNotifications: false,
       badgeMonitoringEnabled: true,
+      spellCheckEnabled: true,
     });
   });
 
@@ -55,9 +57,11 @@ describe("createServiceLoadPayload", () => {
           showBadge: false,
           affectTray: false,
         }),
+        false,
       ),
     ).toMatchObject({
       badgeMonitoringEnabled: false,
+      spellCheckEnabled: false,
     });
   });
 });

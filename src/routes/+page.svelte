@@ -10,6 +10,11 @@
   import WorkspaceEmptyState from "$lib/components/workspace/workspace-empty-state.svelte";
   import WorkspaceSidebar from "$lib/components/workspace/workspace-sidebar.svelte";
   import {
+    DEFAULT_APP_SETTINGS,
+    APP_SETTINGS_STORAGE_KEY,
+    readAppSettings,
+  } from "$lib/services/app-settings";
+  import {
     createDeletePayload,
     createServiceLoadPayload,
     shouldPreloadService,
@@ -44,6 +49,7 @@
   let services = $state<Service[]>([]);
   let badges = $state<Record<string, number | undefined>>({});
   let isInitialized = $state(false);
+  let spellCheckEnabled = $state(DEFAULT_APP_SETTINGS.spellCheckEnabled);
 
   let isAddModalOpen = $state(false);
   let isDnd = $state(false);
@@ -130,6 +136,9 @@
     const startupState = readStartupState(
       localStorage.getItem("ferx-workspace-services"),
     );
+    spellCheckEnabled = readAppSettings(
+      localStorage.getItem(APP_SETTINGS_STORAGE_KEY),
+    ).spellCheckEnabled;
     services = startupState.services;
     activeId = startupState.activeId;
 
@@ -165,7 +174,10 @@
           }
           if (preloaded >= MAX_BACKGROUND_PRELOADS) break;
           if (shouldPreloadService(service, activeId)) {
-            await invoke("load_service", createServiceLoadPayload(service));
+            await invoke(
+              "load_service",
+              createServiceLoadPayload(service, spellCheckEnabled),
+            );
             preloaded++;
             await new Promise((resolve) => setTimeout(resolve, PRELOAD_GAP_MS));
           }
@@ -274,7 +286,7 @@
     if (isAddModalOpen || (activeService && activeService.disabled)) {
       invoke("hide_all_webviews");
     } else if (activeService && !activeService.disabled) {
-      invoke("open_service", createServiceLoadPayload(activeService));
+      invoke("open_service", createServiceLoadPayload(activeService, spellCheckEnabled));
     }
   });
 
@@ -448,7 +460,8 @@
         }
       },
       deleteWebview: async (payload) => invoke("delete_webview", payload),
-      loadService: async (service) => invoke("load_service", createServiceLoadPayload(service)),
+      loadService: async (service) =>
+        invoke("load_service", createServiceLoadPayload(service, spellCheckEnabled)),
     });
   }
 </script>

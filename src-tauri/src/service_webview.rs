@@ -166,6 +166,71 @@ fn notification_script(allow_notifications: bool) -> &'static str {
     }
 }
 
+fn spellcheck_script(spell_check_enabled: bool) -> &'static str {
+    if spell_check_enabled {
+        "window.__ferxSpellcheckEnabled = true;\n"
+    } else {
+        r#"
+    (() => {
+        window.__ferxSpellcheckEnabled = false;
+        if (window.__ferx_spellcheck_control_active) return;
+        window.__ferx_spellcheck_control_active = true;
+
+        const isEditable = (element) =>
+            element instanceof HTMLElement &&
+            (element.matches('input, textarea, [contenteditable], [role="textbox"]'));
+
+        const disableSpellcheck = (element) => {
+            if (!(element instanceof HTMLElement)) return;
+            if (isEditable(element)) {
+                if (element.getAttribute('spellcheck') === 'false' && element.getAttribute('autocorrect') === 'off') {
+                    return;
+                }
+                element.spellcheck = false;
+                element.setAttribute('spellcheck', 'false');
+                element.setAttribute('autocorrect', 'off');
+            }
+
+            element.querySelectorAll('input, textarea, [contenteditable], [role="textbox"]').forEach((child) => {
+                if (!(child instanceof HTMLElement)) return;
+                if (child.getAttribute('spellcheck') === 'false' && child.getAttribute('autocorrect') === 'off') {
+                    return;
+                }
+                child.spellcheck = false;
+                child.setAttribute('spellcheck', 'false');
+                child.setAttribute('autocorrect', 'off');
+            });
+        };
+
+        const scanVisibleEditors = () => {
+            if (document.documentElement instanceof HTMLElement) {
+                disableSpellcheck(document.documentElement);
+            }
+        };
+
+        const scheduleInitialScan = () => {
+            const run = () => scanVisibleEditors();
+            if (typeof window.requestIdleCallback === 'function') {
+                window.requestIdleCallback(run, { timeout: 1500 });
+            } else {
+                window.setTimeout(run, 250);
+            }
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', scheduleInitialScan, { once: true });
+        } else {
+            scheduleInitialScan();
+        }
+
+        document.addEventListener('focusin', (event) => {
+            disableSpellcheck(event.target);
+        }, true);
+    })();
+"#
+    }
+}
+
 fn common_webview_script() -> &'static str {
     r#"
     document.addEventListener('click', (e) => {
@@ -828,7 +893,7 @@ fn teams_badge_engine_script() -> String {
 "#.to_string()
 }
 
-fn injected_js_for_url(url: &str, allow_notifications: bool) -> String {
+fn injected_js_for_url(url: &str, allow_notifications: bool, spell_check_enabled: bool) -> String {
     let strategy_name = crate::badge_strategy_for_url(url);
     let microsoft_service = microsoft_service_kind(url);
     let google_compat = if is_google_service(url) {
@@ -838,13 +903,14 @@ fn injected_js_for_url(url: &str, allow_notifications: bool) -> String {
     };
 
     format!(
-        "{}{}{}{}",
+        "{}{}{}{}{}",
         google_compat,
         if should_skip_notification_shim(url) {
             ""
         } else {
             notification_script(allow_notifications)
         },
+        spellcheck_script(spell_check_enabled),
         common_webview_script(),
         match microsoft_service {
             Some(MicrosoftServiceKind::Outlook) => outlook_badge_engine_script(strategy_name),
@@ -856,15 +922,24 @@ fn injected_js_for_url(url: &str, allow_notifications: bool) -> String {
 
 #[cfg(test)]
 pub(crate) fn injected_js(allow_notifications: bool) -> String {
-    injected_js_for_url("", allow_notifications)
+    injected_js_for_url("", allow_notifications, true)
 }
 
+#[cfg(test)]
 pub(crate) fn service_webview_setup(
     url: &str,
     allow_notifications: bool,
 ) -> Option<(tauri::WebviewUrl, String)> {
+    service_webview_setup_with_spellcheck(url, allow_notifications, true)
+}
+
+pub(crate) fn service_webview_setup_with_spellcheck(
+    url: &str,
+    allow_notifications: bool,
+    spell_check_enabled: bool,
+) -> Option<(tauri::WebviewUrl, String)> {
     Some((
         external_webview_url(url)?,
-        injected_js_for_url(url, allow_notifications),
+        injected_js_for_url(url, allow_notifications, spell_check_enabled),
     ))
 }

@@ -13,7 +13,7 @@ use service_runtime::{
     extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
 };
 use service_storage::{data_store_identifier_for_storage_key, session_dir_for_storage_key};
-use service_webview::{service_webview_setup, user_agent_for_url};
+use service_webview::{service_webview_setup_with_spellcheck, user_agent_for_url};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -101,7 +101,7 @@ mod tests {
         extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
     };
     use crate::service_webview::{
-        external_webview_url, injected_js, service_webview_setup, user_agent_for_url,
+        external_webview_url, injected_js, service_webview_setup, service_webview_setup_with_spellcheck, user_agent_for_url,
     };
 
     #[test]
@@ -479,6 +479,25 @@ mod tests {
     }
 
     #[test]
+    fn service_webview_setup_disables_spellcheck_when_requested() {
+        let Some((_, script)) =
+            service_webview_setup_with_spellcheck("https://discord.com/channels/@me", false, false)
+        else {
+            panic!("expected valid discord setup");
+        };
+
+        assert!(script.contains("window.__ferxSpellcheckEnabled = false;"));
+        assert!(script.contains("window.__ferx_spellcheck_control_active"));
+        assert!(script.contains("element.spellcheck = false;"));
+        assert!(script.contains("element.getAttribute('spellcheck') === 'false'"));
+        assert!(script.contains("requestIdleCallback"));
+        assert!(!script.contains("attributes: true"));
+        assert!(!script.contains("attributeFilter: ['contenteditable', 'spellcheck']"));
+        assert!(!script.contains("mutation.addedNodes"));
+        assert!(!script.contains("observe(document.documentElement"));
+    }
+
+    #[test]
     fn microsoft_apps_do_not_use_spoofed_chrome_user_agent() {
         assert_eq!(user_agent_for_url("https://outlook.office.com/mail"), None);
         assert_eq!(
@@ -629,6 +648,43 @@ async fn hide_all_webviews(app: AppHandle) {
     }
 }
 
+fn close_service_webviews(app: &AppHandle) {
+    {
+        let state = app.state::<ActiveWebview>();
+        if let Ok(mut active) = state.0.lock() {
+            *active = String::new();
+        };
+    }
+    {
+        let prefs = app.state::<BadgeMonitoringPrefs>();
+        if let Ok(mut prefs) = prefs.0.lock() {
+            prefs.clear();
+        };
+    }
+
+    for (name, webview) in app.webviews() {
+        if name != "main" {
+            let _ = webview.close();
+        }
+    }
+}
+
+#[tauri::command]
+async fn restart_app(app: AppHandle) -> Result<(), String> {
+    if tauri::is_dev() {
+        close_service_webviews(&app);
+        let Some(webview) = app.get_webview("main") else {
+            return Err("Main webview is not available".to_string());
+        };
+        webview
+            .eval("window.location.replace(window.location.origin + '/')")
+            .map_err(|error| error.to_string())?;
+        return Ok(());
+    }
+
+    app.restart();
+}
+
 #[tauri::command]
 async fn reload_webview(app: AppHandle, id: String) {
     if let Some(webview) = app.get_webview(&id) {
@@ -717,10 +773,13 @@ async fn open_service(
     storage_key: String,
     allow_notifications: bool,
     badge_monitoring_enabled: bool,
+    spell_check_enabled: bool,
 ) {
     use tauri::{PhysicalPosition, PhysicalSize};
 
-    let Some((webview_url, initialization_script)) = service_webview_setup(&url, allow_notifications) else {
+    let Some((webview_url, initialization_script)) =
+        service_webview_setup_with_spellcheck(&url, allow_notifications, spell_check_enabled)
+    else {
         eprintln!("Invalid external url for open_service: {url}");
         let _ = app.emit("show-toast", "Invalid service URL");
         return;
@@ -826,6 +885,7 @@ async fn load_service(
     storage_key: String,
     allow_notifications: bool,
     badge_monitoring_enabled: bool,
+    spell_check_enabled: bool,
 ) {
     use tauri::{PhysicalPosition, PhysicalSize};
 
@@ -838,7 +898,9 @@ async fn load_service(
         let app_handle = app.clone();
         let service_id = id.clone();
 
-        let Some((webview_url, initialization_script)) = service_webview_setup(&url, allow_notifications) else {
+        let Some((webview_url, initialization_script)) =
+            service_webview_setup_with_spellcheck(&url, allow_notifications, spell_check_enabled)
+        else {
             eprintln!("Invalid external url for load_service: {url}");
             let _ = app.emit("show-toast", "Invalid service URL");
             return;
@@ -984,6 +1046,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             open_service,
             hide_all_webviews,
+            restart_app,
             reload_webview,
             report_outlook_badge,
             report_teams_badge,
