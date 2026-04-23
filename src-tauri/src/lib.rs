@@ -14,12 +14,19 @@ use service_runtime::{
 use service_storage::{data_store_identifier_for_storage_key, session_dir_for_storage_key};
 use service_webview::{service_webview_setup, user_agent_for_url};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::webview::Color;
 use tauri::{AppHandle, Emitter, Manager};
 
 struct ActiveWebview(Mutex<String>);
 struct BadgeMonitoringPrefs(Mutex<HashMap<String, bool>>);
+
+/// Coalesces rapid `Resized` events: only the latest resize may apply `set_bounds` (see debounce in `on_window_event`).
+struct MainWindowResizeGen(AtomicU64);
+
+const RESIZE_DEBOUNCE_MS: u64 = 32;
 
 fn set_badge_monitoring(webview: &tauri::Webview, enabled: bool) {
     let enabled_literal = if enabled { "true" } else { "false" };
@@ -50,6 +57,38 @@ fn badge_monitoring_pref(app: &AppHandle, service_id: &str) -> bool {
         true
     };
     result
+}
+
+fn apply_active_child_webview_bounds(
+    window: &tauri::Window,
+    physical_size: tauri::PhysicalSize<u32>,
+) {
+    let state = window.state::<ActiveWebview>();
+    let active_id = state
+        .0
+        .lock()
+        .map(|active| active.clone())
+        .unwrap_or_default();
+
+    if active_id.is_empty() {
+        return;
+    }
+
+    let scale_factor = window.scale_factor().unwrap_or(1.0);
+    let sidebar_width = (79.0 * scale_factor) as u32;
+
+    if let Some(webview) = window.get_webview(&active_id) {
+        let _ = webview.set_bounds(tauri::Rect {
+            position: tauri::Position::Physical(tauri::PhysicalPosition::new(
+                sidebar_width as i32,
+                0,
+            )),
+            size: tauri::Size::Physical(tauri::PhysicalSize::new(
+                physical_size.width.saturating_sub(sidebar_width),
+                physical_size.height,
+            )),
+        });
+    }
 }
 
 #[cfg(test)]
@@ -858,7 +897,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(ActiveWebview(Mutex::new(String::new())))
-        .manage(BadgeMonitoringPrefs(Mutex::new(HashMap::new())));
+        .manage(BadgeMonitoringPrefs(Mutex::new(HashMap::new())))
+        .manage(MainWindowResizeGen(AtomicU64::new(0)));
 
     #[cfg(feature = "devtools")]
     {
@@ -912,31 +952,23 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| match event {
-            tauri::WindowEvent::Resized(physical_size) => {
-                let state = window.state::<ActiveWebview>();
-                let active_id = state
-                    .0
-                    .lock()
-                    .map(|active| active.clone())
-                    .unwrap_or_default();
-
-                if !active_id.is_empty() {
-                    let scale_factor = window.scale_factor().unwrap_or(1.0);
-                    let sidebar_width = (79.0 * scale_factor) as u32;
-
-                    if let Some(webview) = window.get_webview(&active_id) {
-                        let _ = webview.set_bounds(tauri::Rect {
-                            position: tauri::Position::Physical(tauri::PhysicalPosition::new(
-                                sidebar_width as i32,
-                                0,
-                            )),
-                            size: tauri::Size::Physical(tauri::PhysicalSize::new(
-                                physical_size.width.saturating_sub(sidebar_width),
-                                physical_size.height,
-                            )),
-                        });
+            tauri::WindowEvent::Resized(_) => {
+                let debounce = window.state::<MainWindowResizeGen>();
+                let my_gen = debounce.0.fetch_add(1, Ordering::SeqCst) + 1;
+                let app = window.app_handle().clone();
+                let window_label = window.label().to_string();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(Duration::from_millis(RESIZE_DEBOUNCE_MS)).await;
+                    let debounce = app.state::<MainWindowResizeGen>();
+                    if debounce.0.load(Ordering::SeqCst) != my_gen {
+                        return;
                     }
-                }
+                    let Some(w) = app.get_window(&window_label) else {
+                        return;
+                    };
+                    let physical_size = w.inner_size().unwrap_or_default();
+                    apply_active_child_webview_bounds(&w, physical_size);
+                });
             }
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();

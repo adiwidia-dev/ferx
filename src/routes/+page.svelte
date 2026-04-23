@@ -30,6 +30,13 @@
   } from "$lib/services/workspace-state";
   import { onMount } from "svelte";
 
+  /** Debounced write after the last workspace change (ms). */
+  const WORKSPACE_SAVE_DEBOUNCE_MS = 1200;
+  /** Background preloads: start after launch, cap count, delay between each (reduces main-process churn). */
+  const PRELOAD_START_MS = 2000;
+  const PRELOAD_GAP_MS = 1000;
+  const MAX_BACKGROUND_PRELOADS = 3;
+
   type Service = PageService;
   let toastMessage = $state("");
   let toastTimeout = $state<ReturnType<typeof setTimeout> | null>(null);
@@ -42,17 +49,31 @@
   let isDnd = $state(false);
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
+  function writeWorkspaceToLocalStorage() {
+    localStorage.setItem("ferx-workspace-services", serializeServicesForStorage(services));
+    if (activeId) {
+      localStorage.setItem(WORKSPACE_ACTIVE_ID_KEY, activeId);
+    } else {
+      localStorage.removeItem(WORKSPACE_ACTIVE_ID_KEY);
+    }
+  }
+
+  function flushWorkspaceToStorage() {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    writeWorkspaceToLocalStorage();
+  }
+
   function scheduleSave() {
-    if (saveTimer) return;
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+    }
     saveTimer = setTimeout(() => {
       saveTimer = null;
-      localStorage.setItem("ferx-workspace-services", serializeServicesForStorage(services));
-      if (activeId) {
-        localStorage.setItem(WORKSPACE_ACTIVE_ID_KEY, activeId);
-      } else {
-        localStorage.removeItem(WORKSPACE_ACTIVE_ID_KEY);
-      }
-    }, 500);
+      writeWorkspaceToLocalStorage();
+    }, WORKSPACE_SAVE_DEBOUNCE_MS);
   }
   // --- BULLETPROOF DRAG STATE (Tracking IDs instead of Indexes) ---
   let draggedId = $state<string | null>(null);
@@ -131,19 +152,28 @@
     }
 
     if (services.length > 0) {
-      const MAX_PRELOAD = 3;
       setTimeout(async () => {
         let preloaded = 0;
         for (const service of services) {
-          if (preloaded >= MAX_PRELOAD) break;
+          if (preloaded >= MAX_BACKGROUND_PRELOADS) break;
           if (shouldPreloadService(service, activeId)) {
             await invoke("load_service", createServiceLoadPayload(service));
             preloaded++;
-            await new Promise((resolve) => setTimeout(resolve, 1500));
+            await new Promise((resolve) => setTimeout(resolve, PRELOAD_GAP_MS));
           }
         }
-      }, 3000);
+      }, PRELOAD_START_MS);
     }
+
+    const flushOnExit = () => flushWorkspaceToStorage();
+    window.addEventListener("beforeunload", flushOnExit);
+    window.addEventListener("pagehide", flushOnExit);
+    const onVisibilityForFlush = () => {
+      if (document.visibilityState === "hidden") {
+        flushOnExit();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityForFlush);
 
     const unlistenPromise = listen("menu-action", (event) => {
         const actionStr = event.payload as string;
@@ -206,15 +236,10 @@
     isInitialized = true;
 
     return () => {
-      if (saveTimer) {
-        clearTimeout(saveTimer);
-        localStorage.setItem("ferx-workspace-services", serializeServicesForStorage(services));
-        if (activeId) {
-          localStorage.setItem(WORKSPACE_ACTIVE_ID_KEY, activeId);
-        } else {
-          localStorage.removeItem(WORKSPACE_ACTIVE_ID_KEY);
-        }
-      }
+      window.removeEventListener("beforeunload", flushOnExit);
+      window.removeEventListener("pagehide", flushOnExit);
+      document.removeEventListener("visibilitychange", onVisibilityForFlush);
+      flushOnExit();
       cleanupPageListeners({
         unlistenToastPromise,
         unlistenMenuPromise: unlistenPromise,
@@ -259,7 +284,11 @@
     const target = element?.closest<HTMLElement>("[data-service-drop-target]");
     const targetId = target?.dataset.serviceDropTarget ?? null;
 
-    dragOverId = targetId && targetId !== draggedId ? targetId : null;
+    const next = targetId && targetId !== draggedId ? targetId : null;
+    if (next === dragOverId) {
+      return;
+    }
+    dragOverId = next;
   }
 
   function handlePointerDown(e: PointerEvent, id: string) {

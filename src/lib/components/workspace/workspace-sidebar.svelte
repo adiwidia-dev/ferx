@@ -73,6 +73,8 @@
                   src={getServiceFaviconUrl(service.url)}
                   alt={`${service.name} icon`}
                   class="h-7 w-7 rounded-lg object-contain"
+                  loading="lazy"
+                  decoding="async"
                   onerror={() => {
                     failedIcons = {
                       ...failedIcons,

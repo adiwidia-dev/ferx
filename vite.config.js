@@ -30,6 +30,15 @@ export default defineConfig({
     reportCompressedSize: false,
     // Keep asset inlining modest so we don't blow up the entry chunk.
     assetsInlineLimit: 4096,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules') && id.includes('@tauri-apps')) {
+            return 'tauri';
+          }
+        },
+      },
+    },
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
