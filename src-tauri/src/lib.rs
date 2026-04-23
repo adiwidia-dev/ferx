@@ -33,7 +33,7 @@ const RESIZE_DEBOUNCE_MS: u64 = 32;
 
 fn set_badge_monitoring(webview: &tauri::Webview, enabled: bool) {
     let enabled_literal = if enabled { "true" } else { "false" };
-    let _ = webview.eval(&format!(
+    let _ = webview.eval(format!(
         "window.__ferxSetBadgeMonitoring?.({enabled_literal});"
     ));
 }
@@ -937,7 +937,7 @@ pub fn run() {
                         app.exit(0);
                     }
                     "toggle_window" => {
-                        desktop_ui::toggle_main_window_visibility(&app);
+                        desktop_ui::toggle_main_window_visibility(app);
                     }
                     _ => {}
                 })
@@ -949,7 +949,7 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        desktop_ui::toggle_main_window_visibility(&app);
+                        desktop_ui::toggle_main_window_visibility(app);
                     }
                 })
                 .build(app)?;

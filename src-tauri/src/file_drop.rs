@@ -136,10 +136,10 @@ dropTarget.dispatchEvent(new DragEvent('drop',o));
 pub(crate) fn handle_file_drop(webview: &tauri::Webview, event: &tauri::DragDropEvent) {
     match event {
         tauri::DragDropEvent::Enter { .. } => {
-            let _ = webview.eval(&build_drag_event_js("dragenter"));
+            let _ = webview.eval(build_drag_event_js("dragenter"));
         }
         tauri::DragDropEvent::Over { .. } => {
-            let _ = webview.eval(&build_drag_event_js("dragover"));
+            let _ = webview.eval(build_drag_event_js("dragover"));
         }
         tauri::DragDropEvent::Drop { paths, .. } => {
             if let Some(js) = build_file_drop_js(paths) {
@@ -246,7 +246,7 @@ mod tests {
         let test_file = dir.join("test.png");
         std::fs::write(&test_file, b"fake png data").unwrap();
 
-        let result = build_file_drop_js(&[test_file.clone()]);
+        let result = build_file_drop_js(std::slice::from_ref(&test_file));
         let _ = std::fs::remove_file(&test_file);
         let _ = std::fs::remove_dir(&dir);
 

@@ -151,10 +151,18 @@
       showToast(startupState.toastMessage);
     }
 
+    let preloadTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    let preloadCancelled = false;
     if (services.length > 0) {
-      setTimeout(async () => {
+      preloadTimeoutId = setTimeout(async () => {
+        if (preloadCancelled) {
+          return;
+        }
         let preloaded = 0;
         for (const service of services) {
+          if (preloadCancelled) {
+            break;
+          }
           if (preloaded >= MAX_BACKGROUND_PRELOADS) break;
           if (shouldPreloadService(service, activeId)) {
             await invoke("load_service", createServiceLoadPayload(service));
@@ -236,6 +244,10 @@
     isInitialized = true;
 
     return () => {
+      preloadCancelled = true;
+      if (preloadTimeoutId !== null) {
+        clearTimeout(preloadTimeoutId);
+      }
       window.removeEventListener("beforeunload", flushOnExit);
       window.removeEventListener("pagehide", flushOnExit);
       document.removeEventListener("visibilitychange", onVisibilityForFlush);
