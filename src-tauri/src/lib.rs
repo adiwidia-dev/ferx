@@ -1,5 +1,6 @@
 mod badge_payload;
 mod desktop_ui;
+mod download_dialog;
 mod file_drop;
 mod navigation_bridge;
 mod service_runtime;
@@ -19,6 +20,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 use tauri::webview::Color;
 use tauri::{AppHandle, Emitter, Manager};
+
+use download_dialog::handle_service_webview_download;
 
 struct ActiveWebview(Mutex<String>);
 struct BadgeMonitoringPrefs(Mutex<HashMap<String, bool>>);
@@ -802,7 +805,8 @@ async fn open_service(
             builder
         }
         .initialization_script(&initialization_script)
-        .on_navigation(move |url| handle_special_navigation(&app_handle, &service_id, url));
+        .on_navigation(move |url| handle_special_navigation(&app_handle, &service_id, url))
+        .on_download(handle_service_webview_download);
 
         match window.add_child(builder, active_pos, active_size) {
             Ok(webview) => {
@@ -869,7 +873,8 @@ async fn load_service(
             builder
         }
         .initialization_script(&initialization_script)
-        .on_navigation(move |url| handle_special_navigation(&app_handle, &service_id, url));
+        .on_navigation(move |url| handle_special_navigation(&app_handle, &service_id, url))
+        .on_download(handle_service_webview_download);
 
         let scale_factor = window.scale_factor().unwrap_or(1.0);
         let physical_size = window.inner_size().unwrap_or_default();
