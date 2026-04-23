@@ -9,6 +9,16 @@
     readAppSettings,
     serializeAppSettings,
   } from "$lib/services/app-settings";
+  import {
+    buildWorkspaceConfigExportPayload,
+    serializeWorkspaceConfigExport,
+    type FerxWorkspaceConfigFileV1,
+  } from "$lib/services/workspace-config-export";
+  import {
+    parseWorkspaceConfigImport,
+    writeWorkspaceConfigImportToStorage,
+    type ImportedWorkspaceConfig,
+  } from "$lib/services/workspace-config-import";
   import { getServiceFaviconUrl, getServiceMonogram } from "$lib/services/service-icon";
   import {
     checkForUpdate,
@@ -31,6 +41,14 @@
   let showRestartPrompt = $state(false);
   let showRestartConfirm = $state(false);
   let restartError = $state("");
+  let showExportConfirm = $state(false);
+  let pendingExport = $state<FerxWorkspaceConfigFileV1 | null>(null);
+  let exportError = $state("");
+  let importPreview = $state<ImportedWorkspaceConfig | null>(null);
+  let showImportConfirm = $state(false);
+  let importError = $state("");
+  let configStatus = $state("");
+  let importInput = $state<HTMLInputElement | null>(null);
   let spellCheckRestartRequired = $derived(spellCheckEnabled !== initialSpellCheckEnabled);
 
   onMount(() => {
@@ -45,6 +63,13 @@
     showRestartPrompt = false;
     showRestartConfirm = false;
     restartError = "";
+    showExportConfirm = false;
+    pendingExport = null;
+    exportError = "";
+    importPreview = null;
+    showImportConfirm = false;
+    importError = "";
+    configStatus = "";
   });
 
   async function handleCheckForUpdates() {
@@ -120,6 +145,137 @@
       await relaunchApp();
     } catch (error) {
       restartError = formatErrorMessage(error);
+    }
+  }
+
+  function requestExportConfiguration() {
+    exportError = "";
+    configStatus = "";
+
+    try {
+      const startup = readStartupState(localStorage.getItem("ferx-workspace-services"));
+      const settings = readAppSettings(localStorage.getItem(APP_SETTINGS_STORAGE_KEY));
+      pendingExport = buildWorkspaceConfigExportPayload({
+        services: startup.services,
+        appSettings: settings,
+        activeId: startup.activeId,
+        appVersion: appInfo.version,
+      });
+      showExportConfirm = true;
+    } catch (error) {
+      exportError = formatErrorMessage(error);
+    }
+  }
+
+  function cancelExportConfiguration() {
+    showExportConfirm = false;
+    pendingExport = null;
+    exportError = "";
+  }
+
+  async function confirmExportConfiguration() {
+    if (!pendingExport) return;
+
+    try {
+      const json = serializeWorkspaceConfigExport(pendingExport);
+      const date = pendingExport.ferxExport.exportedAt.slice(0, 10);
+      const defaultFilename = `ferx-workspace-config-${date}.json`;
+      const saved = await invoke<boolean>("save_workspace_config_export", {
+        contents: json,
+        defaultFilename,
+      });
+
+      if (saved) {
+        showExportConfirm = false;
+        pendingExport = null;
+        configStatus = "Configuration export saved.";
+      } else {
+        showExportConfirm = false;
+        pendingExport = null;
+        configStatus = "Configuration export canceled.";
+      }
+    } catch (error) {
+      exportError = formatErrorMessage(error);
+    }
+  }
+
+  function requestImportConfiguration() {
+    importError = "";
+    configStatus = "";
+    importInput?.click();
+  }
+
+  async function handleImportFileChange(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+
+    if (!file) return;
+
+    try {
+      const result = parseWorkspaceConfigImport(await file.text());
+      if (!result.ok) {
+        importError = result.message;
+        importPreview = null;
+        showImportConfirm = false;
+        return;
+      }
+
+      importPreview = result.value;
+      importError = "";
+      showImportConfirm = true;
+    } catch (error) {
+      importError = formatErrorMessage(error);
+      importPreview = null;
+      showImportConfirm = false;
+    }
+  }
+
+  function cancelImportConfiguration() {
+    showImportConfirm = false;
+    importPreview = null;
+    importError = "";
+  }
+
+  async function confirmImportConfiguration() {
+    if (!importPreview) return;
+
+    importError = "";
+    try {
+      await invoke("close_all_service_webviews");
+      writeWorkspaceConfigImportToStorage(importPreview, localStorage);
+      showImportConfirm = false;
+      importPreview = null;
+      configStatus = "Configuration imported. Reload Ferx to apply it.";
+      scheduleWorkspaceReload();
+    } catch (error) {
+      importError = formatErrorMessage(error);
+    }
+  }
+
+  function scheduleWorkspaceReload() {
+    if (!("__TAURI_INTERNALS__" in window)) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      try {
+        window.location.replace("/");
+      } catch {
+        window.location.href = "/";
+      }
+    }, 250);
+  }
+
+  function formatServiceCount(count: number) {
+    return `${count} ${count === 1 ? "service" : "services"}`;
+  }
+
+  function serviceHostname(url: string) {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url;
     }
   }
 </script>
@@ -304,6 +460,114 @@
       </div>
     {/if}
 
+    {#if showExportConfirm && pendingExport}
+      <div
+        class="absolute inset-0 z-[60] flex items-start justify-center bg-background/45 px-4 pt-24 backdrop-blur-sm sm:pt-32"
+        role="presentation"
+      >
+        <div
+          data-testid="export-config-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="export-config-title"
+          class="w-full max-w-md rounded-2xl border bg-card p-5 text-left shadow-2xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-200"
+        >
+          <p id="export-config-title" class="text-base font-semibold text-foreground">
+            Export configuration?
+          </p>
+          <p class="mt-2 text-sm text-muted-foreground">
+            Ferx will create a plain JSON file with {formatServiceCount(pendingExport.services.length)},
+            service URLs, names, and app settings. It does not include passwords or login sessions.
+          </p>
+          <p class="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs font-medium text-amber-700">
+            The file is not encrypted. Store it somewhere you trust.
+          </p>
+          {#if exportError}
+            <p class="mt-3 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs font-medium text-red-500">
+              {exportError}
+            </p>
+          {/if}
+          <div class="mt-5 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              class="h-9 rounded-xl px-3 text-xs"
+              onclick={cancelExportConfiguration}
+            >
+              Cancel
+            </Button>
+            <Button
+              class="h-9 rounded-xl px-3 text-xs"
+              data-testid="confirm-export-config-button"
+              onclick={confirmExportConfiguration}
+            >
+              Export
+            </Button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    {#if showImportConfirm && importPreview}
+      <div
+        class="absolute inset-0 z-[60] flex items-start justify-center bg-background/45 px-4 pt-24 backdrop-blur-sm sm:pt-32"
+        role="presentation"
+      >
+        <div
+          data-testid="import-config-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="import-config-title"
+          class="w-full max-w-md rounded-2xl border bg-card p-5 text-left shadow-2xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-200"
+        >
+          <p id="import-config-title" class="text-base font-semibold text-foreground">
+            Import configuration?
+          </p>
+          <p class="mt-2 text-sm text-muted-foreground">
+            This will replace the current workspace with {formatServiceCount(importPreview.services.length)}
+            and update app settings.
+          </p>
+          <div class="mt-4 max-h-40 overflow-y-auto rounded-xl border bg-muted/20">
+            {#each importPreview.services.slice(0, 8) as service (service.id)}
+              <div class="flex items-center justify-between gap-3 border-b px-3 py-2 last:border-b-0">
+                <p class="min-w-0 truncate text-xs font-semibold text-foreground">{service.name}</p>
+                <p class="shrink-0 text-xs text-muted-foreground">{serviceHostname(service.url)}</p>
+              </div>
+            {/each}
+            {#if importPreview.services.length > 8}
+              <p class="px-3 py-2 text-xs text-muted-foreground">
+                +{importPreview.services.length - 8} more
+              </p>
+            {/if}
+          </div>
+          <p class="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs font-medium text-amber-700">
+            Existing sessions are not imported. Replacing configuration does not erase old session
+            data from disk.
+          </p>
+          {#if importError}
+            <p class="mt-3 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs font-medium text-red-500">
+              {importError}
+            </p>
+          {/if}
+          <div class="mt-5 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              class="h-9 rounded-xl px-3 text-xs"
+              onclick={cancelImportConfiguration}
+            >
+              Cancel
+            </Button>
+            <Button
+              class="h-9 rounded-xl px-3 text-xs"
+              data-testid="confirm-import-config-button"
+              onclick={confirmImportConfiguration}
+            >
+              Replace
+            </Button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
     <div
       class="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-500/5 via-background to-background"
     ></div>
@@ -407,6 +671,51 @@
           >
             Restart Ferx
           </Button>
+        </div>
+
+        <div class="flex items-center justify-between gap-4 px-6 py-4 border-b">
+          <div class="text-left">
+            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Backup
+            </p>
+            <p class="text-sm font-semibold mt-0.5">Import / Export Configuration</p>
+            <p class="mt-1 text-xs text-muted-foreground">
+              Back up service names, URLs, and app settings as plain JSON.
+            </p>
+            {#if configStatus}
+              <p class="mt-1 text-xs font-medium text-emerald-600">{configStatus}</p>
+            {/if}
+            {#if exportError || importError}
+              <p class="mt-1 text-xs font-medium text-red-500">{exportError || importError}</p>
+            {/if}
+          </div>
+
+          <div class="flex shrink-0 items-center gap-2">
+            <Button
+              variant="outline"
+              class="h-9 rounded-xl px-3 text-xs"
+              data-testid="export-config-button"
+              onclick={requestExportConfiguration}
+            >
+              Export
+            </Button>
+            <Button
+              variant="outline"
+              class="h-9 rounded-xl px-3 text-xs"
+              data-testid="import-config-button"
+              onclick={requestImportConfiguration}
+            >
+              Import
+            </Button>
+            <input
+              bind:this={importInput}
+              data-testid="import-config-input"
+              type="file"
+              accept=".json,application/json"
+              class="hidden"
+              onchange={handleImportFileChange}
+            />
+          </div>
         </div>
 
         <div class="px-6 py-5">

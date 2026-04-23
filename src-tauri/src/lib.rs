@@ -203,6 +203,35 @@ mod tests {
     }
 
     #[test]
+    fn close_all_service_webviews_command_exists() {
+        let source = include_str!("lib.rs");
+        let _command = super::close_all_service_webviews;
+
+        assert!(source.contains("close_all_service_webviews,"));
+    }
+
+    #[test]
+    fn save_workspace_config_export_command_exists() {
+        let source = include_str!("lib.rs");
+        let _command = super::save_workspace_config_export;
+
+        assert!(source.contains("save_workspace_config_export,"));
+    }
+
+    #[test]
+    fn safe_export_file_name_removes_paths_and_ensures_json_extension() {
+        assert_eq!(
+            super::safe_export_file_name("../ferx-workspace-config-2026-04-23"),
+            "ferx-workspace-config-2026-04-23.json"
+        );
+        assert_eq!(
+            super::safe_export_file_name("/tmp/ferx-workspace-config.json"),
+            "ferx-workspace-config.json"
+        );
+        assert_eq!(super::safe_export_file_name("   "), "ferx-workspace-config.json");
+    }
+
+    #[test]
     fn microsoft_service_kind_centralizes_outlook_and_teams_host_matching() {
         assert_eq!(
             microsoft_service_kind("https://outlook.office.com/mail"),
@@ -669,6 +698,45 @@ fn close_service_webviews(app: &AppHandle) {
     }
 }
 
+fn safe_export_file_name(default_filename: &str) -> String {
+    let trimmed = default_filename.trim();
+    let fallback = "ferx-workspace-config.json";
+    let without_paths = trimmed
+        .rsplit(['/', '\\'])
+        .next()
+        .filter(|name| !name.is_empty())
+        .unwrap_or(fallback);
+
+    if without_paths.ends_with(".json") {
+        without_paths.to_string()
+    } else {
+        format!("{without_paths}.json")
+    }
+}
+
+#[tauri::command]
+async fn close_all_service_webviews(app: AppHandle) {
+    close_service_webviews(&app);
+}
+
+#[tauri::command]
+async fn save_workspace_config_export(
+    contents: String,
+    default_filename: String,
+) -> Result<bool, String> {
+    let file_name = safe_export_file_name(&default_filename);
+    let Some(path) = rfd::FileDialog::new()
+        .add_filter("JSON", &["json"])
+        .set_file_name(file_name)
+        .save_file()
+    else {
+        return Ok(false);
+    };
+
+    std::fs::write(path, contents).map_err(|error| error.to_string())?;
+    Ok(true)
+}
+
 #[tauri::command]
 async fn restart_app(app: AppHandle) -> Result<(), String> {
     if tauri::is_dev() {
@@ -1046,6 +1114,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             open_service,
             hide_all_webviews,
+            close_all_service_webviews,
+            save_workspace_config_export,
             restart_app,
             reload_webview,
             report_outlook_badge,

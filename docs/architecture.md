@@ -43,3 +43,10 @@ The current build intentionally targets direct distribution rather than the Mac 
 - First-run Gatekeeper friction is expected. Ferx intentionally does not target notarization or the Mac App Store (see the top-level note about distribution).
 - The updater download stage uses `bundle.createUpdaterArtifacts: true` in `tauri.conf.json` to emit `Ferx.app.tar.gz` + `.sig` alongside the DMG. The DMG is for first-time installs; the tarball is what the updater consumes.
 - When changing the updater UI, mock `@tauri-apps/plugin-updater` and `@tauri-apps/plugin-process` in tests — both are wrapped in `src/lib/services/updater.ts` to keep the Svelte components free of direct plugin imports.
+
+## 7. Config Import And Export
+
+- Workspace configuration is stored in `localStorage` under `ferx-workspace-services`, `ferx-workspace-active-id`, and `ferx-app-settings`.
+- Config exports use format `ferx-workspace-config` version `1` and contain only service metadata/preferences plus app settings. Runtime badges are stripped.
+- Imports validate the full JSON file before writing any `localStorage` keys. The replacement flow closes all non-main service webviews via `close_all_service_webviews`, writes the new config, then reloads the main workspace in Tauri.
+- Config import/export is intentionally not a full profile backup. It does not include service cookies, service-local storage, passwords, or webview data stores. Replacing configuration also does not prune old service session data from disk.

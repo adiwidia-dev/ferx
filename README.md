@@ -19,12 +19,15 @@ Ferx is a lightweight desktop application for running services like WhatsApp, Sl
 - Custom unread badge handling
 - Native context menus for sidebar actions
 - Camera and microphone support for meeting-oriented services
+- Config-only backup and restore from Settings, exported as plain JSON
 
 ## Current Status
 
 Ferx is usable today and still early in its public release, with core desktop workflows already in place.
 
 Application updates are installed in-app. The updater checks GitHub Releases, verifies the download with a minisign signature, and swaps the bundle on relaunch. Because Ferx is not notarized with an Apple Developer ID, macOS will still ask you to approve the app the first time you install it; subsequent in-app updates do not re-prompt.
+
+Configuration exports contain workspace service names, URLs, and app settings only. They do not include passwords, cookies, or logged-in service sessions, and the JSON file is not encrypted.
 
 ## Platform Support
 

@@ -24,6 +24,15 @@ describe("settings page", () => {
     document.body.innerHTML = "";
     localStorage.clear();
     invoke.mockClear();
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:ferx-export"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   });
 
   it("renders a spell-check toggle that defaults to enabled", () => {
@@ -207,6 +216,160 @@ describe("settings page", () => {
     const addIndex = buttons.indexOf("Add Service");
     const settingsIndex = buttons.indexOf("Settings");
     expect(settingsIndex).toBeGreaterThan(addIndex);
+
+    unmount(component);
+  });
+
+  it("asks for confirmation and opens a native save dialog before exporting configuration", async () => {
+    invoke.mockResolvedValue(true);
+    localStorage.setItem(
+      "ferx-workspace-services",
+      JSON.stringify([
+        {
+          id: "mail",
+          name: "Mail",
+          url: "https://mail.example.com/",
+          storageKey: "storage-mail",
+          badge: 4,
+          notificationPrefs: {
+            showBadge: true,
+            affectTray: true,
+            allowNotifications: true,
+          },
+        },
+      ]),
+    );
+
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    const exportButton = document.querySelector(
+      '[data-testid="export-config-button"]',
+    ) as HTMLButtonElement | null;
+    exportButton?.click();
+    flushSync();
+
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-testid="export-config-dialog"]')).toBeTruthy();
+    expect(document.body.textContent).toContain("Export configuration?");
+    expect(document.body.textContent).toContain("1 service");
+
+    const confirmButton = document.querySelector(
+      '[data-testid="confirm-export-config-button"]',
+    ) as HTMLButtonElement | null;
+    confirmButton?.click();
+    await Promise.resolve();
+    flushSync();
+
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledWith(
+      "save_workspace_config_export",
+      expect.objectContaining({
+        defaultFilename: expect.stringMatching(/^ferx-workspace-config-\d{4}-\d{2}-\d{2}\.json$/),
+        contents: expect.stringContaining('"format": "ferx-workspace-config"'),
+      }),
+    );
+    expect(document.body.textContent).toContain("Configuration export saved.");
+
+    unmount(component);
+  });
+
+  it("previews an import file and only writes storage after confirmation", async () => {
+    invoke.mockResolvedValue(undefined);
+    localStorage.setItem("ferx-app-settings", JSON.stringify({ spellCheckEnabled: true }));
+    localStorage.setItem(
+      "ferx-workspace-services",
+      JSON.stringify([
+        {
+          id: "old",
+          name: "Old",
+          url: "https://old.example.com/",
+          storageKey: "storage-old",
+          notificationPrefs: {
+            showBadge: true,
+            affectTray: true,
+            allowNotifications: true,
+          },
+        },
+      ]),
+    );
+
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    const file = new File(
+      [
+        JSON.stringify({
+          ferxExport: {
+            format: "ferx-workspace-config",
+            version: 1,
+            exportedAt: "2026-04-23T12:00:00.000Z",
+            appVersion: "0.2.4",
+          },
+          appSettings: {
+            spellCheckEnabled: false,
+          },
+          services: [
+            {
+              id: "mail",
+              name: "Mail",
+              url: "https://mail.example.com",
+              storageKey: "storage-mail",
+            },
+          ],
+          activeServiceId: "mail",
+        }),
+      ],
+      "ferx-workspace-config.json",
+      { type: "application/json" },
+    );
+    const input = document.querySelector(
+      'input[type="file"][data-testid="import-config-input"]',
+    ) as HTMLInputElement | null;
+    Object.defineProperty(input, "files", {
+      configurable: true,
+      value: [file],
+    });
+    input?.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    flushSync();
+
+    expect(localStorage.getItem("ferx-app-settings")).toBe('{"spellCheckEnabled":true}');
+    expect(document.querySelector('[data-testid="import-config-dialog"]')).toBeTruthy();
+    expect(document.body.textContent).toContain("Import configuration?");
+    expect(document.body.textContent).toContain("Mail");
+    expect(document.body.textContent).toContain("mail.example.com");
+
+    const confirmButton = document.querySelector(
+      '[data-testid="confirm-import-config-button"]',
+    ) as HTMLButtonElement | null;
+    confirmButton?.click();
+    await Promise.resolve();
+    flushSync();
+
+    expect(invoke).toHaveBeenCalledWith("close_all_service_webviews");
+    expect(localStorage.getItem("ferx-app-settings")).toBe('{"spellCheckEnabled":false}');
+    expect(localStorage.getItem("ferx-workspace-active-id")).toBe("mail");
+    expect(JSON.parse(localStorage.getItem("ferx-workspace-services") ?? "")).toEqual([
+      {
+        id: "mail",
+        name: "Mail",
+        url: "https://mail.example.com/",
+        storageKey: "storage-mail",
+        notificationPrefs: {
+          showBadge: true,
+          affectTray: true,
+          allowNotifications: true,
+        },
+      },
+    ]);
+    expect(document.body.textContent).toContain("Configuration imported. Reload Ferx to apply it.");
 
     unmount(component);
   });
