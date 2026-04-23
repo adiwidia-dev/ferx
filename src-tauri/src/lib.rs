@@ -13,11 +13,44 @@ use service_runtime::{
 };
 use service_storage::{data_store_identifier_for_storage_key, session_dir_for_storage_key};
 use service_webview::{service_webview_setup, user_agent_for_url};
+use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::webview::Color;
 use tauri::{AppHandle, Emitter, Manager};
 
 struct ActiveWebview(Mutex<String>);
+struct BadgeMonitoringPrefs(Mutex<HashMap<String, bool>>);
+
+fn set_badge_monitoring(webview: &tauri::Webview, enabled: bool) {
+    let enabled_literal = if enabled { "true" } else { "false" };
+    let _ = webview.eval(&format!(
+        "window.__ferxSetBadgeMonitoring?.({enabled_literal});"
+    ));
+}
+
+fn set_badge_monitoring_pref(app: &AppHandle, service_id: &str, enabled: bool) {
+    let prefs = app.state::<BadgeMonitoringPrefs>();
+    if let Ok(mut map) = prefs.0.lock() {
+        map.insert(service_id.to_string(), enabled);
+    };
+}
+
+fn remove_badge_monitoring_pref(app: &AppHandle, service_id: &str) {
+    let prefs = app.state::<BadgeMonitoringPrefs>();
+    if let Ok(mut map) = prefs.0.lock() {
+        map.remove(service_id);
+    };
+}
+
+fn badge_monitoring_pref(app: &AppHandle, service_id: &str) -> bool {
+    let prefs = app.state::<BadgeMonitoringPrefs>();
+    let result = if let Ok(map) = prefs.0.lock() {
+        map.get(service_id).copied().unwrap_or(true)
+    } else {
+        true
+    };
+    result
+}
 
 #[cfg(test)]
 mod tests {
@@ -45,7 +78,8 @@ mod tests {
 
     #[test]
     fn outlook_badge_script_uses_command_bridge_payloads() {
-        let Some((_, script)) = service_webview_setup("https://outlook.office.com/mail", false)
+        let Some((_, script)) =
+            service_webview_setup("https://outlook.office.com/mail", false)
         else {
             panic!("expected valid outlook setup");
         };
@@ -233,11 +267,13 @@ mod tests {
     }
 
     #[test]
-    fn title_observer_watches_head_subtree() {
+    fn title_observer_binds_to_title_then_tracks_head_child_list() {
         let script = injected_js(false);
 
-        assert!(script.contains("const target = document.head || document.documentElement;"));
-        assert!(!script.contains("const titleNode = document.querySelector('title');"));
+        assert!(script.contains("const titleEl = document.querySelector('title');"));
+        assert!(script.contains("titleEl.__ferx_title_observer_bound"));
+        assert!(script.contains("const head = document.head || document.documentElement;"));
+        assert!(script.contains("childList: true"));
     }
 
     #[test]
@@ -298,7 +334,8 @@ mod tests {
 
     #[test]
     fn outlook_badge_script_uses_screen_reader_and_folder_fallbacks() {
-        let Some((_, script)) = service_webview_setup("https://outlook.office.com/mail", false)
+        let Some((_, script)) =
+            service_webview_setup("https://outlook.office.com/mail", false)
         else {
             panic!("expected valid outlook setup");
         };
@@ -307,7 +344,6 @@ mod tests {
         assert!(script.contains("div[role=tree]"));
         assert!(script.contains("outlookScreenReaderState"));
         assert!(script.contains("outlookFolderState"));
-        assert!(script.contains("outlookPageTextState"));
         assert!(script.contains(
             "window.__ferx_badge_monitoring_enabled = window.__ferx_badge_monitoring_enabled ?? true;"
         ));
@@ -316,7 +352,8 @@ mod tests {
 
     #[test]
     fn service_webview_setup_skips_notification_shim_for_microsoft_apps() {
-        let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
+        let Some((_, teams_script)) =
+            service_webview_setup("https://teams.microsoft.com", false)
         else {
             panic!("expected valid teams setup");
         };
@@ -333,7 +370,8 @@ mod tests {
 
     #[test]
     fn service_webview_setup_skips_badge_navigation_for_microsoft_apps() {
-        let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
+        let Some((_, teams_script)) =
+            service_webview_setup("https://teams.microsoft.com", false)
         else {
             panic!("expected valid teams setup");
         };
@@ -352,7 +390,8 @@ mod tests {
 
     #[test]
     fn teams_setup_keeps_common_navigation_hooks() {
-        let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
+        let Some((_, teams_script)) =
+            service_webview_setup("https://teams.microsoft.com", false)
         else {
             panic!("expected valid teams setup");
         };
@@ -387,7 +426,8 @@ mod tests {
 
     #[test]
     fn service_webview_setup_keeps_notification_shim_for_supported_apps() {
-        let Some((_, script)) = service_webview_setup("https://discord.com/channels/@me", false)
+        let Some((_, script)) =
+            service_webview_setup("https://discord.com/channels/@me", false)
         else {
             panic!("expected valid discord setup");
         };
@@ -437,7 +477,8 @@ mod tests {
 
     #[test]
     fn youtube_music_setup_includes_google_auth_compat() {
-        let Some((_, script)) = service_webview_setup("https://music.youtube.com/", false) else {
+        let Some((_, script)) = service_webview_setup("https://music.youtube.com/", false)
+        else {
             panic!("expected valid youtube music setup");
         };
 
@@ -463,7 +504,8 @@ mod tests {
 
     #[test]
     fn non_google_setup_omits_google_auth_compat() {
-        let Some((_, script)) = service_webview_setup("https://discord.com/channels/@me", false)
+        let Some((_, script)) =
+            service_webview_setup("https://discord.com/channels/@me", false)
         else {
             panic!("expected valid discord setup");
         };
@@ -509,7 +551,6 @@ mod tests {
     fn service_webview_setup_rejects_invalid_external_urls() {
         assert!(service_webview_setup("not a url", false).is_none());
     }
-
 }
 
 #[tauri::command]
@@ -536,6 +577,7 @@ async fn hide_all_webviews(app: AppHandle) {
 
         for (name, webview) in app.webviews() {
             if name != "main" {
+                set_badge_monitoring(&webview, false);
                 let _ = webview.set_bounds(tauri::Rect {
                     position: tauri::Position::Physical(offscreen_pos),
                     size: tauri::Size::Physical(active_size),
@@ -567,6 +609,7 @@ async fn delete_webview(app: AppHandle, id: String, storage_key: String) {
     if let Some(webview) = app.get_webview(&id) {
         let _ = webview.close();
     }
+    remove_badge_monitoring_pref(&app, &id);
 
     #[cfg(target_os = "macos")]
     {
@@ -631,12 +674,11 @@ async fn open_service(
     url: String,
     storage_key: String,
     allow_notifications: bool,
+    badge_monitoring_enabled: bool,
 ) {
     use tauri::{PhysicalPosition, PhysicalSize};
 
-    let Some((webview_url, initialization_script)) =
-        service_webview_setup(&url, allow_notifications)
-    else {
+    let Some((webview_url, initialization_script)) = service_webview_setup(&url, allow_notifications) else {
         eprintln!("Invalid external url for open_service: {url}");
         let _ = app.emit("show-toast", "Invalid service URL");
         return;
@@ -648,6 +690,7 @@ async fn open_service(
             *active = id.clone();
         };
     }
+    set_badge_monitoring_pref(&app, &id, badge_monitoring_enabled);
 
     if let Some(window) = app.get_window("main") {
         let scale_factor = window.scale_factor().unwrap_or(1.0);
@@ -666,6 +709,7 @@ async fn open_service(
         for (name, webview) in app.webviews() {
             if name != "main" {
                 if name == id {
+                    set_badge_monitoring(&webview, badge_monitoring_pref(&app, &id));
                     let _ = webview.set_bounds(tauri::Rect {
                         position: tauri::Position::Physical(active_pos),
                         size: tauri::Size::Physical(active_size),
@@ -674,6 +718,7 @@ async fn open_service(
                     let _ = webview.set_focus();
                     already_exists = true;
                 } else {
+                    set_badge_monitoring(&webview, badge_monitoring_pref(&app, &name));
                     let _ = webview.set_bounds(tauri::Rect {
                         position: tauri::Position::Physical(offscreen_pos),
                         size: tauri::Size::Physical(active_size),
@@ -721,7 +766,10 @@ async fn open_service(
         .on_navigation(move |url| handle_special_navigation(&app_handle, &service_id, url));
 
         match window.add_child(builder, active_pos, active_size) {
-            Ok(webview) => register_file_drop_handler(&webview),
+            Ok(webview) => {
+                register_file_drop_handler(&webview);
+                set_badge_monitoring(&webview, badge_monitoring_pref(&app, &id));
+            }
             Err(e) => println!("Webview failed: {}", e),
         }
     }
@@ -734,20 +782,20 @@ async fn load_service(
     url: String,
     storage_key: String,
     allow_notifications: bool,
+    badge_monitoring_enabled: bool,
 ) {
     use tauri::{PhysicalPosition, PhysicalSize};
 
     if app.get_webview(&id).is_some() {
         return;
     }
+    set_badge_monitoring_pref(&app, &id, badge_monitoring_enabled);
 
     if let Some(window) = app.get_window("main") {
         let app_handle = app.clone();
         let service_id = id.clone();
 
-        let Some((webview_url, initialization_script)) =
-            service_webview_setup(&url, allow_notifications)
-        else {
+        let Some((webview_url, initialization_script)) = service_webview_setup(&url, allow_notifications) else {
             eprintln!("Invalid external url for load_service: {url}");
             let _ = app.emit("show-toast", "Invalid service URL");
             return;
@@ -797,6 +845,7 @@ async fn load_service(
             ),
         ) {
             register_file_drop_handler(&webview);
+            set_badge_monitoring(&webview, badge_monitoring_enabled);
         }
     }
 }
@@ -808,7 +857,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .manage(ActiveWebview(Mutex::new(String::new())));
+        .manage(ActiveWebview(Mutex::new(String::new())))
+        .manage(BadgeMonitoringPrefs(Mutex::new(HashMap::new())));
 
     #[cfg(feature = "devtools")]
     {

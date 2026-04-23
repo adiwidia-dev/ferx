@@ -23,7 +23,7 @@
   let updater = $state<UpdaterState>({ status: "idle" });
 
   onMount(() => {
-    invoke("hide_all_webviews");
+    void invoke("hide_all_webviews");
 
     const startup = readStartupState(localStorage.getItem("ferx-workspace-services"));
     services = startup.services;
@@ -82,7 +82,7 @@
   <title>Settings | Ferx</title>
 </svelte:head>
 
-<div class="flex h-screen w-screen overflow-hidden bg-background text-foreground">
+<div class="flex h-screen min-h-0 w-screen overflow-hidden bg-background text-foreground">
   <aside
     class="w-20 border-r flex flex-col items-center pt-14 pb-6 gap-4 bg-background shrink-0"
     data-tauri-drag-region
@@ -92,7 +92,7 @@
         <Button
           title={`${service.name} (Cmd+${index + 1})`}
           variant="ghost"
-          href="/"
+          href={service.disabled ? "/" : `/?open=${encodeURIComponent(service.id)}`}
           class="h-12 w-12 rounded-2xl p-2 transition-all relative overflow-visible
                  hover:bg-foreground/5
                  {service.disabled ? 'opacity-40 grayscale' : ''}"
@@ -172,15 +172,18 @@
   </aside>
 
   <main
-    class="flex-1 flex items-center justify-center relative z-0 bg-background/50"
+    class="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col bg-background/50"
   >
     <div
-      class="absolute inset-0 z-[-1] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-500/5 via-background to-background"
+      class="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-500/5 via-background to-background"
     ></div>
 
     <div
-      class="flex flex-col items-center max-w-md w-full text-center animate-in fade-in zoom-in-95 duration-500"
+      class="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-4 pb-8 pt-6 sm:px-6 sm:pb-10 sm:pt-8"
     >
+      <div
+        class="mx-auto flex w-full max-w-md flex-col items-center text-center animate-in fade-in zoom-in-95 duration-500"
+      >
       <div
         class="h-20 w-20 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 text-blue-500 rounded-[1.5rem] flex items-center justify-center mb-6 shadow-inner ring-1 ring-blue-500/20"
       >
@@ -345,6 +348,7 @@
           {/if}
         </div>
       </div>
+    </div>
     </div>
   </main>
 </div>

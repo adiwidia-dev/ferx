@@ -9,6 +9,9 @@ import {
 import { createDeletePayload } from "$lib/services/service-runtime";
 import { createStorageKey } from "$lib/services/storage-key";
 
+/** Last focused service in the workspace sidebar (survives navigation to /settings). */
+export const WORKSPACE_ACTIVE_ID_KEY = "ferx-workspace-active-id";
+
 export interface PageService {
   id: string;
   name: string;
@@ -37,10 +40,22 @@ export function readStartupState(saved: string | null): {
     badge: undefined,
   }));
   const firstEnabled = startupServices.find((service) => !service.disabled);
+  let activeId = firstEnabled?.id ?? "";
+  if (typeof localStorage !== "undefined") {
+    const storedActive = localStorage.getItem(WORKSPACE_ACTIVE_ID_KEY);
+    if (storedActive) {
+      const match = startupServices.find(
+        (service) => service.id === storedActive && !service.disabled,
+      );
+      if (match) {
+        activeId = match.id;
+      }
+    }
+  }
 
   return {
     services: startupServices,
-    activeId: firstEnabled?.id ?? "",
+    activeId,
     toastMessage: recoveredFromCorruption ? "Saved services were reset." : "",
   };
 }

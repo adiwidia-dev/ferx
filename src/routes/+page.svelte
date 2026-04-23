@@ -25,6 +25,7 @@
     saveServiceState,
     serializeServicesForStorage,
     toggleServiceDisabled,
+    WORKSPACE_ACTIVE_ID_KEY,
     type PageService,
   } from "$lib/services/workspace-state";
   import { onMount } from "svelte";
@@ -46,6 +47,11 @@
     saveTimer = setTimeout(() => {
       saveTimer = null;
       localStorage.setItem("ferx-workspace-services", serializeServicesForStorage(services));
+      if (activeId) {
+        localStorage.setItem(WORKSPACE_ACTIVE_ID_KEY, activeId);
+      } else {
+        localStorage.removeItem(WORKSPACE_ACTIVE_ID_KEY);
+      }
     }, 500);
   }
   // --- BULLETPROOF DRAG STATE (Tracking IDs instead of Indexes) ---
@@ -105,6 +111,20 @@
     );
     services = startupState.services;
     activeId = startupState.activeId;
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const openParam = params.get("open");
+      if (openParam && services.some((s) => s.id === openParam && !s.disabled)) {
+        activeId = openParam;
+      }
+      if (openParam) {
+        params.delete("open");
+        const next = params.toString();
+        const path = window.location.pathname + (next ? `?${next}` : "");
+        window.history.replaceState(null, "", path);
+      }
+    }
 
     if (startupState.toastMessage) {
       showToast(startupState.toastMessage);
@@ -189,6 +209,11 @@
       if (saveTimer) {
         clearTimeout(saveTimer);
         localStorage.setItem("ferx-workspace-services", serializeServicesForStorage(services));
+        if (activeId) {
+          localStorage.setItem(WORKSPACE_ACTIVE_ID_KEY, activeId);
+        } else {
+          localStorage.removeItem(WORKSPACE_ACTIVE_ID_KEY);
+        }
       }
       cleanupPageListeners({
         unlistenToastPromise,
@@ -203,6 +228,7 @@
   $effect(() => {
     if (isInitialized) {
       void services;
+      void activeId;
       scheduleSave();
     }
   });

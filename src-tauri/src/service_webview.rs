@@ -344,16 +344,34 @@ fn badge_engine_script(strategy_name: &str) -> String {
         }};
 
         const observeTitle = () => {{
-            const target = document.head || document.documentElement;
-            if (!target) return;
+            const bindTitleObserver = () => {{
+                const titleEl = document.querySelector('title');
+                if (!titleEl || titleEl.__ferx_title_observer_bound) return false;
+
+                titleEl.__ferx_title_observer_bound = true;
+                new MutationObserver(() => {{
+                    if (!window.__ferx_badge_monitoring_enabled) return;
+                    evaluateBadgeState();
+                }}).observe(titleEl, {{
+                    childList: true,
+                    subtree: true,
+                    characterData: true
+                }});
+                return true;
+            }};
+
+            bindTitleObserver();
+
+            const head = document.head || document.documentElement;
+            if (!head) return;
 
             new MutationObserver(() => {{
+                const didBind = bindTitleObserver();
+                if (!didBind) return;
                 if (!window.__ferx_badge_monitoring_enabled) return;
                 evaluateBadgeState();
-            }}).observe(target, {{
-                childList: true,
-                subtree: true,
-                characterData: true
+            }}).observe(head, {{
+                childList: true
             }});
         }};
 
@@ -500,30 +518,6 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
             return bestCount !== null ? 'count:' + bestCount : null;
         }};
 
-        const outlookPageTextState = () => {{
-            const bodyText = (document.body?.innerText || '').replace(/\s+/g, ' ').trim();
-            if (!bodyText) return null;
-
-            const patterns = [
-                /\bInbox\s+(\d+)\b/i,
-                /\bKotak Masuk\s+(\d+)\b/i,
-                /\bInbox\s*\((\d+)\)/i,
-                /\bKotak Masuk\s*\((\d+)\)/i,
-                /\bInbox\b[^.]*?(\d+)\s*unread/i,
-                /\bKotak Masuk\b[^.]*?(\d+)\s*(?:belum dibaca|baru)/i,
-            ];
-
-            for (const re of patterns) {{
-                const match = bodyText.match(re);
-                if (match) {{
-                    const count = parseInt(match[1], 10);
-                    if (Number.isFinite(count) && count > 0) return 'count:' + count;
-                }}
-            }}
-
-            return null;
-        }};
-
         const emitBadgeState = async (nextState) => {{
             let payload;
             if (nextState === 'unknown') {{
@@ -549,16 +543,10 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
             let nextState = 'clear';
             try {{
                 // Short-circuit from cheapest to most expensive.
-                // `outlookPageTextState` reads `document.body.innerText`,
-                // which forces a full layout and can pin CPU on large
-                // mailboxes, so only run it when the fast paths fail.
                 nextState =
                     outlookScreenReaderState()
                     || outlookFolderState()
                     || titleCountState(document.title);
-                if (nextState === 'clear') {{
-                    nextState = outlookPageTextState() || 'clear';
-                }}
             }} catch (_error) {{
                 nextState = 'clear';
             }}
@@ -576,16 +564,34 @@ fn outlook_badge_engine_script(strategy_name: &str) -> String {
         }};
 
         const observeTitle = () => {{
-            const target = document.head || document.documentElement;
-            if (!target) return;
+            const bindTitleObserver = () => {{
+                const titleEl = document.querySelector('title');
+                if (!titleEl || titleEl.__ferx_title_observer_bound) return false;
+
+                titleEl.__ferx_title_observer_bound = true;
+                new MutationObserver(() => {{
+                    if (!window.__ferx_badge_monitoring_enabled) return;
+                    void evaluateBadgeState();
+                }}).observe(titleEl, {{
+                    childList: true,
+                    subtree: true,
+                    characterData: true
+                }});
+                return true;
+            }};
+
+            bindTitleObserver();
+
+            const head = document.head || document.documentElement;
+            if (!head) return;
 
             new MutationObserver(() => {{
+                const didBind = bindTitleObserver();
+                if (!didBind) return;
                 if (!window.__ferx_badge_monitoring_enabled) return;
                 void evaluateBadgeState();
-            }}).observe(target, {{
-                childList: true,
-                subtree: true,
-                characterData: true
+            }}).observe(head, {{
+                childList: true
             }});
         }};
 
@@ -738,16 +744,34 @@ fn teams_badge_engine_script() -> String {
         };
 
         const observeTitle = () => {
-            const target = document.head || document.documentElement;
-            if (!target) return;
+            const bindTitleObserver = () => {
+                const titleEl = document.querySelector('title');
+                if (!titleEl || titleEl.__ferx_title_observer_bound) return false;
+
+                titleEl.__ferx_title_observer_bound = true;
+                new MutationObserver(() => {
+                    if (!window.__ferx_badge_monitoring_enabled) return;
+                    void evaluateBadgeState();
+                }).observe(titleEl, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true
+                });
+                return true;
+            };
+
+            bindTitleObserver();
+
+            const head = document.head || document.documentElement;
+            if (!head) return;
 
             new MutationObserver(() => {
+                const didBind = bindTitleObserver();
+                if (!didBind) return;
                 if (!window.__ferx_badge_monitoring_enabled) return;
                 void evaluateBadgeState();
-            }).observe(target, {
-                childList: true,
-                subtree: true,
-                characterData: true
+            }).observe(head, {
+                childList: true
             });
         };
 

@@ -11,6 +11,8 @@ function createService(overrides: {
   url?: string;
   storageKey?: string;
   disabled?: boolean;
+  showBadge?: boolean;
+  affectTray?: boolean;
   allowNotifications?: boolean;
 } = {}) {
   return {
@@ -19,6 +21,8 @@ function createService(overrides: {
     storageKey: overrides.storageKey ?? "storage-service-1",
     disabled: overrides.disabled,
     notificationPrefs: {
+      showBadge: overrides.showBadge ?? true,
+      affectTray: overrides.affectTray ?? true,
       allowNotifications: overrides.allowNotifications ?? true,
     },
   };
@@ -40,6 +44,20 @@ describe("createServiceLoadPayload", () => {
       url: "https://docs.example.com/",
       storageKey: "storage-docs",
       allowNotifications: false,
+      badgeMonitoringEnabled: true,
+    });
+  });
+
+  it("disables badge monitoring only when both badge and tray are off", () => {
+    expect(
+      createServiceLoadPayload(
+        createService({
+          showBadge: false,
+          affectTray: false,
+        }),
+      ),
+    ).toMatchObject({
+      badgeMonitoringEnabled: false,
     });
   });
 });
