@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import ListTodoIcon from "@lucide/svelte/icons/list-todo";
   import { Button } from "$lib/components/ui/button";
   import { getServiceFaviconUrl, getServiceMonogram } from "$lib/services/service-icon";
   import type { PageService } from "$lib/services/workspace-state";
@@ -10,10 +11,12 @@
     draggedId: string | null;
     dragOverId: string | null;
     isDnd: boolean;
+    isTodosPanelOpen: boolean;
     onPointerDown: (event: PointerEvent, id: string) => void;
     onSelectService: (id: string) => void;
     onToggleDnd: () => void;
     onOpenAddModal: () => void;
+    onToggleTodosPanel: () => void;
   }
 
   let {
@@ -22,10 +25,12 @@
     draggedId,
     dragOverId,
     isDnd,
+    isTodosPanelOpen,
     onPointerDown,
     onSelectService,
     onToggleDnd,
     onOpenAddModal,
+    onToggleTodosPanel,
   }: Props = $props();
 
   let failedIcons = $state<Record<string, boolean>>({});
@@ -155,6 +160,19 @@
       onclick={onOpenAddModal}
     >
       +
+    </Button>
+
+    <Button
+      title="Todos"
+      aria-pressed={isTodosPanelOpen}
+      variant="ghost"
+      size="icon-lg"
+      class="h-10 w-10 rounded-full p-2 transition-all {isTodosPanelOpen
+        ? 'bg-foreground/10 text-foreground ring-1 ring-border'
+        : 'text-muted-foreground hover:bg-foreground/5'}"
+      onclick={onToggleTodosPanel}
+    >
+      <ListTodoIcon />
     </Button>
 
     <Button

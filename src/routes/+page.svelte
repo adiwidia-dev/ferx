@@ -6,6 +6,7 @@
     type WorkspaceEditorInput,
     type WorkspaceEditorService,
   } from "$lib/components/workspace/service-editor-dialog.svelte";
+  import TodosPanel from "$lib/components/workspace/todos-panel.svelte";
   import ResourceUsageStrip from "$lib/components/workspace/resource-usage-strip.svelte";
   import WorkspaceDisabledState from "$lib/components/workspace/workspace-disabled-state.svelte";
   import WorkspaceEmptyState from "$lib/components/workspace/workspace-empty-state.svelte";
@@ -38,6 +39,25 @@
     WORKSPACE_ACTIVE_ID_KEY,
     type PageService,
   } from "$lib/services/workspace-state";
+  import {
+    TODO_NOTES_STORAGE_KEY,
+    addTodoItem,
+    createTodoItem,
+    createTodoNote,
+    deleteTodoItem,
+    deleteTodoNote,
+    insertTodoItemsAfter,
+    readTodoNotes,
+    reorderTodoItems,
+    reorderTodoNotes,
+    serializeTodoNotes,
+    toggleTodoCompletedCollapsed,
+    toggleTodoItemCompleted,
+    toggleTodoNoteCollapsed,
+    updateTodoItemText,
+    updateTodoNoteTitle,
+    type TodoNote,
+  } from "$lib/services/todos";
   import { onMount } from "svelte";
 
   /** Debounced write after the last workspace change (ms). */
@@ -46,6 +66,7 @@
   const PRELOAD_START_MS = 2000;
   const PRELOAD_GAP_MS = 1000;
   const MAX_BACKGROUND_PRELOADS = 3;
+  const TODOS_PANEL_WIDTH = 360;
 
   type Service = PageService;
   let toastMessage = $state("");
@@ -58,10 +79,13 @@
   let resourceUsageMonitoringEnabled = $state(
     DEFAULT_APP_SETTINGS.resourceUsageMonitoringEnabled,
   );
+  let todoNotes = $state<TodoNote[]>([]);
+  let isTodosPanelOpen = $state(false);
 
   let isAddModalOpen = $state(false);
   let isDnd = $state(false);
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  let todoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   function writeWorkspaceToLocalStorage() {
     localStorage.setItem("ferx-workspace-services", serializeServicesForStorage(services));
@@ -87,6 +111,28 @@
     saveTimer = setTimeout(() => {
       saveTimer = null;
       writeWorkspaceToLocalStorage();
+    }, WORKSPACE_SAVE_DEBOUNCE_MS);
+  }
+
+  function writeTodosToLocalStorage() {
+    localStorage.setItem(TODO_NOTES_STORAGE_KEY, serializeTodoNotes(todoNotes));
+  }
+
+  function flushTodosToStorage() {
+    if (todoSaveTimer) {
+      clearTimeout(todoSaveTimer);
+      todoSaveTimer = null;
+    }
+    writeTodosToLocalStorage();
+  }
+
+  function scheduleTodoSave() {
+    if (todoSaveTimer) {
+      clearTimeout(todoSaveTimer);
+    }
+    todoSaveTimer = setTimeout(() => {
+      todoSaveTimer = null;
+      writeTodosToLocalStorage();
     }, WORKSPACE_SAVE_DEBOUNCE_MS);
   }
   // --- BULLETPROOF DRAG STATE (Tracking IDs instead of Indexes) ---
@@ -153,6 +199,7 @@
     resourceUsageMonitoringEnabled = settings.resourceUsageMonitoringEnabled;
     services = startupState.services;
     activeId = startupState.activeId;
+    todoNotes = readTodoNotes(localStorage.getItem(TODO_NOTES_STORAGE_KEY));
 
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -201,7 +248,10 @@
       }, PRELOAD_START_MS);
     }
 
-    const flushOnExit = () => flushWorkspaceToStorage();
+    const flushOnExit = () => {
+      flushWorkspaceToStorage();
+      flushTodosToStorage();
+    };
     window.addEventListener("beforeunload", flushOnExit);
     window.addEventListener("pagehide", flushOnExit);
     const onVisibilityForFlush = () => {
@@ -297,6 +347,7 @@
       window.removeEventListener("pagehide", flushOnExit);
       document.removeEventListener("visibilitychange", onVisibilityForFlush);
       flushOnExit();
+      void invoke("set_right_panel_width", { width: 0 });
       cleanupPageListeners({
         unlistenToastPromise,
         unlistenMenuPromise: unlistenPromise,
@@ -313,6 +364,13 @@
       void services;
       void activeId;
       scheduleSave();
+    }
+  });
+
+  $effect(() => {
+    if (isInitialized) {
+      void todoNotes;
+      scheduleTodoSave();
     }
   });
 
@@ -476,6 +534,35 @@
     }, 50);
   }
 
+  function createTodoId() {
+    return crypto.randomUUID().slice(0, 8);
+  }
+
+  function setTodosPanelOpen(open: boolean) {
+    isTodosPanelOpen = open;
+    void invoke("set_right_panel_width", {
+      width: open ? TODOS_PANEL_WIDTH : 0,
+    });
+  }
+
+  function addTodoNote() {
+    todoNotes = [createTodoNote(createTodoId), ...todoNotes];
+  }
+
+  function addTodoListItem(noteId: string, afterItemId?: string, text = "") {
+    const item = createTodoItem(createTodoId, text);
+    todoNotes = afterItemId
+      ? insertTodoItemsAfter(todoNotes, noteId, afterItemId, [item])
+      : addTodoItem(todoNotes, noteId, item);
+    return item.id;
+  }
+
+  function addTodoListItemsAfter(noteId: string, afterItemId: string, texts: string[]) {
+    const items = texts.map((text) => createTodoItem(createTodoId, text));
+    todoNotes = insertTodoItemsAfter(todoNotes, noteId, afterItemId, items);
+    return items.map((item) => item.id);
+  }
+
   function saveService(input: WorkspaceEditorInput) {
     const nextState = saveServiceState({
       services,
@@ -530,10 +617,12 @@
     {draggedId}
     {dragOverId}
     {isDnd}
+    {isTodosPanelOpen}
     onPointerDown={handlePointerDown}
     onSelectService={switchService}
     onToggleDnd={() => (isDnd = !isDnd)}
     onOpenAddModal={openAddModal}
+    onToggleTodosPanel={() => setTodosPanelOpen(!isTodosPanelOpen)}
   />
 
   <ServiceEditorDialog
@@ -575,4 +664,43 @@
       {/if}
     </div>
   </main>
+
+  {#if isTodosPanelOpen}
+    <TodosPanel
+      notes={todoNotes}
+      width={TODOS_PANEL_WIDTH}
+      {spellCheckEnabled}
+      onClose={() => setTodosPanelOpen(false)}
+      onAddNote={addTodoNote}
+      onDeleteNote={(noteId) => {
+        todoNotes = deleteTodoNote(todoNotes, noteId);
+      }}
+      onUpdateNoteTitle={(noteId, title) => {
+        todoNotes = updateTodoNoteTitle(todoNotes, noteId, title);
+      }}
+      onAddItem={addTodoListItem}
+      onAddItemsAfter={addTodoListItemsAfter}
+      onDeleteItem={(noteId, itemId) => {
+        todoNotes = deleteTodoItem(todoNotes, noteId, itemId);
+      }}
+      onUpdateItemText={(noteId, itemId, text) => {
+        todoNotes = updateTodoItemText(todoNotes, noteId, itemId, text);
+      }}
+      onToggleItemCompleted={(noteId, itemId, completed) => {
+        todoNotes = toggleTodoItemCompleted(todoNotes, noteId, itemId, completed);
+      }}
+      onToggleCompletedCollapsed={(noteId) => {
+        todoNotes = toggleTodoCompletedCollapsed(todoNotes, noteId);
+      }}
+      onToggleNoteCollapsed={(noteId) => {
+        todoNotes = toggleTodoNoteCollapsed(todoNotes, noteId);
+      }}
+      onReorderNotes={(draggedId, targetId) => {
+        todoNotes = reorderTodoNotes(todoNotes, draggedId, targetId);
+      }}
+      onReorderItems={(noteId, draggedId, targetId) => {
+        todoNotes = reorderTodoItems(todoNotes, noteId, draggedId, targetId);
+      }}
+    />
+  {/if}
 </div>

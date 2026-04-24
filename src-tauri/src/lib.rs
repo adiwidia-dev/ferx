@@ -29,11 +29,13 @@ use download_dialog::handle_service_webview_download;
 struct ActiveWebview(Mutex<String>);
 struct ActiveResourceUsageMonitoring(Mutex<bool>);
 struct BadgeMonitoringPrefs(Mutex<HashMap<String, bool>>);
+struct RightPanelWidth(Mutex<f64>);
 
 /// Coalesces rapid `Resized` events: only the latest resize may apply `set_bounds` (see debounce in `on_window_event`).
 struct MainWindowResizeGen(AtomicU64);
 
 const RESIZE_DEBOUNCE_MS: u64 = 32;
+const SIDEBAR_WIDTH: f64 = 79.0;
 const RESOURCE_USAGE_STRIP_HEIGHT: f64 = 32.0;
 
 fn set_badge_monitoring(webview: &tauri::Webview, enabled: bool) {
@@ -79,12 +81,47 @@ fn active_resource_usage_monitoring(app: &AppHandle) -> bool {
     state.0.lock().map(|active| *active).unwrap_or(false)
 }
 
+fn set_stored_right_panel_width(app: &AppHandle, width: f64) {
+    let state = app.state::<RightPanelWidth>();
+    if let Ok(mut stored_width) = state.0.lock() {
+        *stored_width = width.max(0.0);
+    };
+}
+
+fn right_panel_width(app: &AppHandle) -> f64 {
+    let state = app.state::<RightPanelWidth>();
+    state.0.lock().map(|width| *width).unwrap_or(0.0)
+}
+
+fn sidebar_physical_width(scale_factor: f64) -> u32 {
+    (SIDEBAR_WIDTH * scale_factor) as u32
+}
+
+fn right_panel_physical_width(scale_factor: f64, right_panel_width: f64) -> u32 {
+    (right_panel_width.max(0.0) * scale_factor) as u32
+}
+
 fn service_content_top_offset(scale_factor: f64, resource_usage_monitoring_enabled: bool) -> u32 {
     if resource_usage_monitoring_enabled {
         (RESOURCE_USAGE_STRIP_HEIGHT * scale_factor) as u32
     } else {
         0
     }
+}
+
+fn effective_service_content_size(
+    physical_size: tauri::PhysicalSize<u32>,
+    sidebar_width: u32,
+    top_offset: u32,
+    right_panel_width: u32,
+) -> tauri::PhysicalSize<u32> {
+    tauri::PhysicalSize::new(
+        physical_size
+            .width
+            .saturating_sub(sidebar_width)
+            .saturating_sub(right_panel_width),
+        physical_size.height.saturating_sub(top_offset),
+    )
 }
 
 fn apply_active_child_webview_bounds(
@@ -103,9 +140,13 @@ fn apply_active_child_webview_bounds(
     }
 
     let scale_factor = window.scale_factor().unwrap_or(1.0);
-    let sidebar_width = (79.0 * scale_factor) as u32;
-    let top_offset =
-        service_content_top_offset(scale_factor, active_resource_usage_monitoring(&window.app_handle()));
+    let sidebar_width = sidebar_physical_width(scale_factor);
+    let top_offset = service_content_top_offset(
+        scale_factor,
+        active_resource_usage_monitoring(&window.app_handle()),
+    );
+    let right_panel_width =
+        right_panel_physical_width(scale_factor, right_panel_width(&window.app_handle()));
 
     if let Some(webview) = window.get_webview(&active_id) {
         let _ = webview.set_bounds(tauri::Rect {
@@ -113,9 +154,11 @@ fn apply_active_child_webview_bounds(
                 sidebar_width as i32,
                 top_offset as i32,
             )),
-            size: tauri::Size::Physical(tauri::PhysicalSize::new(
-                physical_size.width.saturating_sub(sidebar_width),
-                physical_size.height.saturating_sub(top_offset),
+            size: tauri::Size::Physical(effective_service_content_size(
+                physical_size,
+                sidebar_width,
+                top_offset,
+                right_panel_width,
             )),
         });
     }
@@ -269,6 +312,45 @@ mod tests {
             "ferx-workspace-config.json"
         );
         assert_eq!(super::safe_export_file_name("   "), "ferx-workspace-config.json");
+    }
+
+    #[test]
+    fn effective_service_content_size_excludes_sidebar_top_offset_and_right_panel() {
+        assert_eq!(
+            super::effective_service_content_size(
+                tauri::PhysicalSize::new(1200, 800),
+                80,
+                32,
+                360,
+            ),
+            tauri::PhysicalSize::new(760, 768)
+        );
+    }
+
+    #[test]
+    fn effective_service_content_size_preserves_current_width_without_right_panel() {
+        assert_eq!(
+            super::effective_service_content_size(
+                tauri::PhysicalSize::new(1200, 800),
+                80,
+                0,
+                0,
+            ),
+            tauri::PhysicalSize::new(1120, 800)
+        );
+    }
+
+    #[test]
+    fn effective_service_content_size_saturates_when_chrome_exceeds_window_size() {
+        assert_eq!(
+            super::effective_service_content_size(
+                tauri::PhysicalSize::new(300, 120),
+                80,
+                150,
+                360,
+            ),
+            tauri::PhysicalSize::new(0, 0)
+        );
     }
 
     #[test]
@@ -720,7 +802,7 @@ mod tests {
 
 #[tauri::command]
 async fn hide_all_webviews(app: AppHandle) {
-    use tauri::{PhysicalPosition, PhysicalSize};
+    use tauri::PhysicalPosition;
 
     {
         let state = app.state::<ActiveWebview>();
@@ -733,12 +815,11 @@ async fn hide_all_webviews(app: AppHandle) {
     if let Some(window) = app.get_window("main") {
         let scale_factor = window.scale_factor().unwrap_or(1.0);
         let physical_size = window.inner_size().unwrap_or_default();
-        let sidebar_width = (79.0 * scale_factor) as u32;
+        let sidebar_width = sidebar_physical_width(scale_factor);
+        let right_panel_width = right_panel_physical_width(scale_factor, right_panel_width(&app));
 
-        let active_size = PhysicalSize::new(
-            physical_size.width.saturating_sub(sidebar_width),
-            physical_size.height,
-        );
+        let active_size =
+            effective_service_content_size(physical_size, sidebar_width, 0, right_panel_width);
         let offscreen_pos = PhysicalPosition::new(-10000, -10000);
 
         for (name, webview) in app.webviews() {
@@ -794,6 +875,16 @@ fn safe_export_file_name(default_filename: &str) -> String {
 #[tauri::command]
 async fn close_all_service_webviews(app: AppHandle) {
     close_service_webviews(&app);
+}
+
+#[tauri::command]
+async fn set_right_panel_width(app: AppHandle, width: f64) {
+    set_stored_right_panel_width(&app, width);
+
+    if let Some(window) = app.get_window("main") {
+        let physical_size = window.inner_size().unwrap_or_default();
+        apply_active_child_webview_bounds(&window, physical_size);
+    }
 }
 
 #[tauri::command]
@@ -926,7 +1017,7 @@ async fn open_service(
     spell_check_enabled: bool,
     resource_usage_monitoring_enabled: bool,
 ) {
-    use tauri::{PhysicalPosition, PhysicalSize};
+    use tauri::PhysicalPosition;
 
     let Some((webview_url, initialization_script)) = service_webview_setup_with_resource_monitoring(
         &url,
@@ -952,13 +1043,17 @@ async fn open_service(
     if let Some(window) = app.get_window("main") {
         let scale_factor = window.scale_factor().unwrap_or(1.0);
         let physical_size = window.inner_size().unwrap_or_default();
-        let sidebar_width = (79.0 * scale_factor) as u32;
-        let top_offset = service_content_top_offset(scale_factor, resource_usage_monitoring_enabled);
+        let sidebar_width = sidebar_physical_width(scale_factor);
+        let top_offset =
+            service_content_top_offset(scale_factor, resource_usage_monitoring_enabled);
+        let right_panel_width = right_panel_physical_width(scale_factor, right_panel_width(&app));
 
         let active_pos = PhysicalPosition::new(sidebar_width as i32, top_offset as i32);
-        let active_size = PhysicalSize::new(
-            physical_size.width.saturating_sub(sidebar_width),
-            physical_size.height.saturating_sub(top_offset),
+        let active_size = effective_service_content_size(
+            physical_size,
+            sidebar_width,
+            top_offset,
+            right_panel_width,
         );
         let offscreen_pos = PhysicalPosition::new(-10000, -10000);
 
@@ -1049,7 +1144,7 @@ async fn load_service(
     spell_check_enabled: bool,
     resource_usage_monitoring_enabled: bool,
 ) {
-    use tauri::{PhysicalPosition, PhysicalSize};
+    use tauri::PhysicalPosition;
 
     if app.get_webview(&id).is_some() {
         return;
@@ -1107,15 +1202,13 @@ async fn load_service(
 
         let scale_factor = window.scale_factor().unwrap_or(1.0);
         let physical_size = window.inner_size().unwrap_or_default();
-        let sidebar_width = (79.0 * scale_factor) as u32;
+        let sidebar_width = sidebar_physical_width(scale_factor);
+        let right_panel_width = right_panel_physical_width(scale_factor, right_panel_width(&app));
 
         if let Ok(webview) = window.add_child(
             builder,
             PhysicalPosition::new(-10000, -10000),
-            PhysicalSize::new(
-                physical_size.width.saturating_sub(sidebar_width),
-                physical_size.height,
-            ),
+            effective_service_content_size(physical_size, sidebar_width, 0, right_panel_width),
         ) {
             register_file_drop_handler(&webview);
             set_badge_monitoring(&webview, badge_monitoring_enabled);
@@ -1133,6 +1226,7 @@ pub fn run() {
         .manage(ActiveWebview(Mutex::new(String::new())))
         .manage(ActiveResourceUsageMonitoring(Mutex::new(false)))
         .manage(BadgeMonitoringPrefs(Mutex::new(HashMap::new())))
+        .manage(RightPanelWidth(Mutex::new(0.0)))
         .manage(MainWindowResizeGen(AtomicU64::new(0)));
 
     #[cfg(feature = "devtools")]
@@ -1215,6 +1309,7 @@ pub fn run() {
             open_service,
             hide_all_webviews,
             close_all_service_webviews,
+            set_right_panel_width,
             save_workspace_config_export,
             restart_app,
             reload_webview,
