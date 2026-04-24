@@ -6,6 +6,7 @@
     type WorkspaceEditorInput,
     type WorkspaceEditorService,
   } from "$lib/components/workspace/service-editor-dialog.svelte";
+  import ResourceUsageStrip from "$lib/components/workspace/resource-usage-strip.svelte";
   import WorkspaceDisabledState from "$lib/components/workspace/workspace-disabled-state.svelte";
   import WorkspaceEmptyState from "$lib/components/workspace/workspace-empty-state.svelte";
   import WorkspaceSidebar from "$lib/components/workspace/workspace-sidebar.svelte";
@@ -23,6 +24,10 @@
     countTrayRelevantUnreadServices,
     type NotificationPrefs,
   } from "$lib/services/notification-prefs";
+  import {
+    parseResourceUsagePayload,
+    type ResourceUsageSnapshot,
+  } from "$lib/services/resource-usage";
   import {
     applySaveServiceResult,
     cleanupPageListeners,
@@ -50,6 +55,9 @@
   let badges = $state<Record<string, number | undefined>>({});
   let isInitialized = $state(false);
   let spellCheckEnabled = $state(DEFAULT_APP_SETTINGS.spellCheckEnabled);
+  let resourceUsageMonitoringEnabled = $state(
+    DEFAULT_APP_SETTINGS.resourceUsageMonitoringEnabled,
+  );
 
   let isAddModalOpen = $state(false);
   let isDnd = $state(false);
@@ -96,7 +104,11 @@
       badge: badges[service.id],
     })),
   );
+  let resourceUsageSnapshots = $state<Record<string, ResourceUsageSnapshot | undefined>>({});
   let activeService = $derived(services.find((s) => s.id === activeId));
+  let activeResourceUsageSnapshot = $derived(
+    activeId ? resourceUsageSnapshots[activeId] : undefined,
+  );
   let hasUnreadNotifications = $derived(
     !isDnd && countTrayRelevantUnreadServices(displayServices) > 0,
   );
@@ -136,9 +148,9 @@
     const startupState = readStartupState(
       localStorage.getItem("ferx-workspace-services"),
     );
-    spellCheckEnabled = readAppSettings(
-      localStorage.getItem(APP_SETTINGS_STORAGE_KEY),
-    ).spellCheckEnabled;
+    const settings = readAppSettings(localStorage.getItem(APP_SETTINGS_STORAGE_KEY));
+    spellCheckEnabled = settings.spellCheckEnabled;
+    resourceUsageMonitoringEnabled = settings.resourceUsageMonitoringEnabled;
     services = startupState.services;
     activeId = startupState.activeId;
 
@@ -176,7 +188,11 @@
           if (shouldPreloadService(service, activeId)) {
             await invoke(
               "load_service",
-              createServiceLoadPayload(service, spellCheckEnabled),
+              createServiceLoadPayload(
+                service,
+                spellCheckEnabled,
+                false,
+              ),
             );
             preloaded++;
             await new Promise((resolve) => setTimeout(resolve, PRELOAD_GAP_MS));
@@ -243,6 +259,23 @@
       }
     });
 
+    const unlistenResourceUsagePromise = listen("resource-usage-update", (event) => {
+      const [targetId, payload = ""] = (event.payload as string).split(/:(.*)/s);
+      if (!targetId || !services.some((service) => service.id === targetId)) {
+        return;
+      }
+
+      const snapshot = parseResourceUsagePayload(targetId, payload);
+      if (!snapshot) {
+        return;
+      }
+
+      resourceUsageSnapshots = {
+        ...resourceUsageSnapshots,
+        [targetId]: snapshot,
+      };
+    });
+
     const unlistenShortcutPromise = listen("switch-shortcut", (event) => {
       const key = parseInt(event.payload as string);
       if (!isNaN(key) && key >= 1 && key <= 9) {
@@ -271,6 +304,7 @@
         unlistenShortcutPromise,
         toastTimeout,
       });
+      void unlistenResourceUsagePromise.then((unlisten) => unlisten());
     };
   });
 
@@ -286,7 +320,14 @@
     if (isAddModalOpen || (activeService && activeService.disabled)) {
       invoke("hide_all_webviews");
     } else if (activeService && !activeService.disabled) {
-      invoke("open_service", createServiceLoadPayload(activeService, spellCheckEnabled));
+      invoke(
+        "open_service",
+        createServiceLoadPayload(
+          activeService,
+          spellCheckEnabled,
+          resourceUsageMonitoringEnabled,
+        ),
+      );
     }
   });
 
@@ -461,7 +502,14 @@
       },
       deleteWebview: async (payload) => invoke("delete_webview", payload),
       loadService: async (service) =>
-        invoke("load_service", createServiceLoadPayload(service, spellCheckEnabled)),
+        invoke(
+          "load_service",
+          createServiceLoadPayload(
+            service,
+            spellCheckEnabled,
+            false,
+          ),
+        ),
     });
   }
 </script>
@@ -495,7 +543,7 @@
   />
 
   <main
-    class="flex-1 flex items-center justify-center relative z-0 bg-background/50"
+    class="flex-1 flex min-w-0 flex-col relative z-0 bg-background/50"
   >
     {#if toastMessage}
       <div
@@ -508,13 +556,23 @@
       class="absolute inset-0 z-[-1] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-500/5 via-background to-background"
     ></div>
 
-    {#if !activeService}
-      <WorkspaceEmptyState onOpenAddModal={openAddModal} />
-    {:else if activeService.disabled}
-      <WorkspaceDisabledState
+    {#if resourceUsageMonitoringEnabled && activeService && !activeService.disabled}
+      <ResourceUsageStrip
+        serviceId={activeService.id}
         serviceName={activeService.name}
-        onEnable={() => toggleDisable(activeService.id)}
+        snapshot={activeResourceUsageSnapshot}
       />
     {/if}
+
+    <div class="flex min-h-0 flex-1 items-center justify-center">
+      {#if !activeService}
+        <WorkspaceEmptyState onOpenAddModal={openAddModal} />
+      {:else if activeService.disabled}
+        <WorkspaceDisabledState
+          serviceName={activeService.name}
+          onEnable={() => toggleDisable(activeService.id)}
+        />
+      {/if}
+    </div>
   </main>
 </div>

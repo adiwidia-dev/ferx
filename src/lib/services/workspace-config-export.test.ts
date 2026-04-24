@@ -38,7 +38,10 @@ describe("workspace config export", () => {
   it("builds a versioned config-only payload without runtime badges", () => {
     const payload = buildWorkspaceConfigExportPayload({
       services,
-      appSettings: { spellCheckEnabled: false },
+      appSettings: {
+        spellCheckEnabled: false,
+        resourceUsageMonitoringEnabled: true,
+      },
       activeId: "mail",
       appVersion: "0.2.4",
       exportedAt: "2026-04-23T12:00:00.000Z",
@@ -53,6 +56,7 @@ describe("workspace config export", () => {
       },
       appSettings: {
         spellCheckEnabled: false,
+        resourceUsageMonitoringEnabled: true,
       },
       services: [
         {
@@ -87,7 +91,10 @@ describe("workspace config export", () => {
   it("omits duplicate service ids and ignores disabled active service ids", () => {
     const payload = buildWorkspaceConfigExportPayload({
       services: [services[0], { ...services[0], name: "Duplicate" }, services[1]],
-      appSettings: { spellCheckEnabled: true },
+      appSettings: {
+        spellCheckEnabled: true,
+        resourceUsageMonitoringEnabled: false,
+      },
       activeId: "chat",
       appVersion: "0.2.4",
       exportedAt: "2026-04-23T12:00:00.000Z",
@@ -101,7 +108,10 @@ describe("workspace config export", () => {
     const json = serializeWorkspaceConfigExport(
       buildWorkspaceConfigExportPayload({
         services: [],
-        appSettings: { spellCheckEnabled: true },
+        appSettings: {
+          spellCheckEnabled: true,
+          resourceUsageMonitoringEnabled: false,
+        },
         activeId: "",
         appVersion: "0.2.4",
         exportedAt: "2026-04-23T12:00:00.000Z",

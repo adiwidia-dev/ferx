@@ -47,6 +47,13 @@ describe("createServiceLoadPayload", () => {
       allowNotifications: false,
       badgeMonitoringEnabled: true,
       spellCheckEnabled: true,
+      resourceUsageMonitoringEnabled: false,
+    });
+  });
+
+  it("includes resource usage monitoring when requested", () => {
+    expect(createServiceLoadPayload(createService(), true, true)).toMatchObject({
+      resourceUsageMonitoringEnabled: true,
     });
   });
 

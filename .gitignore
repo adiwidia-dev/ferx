@@ -1,6 +1,7 @@
 .DS_Store
 node_modules
 .worktrees/
+.superpowers/
 docs/superpowers/
 /build
 /.svelte-kit

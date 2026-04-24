@@ -58,6 +58,35 @@ describe("settings page", () => {
     unmount(component);
   });
 
+  it("renders a resource usage monitoring toggle that defaults to disabled and persists changes", () => {
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    expect(document.body.textContent).toContain("Resource Usage Monitoring");
+    expect(document.body.textContent).toContain("Shows estimated resource activity for the active service.");
+
+    const checkbox = document.querySelector(
+      'input[type="checkbox"][name="resource-usage-monitoring-enabled"]',
+    ) as HTMLInputElement | null;
+
+    expect(checkbox).toBeTruthy();
+    expect(checkbox?.checked).toBe(false);
+
+    checkbox!.checked = true;
+    checkbox!.dispatchEvent(new Event("change", { bubbles: true }));
+    flushSync();
+
+    expect(localStorage.getItem("ferx-app-settings")).toBe(
+      '{"spellCheckEnabled":true,"resourceUsageMonitoringEnabled":true}',
+    );
+    expect(document.body.textContent).not.toContain("Restart Ferx to apply resource usage changes.");
+
+    unmount(component);
+  });
+
   it("shows restart warning and restart prompt only after changing spell checking", () => {
     const component = mount(SettingsPage, {
       target: document.body,
@@ -354,7 +383,9 @@ describe("settings page", () => {
     flushSync();
 
     expect(invoke).toHaveBeenCalledWith("close_all_service_webviews");
-    expect(localStorage.getItem("ferx-app-settings")).toBe('{"spellCheckEnabled":false}');
+    expect(localStorage.getItem("ferx-app-settings")).toBe(
+      '{"spellCheckEnabled":false,"resourceUsageMonitoringEnabled":false}',
+    );
     expect(localStorage.getItem("ferx-workspace-active-id")).toBe("mail");
     expect(JSON.parse(localStorage.getItem("ferx-workspace-services") ?? "")).toEqual([
       {

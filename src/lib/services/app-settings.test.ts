@@ -13,7 +13,11 @@ describe("app settings", () => {
   });
 
   it("defaults spell checking to enabled when storage is missing", () => {
-    expect(readAppSettings(null)).toEqual(DEFAULT_APP_SETTINGS);
+    expect(readAppSettings(null)).toEqual({
+      ...DEFAULT_APP_SETTINGS,
+      spellCheckEnabled: true,
+      resourceUsageMonitoringEnabled: false,
+    });
   });
 
   it("falls back to defaults when storage is invalid", () => {
@@ -23,10 +27,23 @@ describe("app settings", () => {
   it("preserves an explicit disabled spell-check preference", () => {
     expect(readAppSettings('{"spellCheckEnabled":false}')).toEqual({
       spellCheckEnabled: false,
+      resourceUsageMonitoringEnabled: false,
+    });
+  });
+
+  it("preserves an explicit enabled resource usage monitoring preference", () => {
+    expect(readAppSettings('{"resourceUsageMonitoringEnabled":true}')).toEqual({
+      spellCheckEnabled: true,
+      resourceUsageMonitoringEnabled: true,
     });
   });
 
   it("serializes only app-level settings", () => {
-    expect(serializeAppSettings({ spellCheckEnabled: true })).toBe('{"spellCheckEnabled":true}');
+    expect(
+      serializeAppSettings({
+        spellCheckEnabled: true,
+        resourceUsageMonitoringEnabled: true,
+      }),
+    ).toBe('{"spellCheckEnabled":true,"resourceUsageMonitoringEnabled":true}');
   });
 });

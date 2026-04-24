@@ -37,6 +37,7 @@
   let failedIcons = $state<Record<string, boolean>>({});
   let updater = $state<UpdaterState>({ status: "idle" });
   let spellCheckEnabled = $state(true);
+  let resourceUsageMonitoringEnabled = $state(false);
   let initialSpellCheckEnabled = $state(true);
   let showRestartPrompt = $state(false);
   let showRestartConfirm = $state(false);
@@ -59,6 +60,7 @@
     services = startup.services;
     activeId = startup.activeId;
     spellCheckEnabled = settings.spellCheckEnabled;
+    resourceUsageMonitoringEnabled = settings.resourceUsageMonitoringEnabled;
     initialSpellCheckEnabled = settings.spellCheckEnabled;
     showRestartPrompt = false;
     showRestartConfirm = false;
@@ -123,10 +125,18 @@
     spellCheckEnabled = enabled;
     localStorage.setItem(
       APP_SETTINGS_STORAGE_KEY,
-      serializeAppSettings({ spellCheckEnabled }),
+      serializeAppSettings({ spellCheckEnabled, resourceUsageMonitoringEnabled }),
     );
     showRestartPrompt = enabled !== initialSpellCheckEnabled;
     restartError = "";
+  }
+
+  function handleResourceUsageMonitoringChange(enabled: boolean) {
+    resourceUsageMonitoringEnabled = enabled;
+    localStorage.setItem(
+      APP_SETTINGS_STORAGE_KEY,
+      serializeAppSettings({ spellCheckEnabled, resourceUsageMonitoringEnabled }),
+    );
   }
 
   function requestRestartFerx() {
@@ -639,6 +649,37 @@
               checked={spellCheckEnabled}
               onchange={(event) =>
                 handleSpellCheckChange((event.currentTarget as HTMLInputElement).checked)}
+            />
+            <span
+              class="h-6 w-11 rounded-full bg-muted transition-colors peer-checked:bg-blue-500"
+            ></span>
+            <span
+              class="pointer-events-none absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-background shadow-sm transition-transform peer-checked:translate-x-5"
+            ></span>
+          </label>
+        </div>
+
+        <div class="flex items-center justify-between gap-4 px-6 py-4 border-b">
+          <div class="text-left">
+            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Resource Usage
+            </p>
+            <p class="text-sm font-semibold mt-0.5">Resource Usage Monitoring</p>
+            <p class="mt-1 text-xs text-muted-foreground">
+              Shows estimated resource activity for the active service.
+            </p>
+          </div>
+
+          <label class="relative inline-flex cursor-pointer items-center">
+            <input
+              name="resource-usage-monitoring-enabled"
+              type="checkbox"
+              class="peer sr-only"
+              checked={resourceUsageMonitoringEnabled}
+              onchange={(event) =>
+                handleResourceUsageMonitoringChange(
+                  (event.currentTarget as HTMLInputElement).checked,
+                )}
             />
             <span
               class="h-6 w-11 rounded-full bg-muted transition-colors peer-checked:bg-blue-500"

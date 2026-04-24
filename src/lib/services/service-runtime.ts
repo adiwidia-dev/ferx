@@ -13,6 +13,7 @@ type ServiceRuntimeService = {
 export function createServiceLoadPayload(
   service: ServiceRuntimeService,
   spellCheckEnabled: boolean,
+  resourceUsageMonitoringEnabled = false,
 ) {
   const badgeMonitoringEnabled =
     service.notificationPrefs.showBadge !== false ||
@@ -25,6 +26,7 @@ export function createServiceLoadPayload(
     allowNotifications: service.notificationPrefs.allowNotifications,
     badgeMonitoringEnabled,
     spellCheckEnabled,
+    resourceUsageMonitoringEnabled,
   };
 }
 

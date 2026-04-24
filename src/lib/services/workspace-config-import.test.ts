@@ -45,7 +45,10 @@ describe("workspace config import", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.appSettings).toEqual({ spellCheckEnabled: false });
+    expect(result.value.appSettings).toEqual({
+      spellCheckEnabled: false,
+      resourceUsageMonitoringEnabled: false,
+    });
     expect(result.value.activeId).toBe("mail");
     expect(result.value.services).toEqual([
       {
@@ -205,7 +208,7 @@ describe("workspace config import", () => {
     writeWorkspaceConfigImportToStorage(result.value, localStorage);
 
     expect(localStorage.getItem(APP_SETTINGS_STORAGE_KEY)).toBe(
-      '{"spellCheckEnabled":false}',
+      '{"spellCheckEnabled":false,"resourceUsageMonitoringEnabled":false}',
     );
     expect(localStorage.getItem(WORKSPACE_ACTIVE_ID_KEY)).toBe("mail");
     expect(JSON.parse(localStorage.getItem("ferx-workspace-services") ?? "")).toEqual([

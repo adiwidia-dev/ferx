@@ -254,6 +254,192 @@ fn common_webview_script() -> &'static str {
 "#
 }
 
+pub(crate) fn resource_usage_monitor_eval_script(enabled: bool) -> &'static str {
+    if enabled {
+        resource_usage_monitor_script()
+    } else {
+        "window.__ferxSetResourceUsageMonitoring?.(false);"
+    }
+}
+
+fn resource_usage_monitor_script() -> &'static str {
+    r#"
+    (() => {
+        const invoke = window.__TAURI_INTERNALS__?.invoke;
+        if (typeof invoke !== 'function') return;
+
+        window.__ferxResourceUsageMonitoringEnabled = true;
+
+        if (window.__ferx_resource_usage_monitor_active) {
+            window.__ferxSetResourceUsageMonitoring?.(true);
+            return;
+        }
+
+        window.__ferx_resource_usage_monitor_active = true;
+        window.__ferx_resource_usage_timer = null;
+        window.__ferx_resource_usage_last_network_bytes = 0;
+        window.__ferx_resource_usage_upload_bytes = 0;
+        window.__ferx_resource_usage_last_sample = performance.now();
+        window.__ferx_resource_usage_long_task_ms = 0;
+        window.__ferx_resource_usage_last_tick = performance.now();
+        window.__ferx_resource_usage_cpu_estimate = null;
+
+        const safeNumber = (value) => Number.isFinite(value) ? value : null;
+        const textEncoder = new TextEncoder();
+        const bodyByteLength = (body) => {
+            if (body == null) return 0;
+            try {
+                if (typeof body === 'string') return textEncoder.encode(body).byteLength;
+                if (body instanceof URLSearchParams) return textEncoder.encode(body.toString()).byteLength;
+                if (body instanceof Blob) return body.size;
+                if (body instanceof ArrayBuffer) return body.byteLength;
+                if (ArrayBuffer.isView(body)) return body.byteLength;
+                if (body instanceof FormData) {
+                    let total = 0;
+                    for (const [key, value] of body.entries()) {
+                        total += textEncoder.encode(String(key)).byteLength;
+                        if (typeof value === 'string') {
+                            total += textEncoder.encode(value).byteLength;
+                        } else if (value && Number.isFinite(value.size)) {
+                            total += value.size;
+                        }
+                    }
+                    return total;
+                }
+            } catch (_error) {
+                return 0;
+            }
+            return 0;
+        };
+        const recordUploadBytes = (bytes) => {
+            if (Number.isFinite(bytes) && bytes > 0) {
+                window.__ferx_resource_usage_upload_bytes += bytes;
+            }
+        };
+        const memoryEstimate = () => {
+            const memory = performance.memory;
+            if (!memory || !Number.isFinite(memory.usedJSHeapSize)) return null;
+            return memory.usedJSHeapSize;
+        };
+
+        const totalNetworkBytes = () => {
+            let total = 0;
+            try {
+                const entries = performance.getEntriesByType('resource');
+                for (const entry of entries) {
+                    const bytes = entry.transferSize || entry.encodedBodySize || entry.decodedBodySize || 0;
+                    if (Number.isFinite(bytes) && bytes > 0) total += bytes;
+                }
+            } catch (_error) {
+                return 0;
+            }
+            return total;
+        };
+
+        const installNetworkUploadHooks = () => {
+            if (window.__ferx_resource_usage_upload_hooks_active) return;
+            window.__ferx_resource_usage_upload_hooks_active = true;
+
+            const originalFetch = window.fetch;
+            if (typeof originalFetch === 'function') {
+                window.fetch = function(input, init) {
+                    try {
+                        const body = init && 'body' in init ? init.body : input instanceof Request ? input.body : null;
+                        recordUploadBytes(bodyByteLength(body));
+                    } catch (_error) {}
+                    return originalFetch.apply(this, arguments);
+                };
+            }
+
+            const originalSend = XMLHttpRequest.prototype.send;
+            if (typeof originalSend === 'function') {
+                XMLHttpRequest.prototype.send = function(body) {
+                    try {
+                        recordUploadBytes(bodyByteLength(body));
+                    } catch (_error) {}
+                    return originalSend.apply(this, arguments);
+                };
+            }
+
+            const originalSendBeacon = navigator.sendBeacon?.bind(navigator);
+            if (typeof originalSendBeacon === 'function') {
+                navigator.sendBeacon = function(url, data) {
+                    try {
+                        recordUploadBytes(bodyByteLength(data));
+                    } catch (_error) {}
+                    return originalSendBeacon(url, data);
+                };
+            }
+        };
+
+        if (typeof PerformanceObserver === 'function') {
+            try {
+                const observer = new PerformanceObserver((list) => {
+                    for (const entry of list.getEntries()) {
+                        if (Number.isFinite(entry.duration)) {
+                            window.__ferx_resource_usage_long_task_ms += entry.duration;
+                        }
+                    }
+                });
+                observer.observe({ type: 'longtask', buffered: true });
+            } catch (_error) {}
+        }
+
+        const sample = async () => {
+            if (!window.__ferxResourceUsageMonitoringEnabled) return;
+
+            const now = performance.now();
+            const elapsedMs = Math.max(1, now - window.__ferx_resource_usage_last_sample);
+            const networkBytes = totalNetworkBytes();
+            const networkDelta = Math.max(0, networkBytes - window.__ferx_resource_usage_last_network_bytes);
+            const networkInMbps = (networkDelta * 8) / (elapsedMs / 1000) / 1000000;
+            const uploadBytes = window.__ferx_resource_usage_upload_bytes;
+            const networkOutMbps = (uploadBytes * 8) / (elapsedMs / 1000) / 1000000;
+            const longTaskPercent = Math.min(100, (window.__ferx_resource_usage_long_task_ms / elapsedMs) * 100);
+
+            const tickDelay = Math.max(0, now - window.__ferx_resource_usage_last_tick - 1000);
+            const tickEstimate = Math.min(100, (tickDelay / elapsedMs) * 100);
+            const cpuEstimatePercent = Math.max(longTaskPercent, tickEstimate);
+
+            window.__ferx_resource_usage_last_tick = now;
+            window.__ferx_resource_usage_last_sample = now;
+            window.__ferx_resource_usage_last_network_bytes = networkBytes;
+            window.__ferx_resource_usage_upload_bytes = 0;
+            window.__ferx_resource_usage_long_task_ms = 0;
+            window.__ferx_resource_usage_cpu_estimate = cpuEstimatePercent;
+
+            const payload = JSON.stringify({
+                sampledAt: Date.now(),
+                cpuEstimatePercent: safeNumber(cpuEstimatePercent),
+                memoryEstimateBytes: memoryEstimate(),
+                networkInMbps: safeNumber(networkInMbps),
+                networkOutMbps: safeNumber(networkOutMbps)
+            });
+
+            try {
+                await invoke('report_resource_usage', { payload });
+            } catch (_error) {}
+        };
+
+        window.__ferxSetResourceUsageMonitoring = (enabled) => {
+            window.__ferxResourceUsageMonitoringEnabled = enabled;
+            if (window.__ferx_resource_usage_timer) {
+                clearInterval(window.__ferx_resource_usage_timer);
+                window.__ferx_resource_usage_timer = null;
+            }
+            if (!enabled) return;
+            window.__ferx_resource_usage_last_sample = performance.now();
+            window.__ferx_resource_usage_last_network_bytes = totalNetworkBytes();
+            window.__ferx_resource_usage_timer = setInterval(() => void sample(), 1000);
+            void sample();
+        };
+
+        installNetworkUploadHooks();
+        window.__ferxSetResourceUsageMonitoring(true);
+    })();
+"#
+}
+
 fn badge_engine_script(strategy_name: &str) -> String {
     format!(
         r#"
@@ -893,7 +1079,12 @@ fn teams_badge_engine_script() -> String {
 "#.to_string()
 }
 
-fn injected_js_for_url(url: &str, allow_notifications: bool, spell_check_enabled: bool) -> String {
+fn injected_js_for_url(
+    url: &str,
+    allow_notifications: bool,
+    spell_check_enabled: bool,
+    resource_usage_monitoring_enabled: bool,
+) -> String {
     let strategy_name = crate::badge_strategy_for_url(url);
     let microsoft_service = microsoft_service_kind(url);
     let google_compat = if is_google_service(url) {
@@ -903,7 +1094,7 @@ fn injected_js_for_url(url: &str, allow_notifications: bool, spell_check_enabled
     };
 
     format!(
-        "{}{}{}{}{}",
+        "{}{}{}{}{}{}",
         google_compat,
         if should_skip_notification_shim(url) {
             ""
@@ -911,6 +1102,7 @@ fn injected_js_for_url(url: &str, allow_notifications: bool, spell_check_enabled
             notification_script(allow_notifications)
         },
         spellcheck_script(spell_check_enabled),
+        resource_usage_monitor_eval_script(resource_usage_monitoring_enabled),
         common_webview_script(),
         match microsoft_service {
             Some(MicrosoftServiceKind::Outlook) => outlook_badge_engine_script(strategy_name),
@@ -922,7 +1114,7 @@ fn injected_js_for_url(url: &str, allow_notifications: bool, spell_check_enabled
 
 #[cfg(test)]
 pub(crate) fn injected_js(allow_notifications: bool) -> String {
-    injected_js_for_url("", allow_notifications, true)
+    injected_js_for_url("", allow_notifications, true, false)
 }
 
 #[cfg(test)]
@@ -933,13 +1125,33 @@ pub(crate) fn service_webview_setup(
     service_webview_setup_with_spellcheck(url, allow_notifications, true)
 }
 
+#[cfg(test)]
 pub(crate) fn service_webview_setup_with_spellcheck(
     url: &str,
     allow_notifications: bool,
     spell_check_enabled: bool,
 ) -> Option<(tauri::WebviewUrl, String)> {
+    service_webview_setup_with_resource_monitoring(
+        url,
+        allow_notifications,
+        spell_check_enabled,
+        false,
+    )
+}
+
+pub(crate) fn service_webview_setup_with_resource_monitoring(
+    url: &str,
+    allow_notifications: bool,
+    spell_check_enabled: bool,
+    resource_usage_monitoring_enabled: bool,
+) -> Option<(tauri::WebviewUrl, String)> {
     Some((
         external_webview_url(url)?,
-        injected_js_for_url(url, allow_notifications, spell_check_enabled),
+        injected_js_for_url(
+            url,
+            allow_notifications,
+            spell_check_enabled,
+            resource_usage_monitoring_enabled,
+        ),
     ))
 }

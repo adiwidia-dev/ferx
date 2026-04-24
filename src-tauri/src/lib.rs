@@ -13,7 +13,10 @@ use service_runtime::{
     extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
 };
 use service_storage::{data_store_identifier_for_storage_key, session_dir_for_storage_key};
-use service_webview::{service_webview_setup_with_spellcheck, user_agent_for_url};
+use service_webview::{
+    resource_usage_monitor_eval_script, service_webview_setup_with_resource_monitoring,
+    user_agent_for_url,
+};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -24,12 +27,14 @@ use tauri::{AppHandle, Emitter, Manager};
 use download_dialog::handle_service_webview_download;
 
 struct ActiveWebview(Mutex<String>);
+struct ActiveResourceUsageMonitoring(Mutex<bool>);
 struct BadgeMonitoringPrefs(Mutex<HashMap<String, bool>>);
 
 /// Coalesces rapid `Resized` events: only the latest resize may apply `set_bounds` (see debounce in `on_window_event`).
 struct MainWindowResizeGen(AtomicU64);
 
 const RESIZE_DEBOUNCE_MS: u64 = 32;
+const RESOURCE_USAGE_STRIP_HEIGHT: f64 = 32.0;
 
 fn set_badge_monitoring(webview: &tauri::Webview, enabled: bool) {
     let enabled_literal = if enabled { "true" } else { "false" };
@@ -62,6 +67,26 @@ fn badge_monitoring_pref(app: &AppHandle, service_id: &str) -> bool {
     result
 }
 
+fn set_active_resource_usage_monitoring(app: &AppHandle, enabled: bool) {
+    let state = app.state::<ActiveResourceUsageMonitoring>();
+    if let Ok(mut active) = state.0.lock() {
+        *active = enabled;
+    };
+}
+
+fn active_resource_usage_monitoring(app: &AppHandle) -> bool {
+    let state = app.state::<ActiveResourceUsageMonitoring>();
+    state.0.lock().map(|active| *active).unwrap_or(false)
+}
+
+fn service_content_top_offset(scale_factor: f64, resource_usage_monitoring_enabled: bool) -> u32 {
+    if resource_usage_monitoring_enabled {
+        (RESOURCE_USAGE_STRIP_HEIGHT * scale_factor) as u32
+    } else {
+        0
+    }
+}
+
 fn apply_active_child_webview_bounds(
     window: &tauri::Window,
     physical_size: tauri::PhysicalSize<u32>,
@@ -79,16 +104,18 @@ fn apply_active_child_webview_bounds(
 
     let scale_factor = window.scale_factor().unwrap_or(1.0);
     let sidebar_width = (79.0 * scale_factor) as u32;
+    let top_offset =
+        service_content_top_offset(scale_factor, active_resource_usage_monitoring(&window.app_handle()));
 
     if let Some(webview) = window.get_webview(&active_id) {
         let _ = webview.set_bounds(tauri::Rect {
             position: tauri::Position::Physical(tauri::PhysicalPosition::new(
                 sidebar_width as i32,
-                0,
+                top_offset as i32,
             )),
             size: tauri::Size::Physical(tauri::PhysicalSize::new(
                 physical_size.width.saturating_sub(sidebar_width),
-                physical_size.height,
+                physical_size.height.saturating_sub(top_offset),
             )),
         });
     }
@@ -96,12 +123,17 @@ fn apply_active_child_webview_bounds(
 
 #[cfg(test)]
 mod tests {
-    use super::{badge_strategy_for_url, report_outlook_badge, report_teams_badge, AppHandle};
+    use super::{
+        badge_strategy_for_url, report_outlook_badge, report_resource_usage, report_teams_badge,
+        AppHandle,
+    };
     use crate::service_runtime::{
         extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
     };
     use crate::service_webview::{
-        external_webview_url, injected_js, service_webview_setup, service_webview_setup_with_spellcheck, user_agent_for_url,
+        external_webview_url, injected_js, service_webview_setup,
+        service_webview_setup_with_resource_monitoring, service_webview_setup_with_spellcheck,
+        user_agent_for_url,
     };
 
     #[test]
@@ -216,6 +248,14 @@ mod tests {
         let _command = super::save_workspace_config_export;
 
         assert!(source.contains("save_workspace_config_export,"));
+    }
+
+    #[test]
+    fn report_resource_usage_command_exists() {
+        let source = include_str!("lib.rs");
+        let _command = report_resource_usage;
+
+        assert!(source.contains("report_resource_usage,"));
     }
 
     #[test]
@@ -527,6 +567,41 @@ mod tests {
     }
 
     #[test]
+    fn service_webview_setup_injects_resource_usage_monitor_when_enabled() {
+        let Some((_, script)) = service_webview_setup_with_resource_monitoring(
+            "https://discord.com/channels/@me",
+            false,
+            true,
+            true,
+        ) else {
+            panic!("expected valid discord setup");
+        };
+
+        assert!(script.contains("window.__ferxResourceUsageMonitoringEnabled = true"));
+        assert!(script.contains("report_resource_usage"));
+        assert!(script.contains("networkInMbps"));
+        assert!(script.contains("networkOutMbps: safeNumber(networkOutMbps)"));
+        assert!(script.contains("window.fetch = function"));
+        assert!(script.contains("XMLHttpRequest.prototype.send"));
+        assert!(script.contains("navigator.sendBeacon = function"));
+    }
+
+    #[test]
+    fn service_webview_setup_skips_resource_usage_monitor_when_disabled() {
+        let Some((_, script)) = service_webview_setup_with_resource_monitoring(
+            "https://discord.com/channels/@me",
+            false,
+            true,
+            false,
+        ) else {
+            panic!("expected valid discord setup");
+        };
+
+        assert!(!script.contains("report_resource_usage"));
+        assert!(!script.contains("__ferxResourceUsageMonitoringEnabled = true"));
+    }
+
+    #[test]
     fn microsoft_apps_do_not_use_spoofed_chrome_user_agent() {
         assert_eq!(user_agent_for_url("https://outlook.office.com/mail"), None);
         assert_eq!(
@@ -653,6 +728,7 @@ async fn hide_all_webviews(app: AppHandle) {
             *active = String::new();
         };
     }
+    set_active_resource_usage_monitoring(&app, false);
 
     if let Some(window) = app.get_window("main") {
         let scale_factor = window.scale_factor().unwrap_or(1.0);
@@ -690,6 +766,7 @@ fn close_service_webviews(app: &AppHandle) {
             prefs.clear();
         };
     }
+    set_active_resource_usage_monitoring(app, false);
 
     for (name, webview) in app.webviews() {
         if name != "main" {
@@ -771,6 +848,11 @@ fn report_teams_badge(app: AppHandle, webview: tauri::Webview, payload: String) 
 }
 
 #[tauri::command]
+fn report_resource_usage(app: AppHandle, webview: tauri::Webview, payload: String) {
+    let _ = app.emit("resource-usage-update", format!("{}:{payload}", webview.label()));
+}
+
+#[tauri::command]
 async fn delete_webview(app: AppHandle, id: String, storage_key: String) {
     if let Some(webview) = app.get_webview(&id) {
         let _ = webview.close();
@@ -842,11 +924,16 @@ async fn open_service(
     allow_notifications: bool,
     badge_monitoring_enabled: bool,
     spell_check_enabled: bool,
+    resource_usage_monitoring_enabled: bool,
 ) {
     use tauri::{PhysicalPosition, PhysicalSize};
 
-    let Some((webview_url, initialization_script)) =
-        service_webview_setup_with_spellcheck(&url, allow_notifications, spell_check_enabled)
+    let Some((webview_url, initialization_script)) = service_webview_setup_with_resource_monitoring(
+        &url,
+        allow_notifications,
+        spell_check_enabled,
+        resource_usage_monitoring_enabled,
+    )
     else {
         eprintln!("Invalid external url for open_service: {url}");
         let _ = app.emit("show-toast", "Invalid service URL");
@@ -860,16 +947,18 @@ async fn open_service(
         };
     }
     set_badge_monitoring_pref(&app, &id, badge_monitoring_enabled);
+    set_active_resource_usage_monitoring(&app, resource_usage_monitoring_enabled);
 
     if let Some(window) = app.get_window("main") {
         let scale_factor = window.scale_factor().unwrap_or(1.0);
         let physical_size = window.inner_size().unwrap_or_default();
         let sidebar_width = (79.0 * scale_factor) as u32;
+        let top_offset = service_content_top_offset(scale_factor, resource_usage_monitoring_enabled);
 
-        let active_pos = PhysicalPosition::new(sidebar_width as i32, 0);
+        let active_pos = PhysicalPosition::new(sidebar_width as i32, top_offset as i32);
         let active_size = PhysicalSize::new(
             physical_size.width.saturating_sub(sidebar_width),
-            physical_size.height,
+            physical_size.height.saturating_sub(top_offset),
         );
         let offscreen_pos = PhysicalPosition::new(-10000, -10000);
 
@@ -879,6 +968,9 @@ async fn open_service(
             if name != "main" {
                 if name == id {
                     set_badge_monitoring(&webview, badge_monitoring_pref(&app, &id));
+                    let _ = webview.eval(resource_usage_monitor_eval_script(
+                        resource_usage_monitoring_enabled,
+                    ));
                     let _ = webview.set_bounds(tauri::Rect {
                         position: tauri::Position::Physical(active_pos),
                         size: tauri::Size::Physical(active_size),
@@ -888,6 +980,7 @@ async fn open_service(
                     already_exists = true;
                 } else {
                     set_badge_monitoring(&webview, badge_monitoring_pref(&app, &name));
+                    let _ = webview.eval(resource_usage_monitor_eval_script(false));
                     let _ = webview.set_bounds(tauri::Rect {
                         position: tauri::Position::Physical(offscreen_pos),
                         size: tauri::Size::Physical(active_size),
@@ -954,6 +1047,7 @@ async fn load_service(
     allow_notifications: bool,
     badge_monitoring_enabled: bool,
     spell_check_enabled: bool,
+    resource_usage_monitoring_enabled: bool,
 ) {
     use tauri::{PhysicalPosition, PhysicalSize};
 
@@ -967,7 +1061,12 @@ async fn load_service(
         let service_id = id.clone();
 
         let Some((webview_url, initialization_script)) =
-            service_webview_setup_with_spellcheck(&url, allow_notifications, spell_check_enabled)
+            service_webview_setup_with_resource_monitoring(
+                &url,
+                allow_notifications,
+                spell_check_enabled,
+                resource_usage_monitoring_enabled,
+            )
         else {
             eprintln!("Invalid external url for load_service: {url}");
             let _ = app.emit("show-toast", "Invalid service URL");
@@ -1032,6 +1131,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(ActiveWebview(Mutex::new(String::new())))
+        .manage(ActiveResourceUsageMonitoring(Mutex::new(false)))
         .manage(BadgeMonitoringPrefs(Mutex::new(HashMap::new())))
         .manage(MainWindowResizeGen(AtomicU64::new(0)));
 
@@ -1120,6 +1220,7 @@ pub fn run() {
             reload_webview,
             report_outlook_badge,
             report_teams_badge,
+            report_resource_usage,
             delete_webview,
             show_context_menu,
             load_service,

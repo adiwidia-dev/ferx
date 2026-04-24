@@ -74,6 +74,7 @@ export function buildWorkspaceConfigExportPayload({
     },
     appSettings: {
       spellCheckEnabled: appSettings.spellCheckEnabled,
+      resourceUsageMonitoringEnabled: appSettings.resourceUsageMonitoringEnabled,
     },
     services: exportedServices,
     activeServiceId,
