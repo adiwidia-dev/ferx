@@ -257,6 +257,23 @@ describe("settings page", () => {
   });
 
   it("keeps the workspace sidebar controls visible on the settings page", () => {
+    localStorage.setItem(
+      "ferx-workspace-services",
+      JSON.stringify([
+        {
+          id: "mail",
+          name: "Mail",
+          url: "https://mail.example.com/",
+          storageKey: "storage-mail",
+          notificationPrefs: {
+            showBadge: true,
+            affectTray: true,
+            allowNotifications: true,
+          },
+        },
+      ]),
+    );
+
     const component = mount(SettingsPage, {
       target: document.body,
     });
@@ -278,6 +295,12 @@ describe("settings page", () => {
     expect(todosIndex).toBeGreaterThan(addIndex);
     expect(settingsIndex).toBeGreaterThan(addIndex);
     expect(settingsIndex).toBeGreaterThan(todosIndex);
+
+    const serviceButton = document.querySelector(
+      '[title="Mail (Cmd+1)"]',
+    ) as HTMLElement | null;
+    expect(serviceButton?.className).toContain("h-14 w-16");
+    expect(serviceButton?.className).toContain("rounded-2xl");
 
     unmount(component);
   });
