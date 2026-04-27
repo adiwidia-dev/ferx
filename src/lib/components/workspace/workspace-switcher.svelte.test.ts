@@ -164,6 +164,11 @@ describe("WorkspaceSwitcher", () => {
     expect(overlay?.className).toContain("fixed inset-y-0 left-20 right-0");
     expect(panel?.className).toContain("left-1/2 top-1/2");
     expect(panel?.className).toContain("-translate-x-1/2 -translate-y-1/2");
+    expect(panel?.className).toContain("w-[min(30rem,calc(100vw-2rem))]");
+    expect(panel?.className).toContain("rounded-2xl");
+    expect(document.body.textContent).toContain("Workspaces");
+    expect(document.body.textContent).toContain("New workspace");
+    expect(document.body.textContent).not.toContain("⌘⇧1-9");
 
     unmount(component);
   });

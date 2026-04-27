@@ -102,8 +102,8 @@
           <Button
             title={`${service.name} (Cmd+${index + 1})`}
             variant="ghost"
-            class="h-12 w-12 rounded-2xl p-2 transition-all relative overflow-visible
-                   {activeId === service.id ? 'bg-foreground/10 ring-1 ring-border shadow-sm' : 'hover:bg-foreground/5'}
+            class="h-14 w-16 rounded-2xl p-2 transition-all relative overflow-visible
+                   {activeId === service.id ? 'bg-muted ring-1 ring-border shadow-sm' : 'hover:bg-foreground/5'}
                    {service.disabled ? 'opacity-40 grayscale' : ''}"
             style={service.iconBgColor ? `box-shadow: inset 0 0 0 2.5px ${service.iconBgColor};` : ""}
             onclick={() => selectService(service.id)}
@@ -114,7 +114,8 @@
           >
             <div
               aria-hidden="true"
-              class="flex h-full w-full items-center justify-center rounded-xl bg-muted/60 text-sm font-semibold tracking-wide text-foreground/80 pointer-events-none"
+              class="flex h-full w-full items-center justify-center rounded-xl text-sm font-semibold tracking-wide text-foreground/80 pointer-events-none
+                     {activeId === service.id ? 'bg-background/85' : 'bg-muted/60'}"
             >
               {#if !failedIcons[service.id]}
                 <img

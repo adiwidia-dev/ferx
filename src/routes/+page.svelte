@@ -3,8 +3,8 @@
   import { listen } from "@tauri-apps/api/event";
   import { moveItemToTarget } from "$lib/services/reorder";
   import ServiceEditorDialog, {
-    type WorkspaceEditorInput,
-    type WorkspaceEditorService,
+    type ServiceEditorInput,
+    type ServiceEditorService,
   } from "$lib/components/workspace/service-editor-dialog.svelte";
   import TodosPanel from "$lib/components/workspace/todos-panel.svelte";
   import ResourceUsageStrip from "$lib/components/workspace/resource-usage-strip.svelte";
@@ -103,6 +103,7 @@
   let isDnd = $state(false);
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   let todoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  let webviewCommandQueue: Promise<unknown> = Promise.resolve();
 
   function writeWorkspaceToLocalStorage() {
     localStorage.setItem(WORKSPACES_STATE_KEY, serializeWorkspaceGroupsState(workspaceState));
@@ -147,6 +148,11 @@
       writeTodosToLocalStorage();
     }, WORKSPACE_SAVE_DEBOUNCE_MS);
   }
+
+  function queueWebviewCommand(run: () => Promise<unknown>) {
+    webviewCommandQueue = webviewCommandQueue.then(run, run);
+    void webviewCommandQueue;
+  }
   // --- BULLETPROOF DRAG STATE (Tracking IDs instead of Indexes) ---
   let draggedId = $state<string | null>(null);
   let dragOverId = $state<string | null>(null);
@@ -186,7 +192,7 @@
   let hasUnreadNotifications = $derived(
     !isDnd && countTrayRelevantUnreadServices(displayServices) > 0,
   );
-  let editingService = $state<WorkspaceEditorService | null>(null);
+  let editingService = $state<ServiceEditorService | null>(null);
   let lastTrayUnreadState: boolean | null = null;
 
   $effect(() => {
@@ -417,14 +423,16 @@
       isCurrentWorkspaceDisabled ||
       (activeService && activeService.disabled)
     ) {
-      invoke("hide_all_webviews");
+      queueWebviewCommand(() => invoke("hide_all_webviews"));
     } else if (activeService && !activeService.disabled) {
-      invoke(
-        "open_service",
-        createServiceLoadPayload(
-          activeService,
-          spellCheckEnabled,
-          resourceUsageMonitoringEnabled,
+      queueWebviewCommand(() =>
+        invoke(
+          "open_service",
+          createServiceLoadPayload(
+            activeService,
+            spellCheckEnabled,
+            resourceUsageMonitoringEnabled,
+          ),
         ),
       );
     }
@@ -538,9 +546,6 @@
 
   function setWorkspaceSwitcherOpen(open: boolean) {
     isWorkspaceSwitcherOpen = open;
-    if (open) {
-      void invoke("hide_all_webviews");
-    }
   }
 
   function reloadService(id: string) {
@@ -727,7 +732,7 @@
     return items.map((item) => item.id);
   }
 
-  function saveService(input: WorkspaceEditorInput) {
+  function saveService(input: ServiceEditorInput) {
     const nextState = saveServiceState({
       services,
       activeId,

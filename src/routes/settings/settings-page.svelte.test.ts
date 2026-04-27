@@ -228,7 +228,35 @@ describe("settings page", () => {
     unmount(component);
   });
 
-  it("renders Settings button after Add Service in the sidebar footer", () => {
+  it("renders settings as a same-page utility console with section navigation", () => {
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    const sectionLinks = Array.from(
+      document.querySelectorAll('[data-testid="settings-section-nav"] a'),
+    ).map((link) => ({
+      href: link.getAttribute("href"),
+      text: link.textContent?.trim(),
+    }));
+
+    expect(sectionLinks).toEqual([
+      { href: "#general", text: "General" },
+      { href: "#preferences", text: "Preferences" },
+      { href: "#configuration", text: "Configuration" },
+      { href: "#updates", text: "Updates" },
+    ]);
+
+    for (const id of ["general", "preferences", "configuration", "updates"]) {
+      expect(document.querySelector(`section#${id}`)).toBeTruthy();
+    }
+
+    unmount(component);
+  });
+
+  it("keeps the workspace sidebar controls visible on the settings page", () => {
     const component = mount(SettingsPage, {
       target: document.body,
     });
@@ -239,12 +267,17 @@ describe("settings page", () => {
       .map((node) => node.getAttribute("title"))
       .filter(Boolean);
 
+    expect(buttons).toContain("Switch workspace: Default");
     expect(buttons).toContain("Add Service");
+    expect(buttons).toContain("Todos");
     expect(buttons).toContain("Settings");
 
     const addIndex = buttons.indexOf("Add Service");
+    const todosIndex = buttons.indexOf("Todos");
     const settingsIndex = buttons.indexOf("Settings");
+    expect(todosIndex).toBeGreaterThan(addIndex);
     expect(settingsIndex).toBeGreaterThan(addIndex);
+    expect(settingsIndex).toBeGreaterThan(todosIndex);
 
     unmount(component);
   });
