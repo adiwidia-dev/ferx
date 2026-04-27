@@ -12,7 +12,7 @@
   import {
     buildWorkspaceConfigExportPayload,
     serializeWorkspaceConfigExport,
-    type FerxWorkspaceConfigFileV1,
+    type FerxWorkspaceConfigFileV2,
   } from "$lib/services/workspace-config-export";
   import {
     parseWorkspaceConfigImport,
@@ -27,12 +27,19 @@
     relaunchApp,
     type UpdaterState,
   } from "$lib/services/updater";
-  import { readStartupState, type PageService } from "$lib/services/workspace-state";
+  import { WORKSPACE_ACTIVE_ID_KEY, type PageService } from "$lib/services/workspace-state";
+  import {
+    WORKSPACES_STATE_KEY,
+    createDefaultWorkspaceGroupsState,
+    getWorkspaceServices,
+    readWorkspaceGroupsStartupState,
+    type WorkspaceGroupsState,
+  } from "$lib/services/workspace-groups";
 
   const appInfo = getAppInfo();
 
-  let services = $state<PageService[]>([]);
-  let activeId = $state("");
+  let workspaceState = $state<WorkspaceGroupsState>(createDefaultWorkspaceGroupsState());
+  let services = $derived(getWorkspaceServices(workspaceState));
   let isDnd = $state(false);
   let failedIcons = $state<Record<string, boolean>>({});
   let updater = $state<UpdaterState>({ status: "idle" });
@@ -43,7 +50,7 @@
   let showRestartConfirm = $state(false);
   let restartError = $state("");
   let showExportConfirm = $state(false);
-  let pendingExport = $state<FerxWorkspaceConfigFileV1 | null>(null);
+  let pendingExport = $state<FerxWorkspaceConfigFileV2 | null>(null);
   let exportError = $state("");
   let importPreview = $state<ImportedWorkspaceConfig | null>(null);
   let showImportConfirm = $state(false);
@@ -55,10 +62,13 @@
   onMount(() => {
     void invoke("hide_all_webviews");
 
-    const startup = readStartupState(localStorage.getItem("ferx-workspace-services"));
+    const startup = readWorkspaceGroupsStartupState(
+      localStorage.getItem(WORKSPACES_STATE_KEY),
+      localStorage.getItem("ferx-workspace-services"),
+      localStorage.getItem(WORKSPACE_ACTIVE_ID_KEY),
+    );
     const settings = readAppSettings(localStorage.getItem(APP_SETTINGS_STORAGE_KEY));
-    services = startup.services;
-    activeId = startup.activeId;
+    workspaceState = startup.state;
     spellCheckEnabled = settings.spellCheckEnabled;
     resourceUsageMonitoringEnabled = settings.resourceUsageMonitoringEnabled;
     initialSpellCheckEnabled = settings.spellCheckEnabled;
@@ -163,12 +173,15 @@
     configStatus = "";
 
     try {
-      const startup = readStartupState(localStorage.getItem("ferx-workspace-services"));
+      const startup = readWorkspaceGroupsStartupState(
+        localStorage.getItem(WORKSPACES_STATE_KEY),
+        localStorage.getItem("ferx-workspace-services"),
+        localStorage.getItem(WORKSPACE_ACTIVE_ID_KEY),
+      );
       const settings = readAppSettings(localStorage.getItem(APP_SETTINGS_STORAGE_KEY));
       pendingExport = buildWorkspaceConfigExportPayload({
-        services: startup.services,
+        workspaceState: startup.state,
         appSettings: settings,
-        activeId: startup.activeId,
         appVersion: appInfo.version,
       });
       showExportConfirm = true;
@@ -279,6 +292,14 @@
 
   function formatServiceCount(count: number) {
     return `${count} ${count === 1 ? "service" : "services"}`;
+  }
+
+  function formatWorkspaceCount(count: number) {
+    return `${count} ${count === 1 ? "workspace" : "workspaces"}`;
+  }
+
+  function sharedServiceCount(state: WorkspaceGroupsState) {
+    return Object.keys(state.servicesById).length;
   }
 
   function serviceHostname(url: string) {
@@ -486,8 +507,9 @@
             Export configuration?
           </p>
           <p class="mt-2 text-sm text-muted-foreground">
-            Ferx will create a plain JSON file with {formatServiceCount(pendingExport.services.length)},
-            service URLs, names, and app settings. It does not include passwords or login sessions.
+            Ferx will create a plain JSON file with {formatWorkspaceCount(pendingExport.workspaceState.workspaces.length)},
+            {formatServiceCount(sharedServiceCount(pendingExport.workspaceState))}, service URLs,
+            names, and app settings. It does not include passwords or login sessions.
           </p>
           <p class="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs font-medium text-amber-700">
             The file is not encrypted. Store it somewhere you trust.
@@ -533,19 +555,19 @@
             Import configuration?
           </p>
           <p class="mt-2 text-sm text-muted-foreground">
-            This will replace the current workspace with {formatServiceCount(importPreview.services.length)}
-            and update app settings.
+            This will replace the current configuration with {formatWorkspaceCount(importPreview.workspaceState.workspaces.length)},
+            {formatServiceCount(sharedServiceCount(importPreview.workspaceState))}, and app settings.
           </p>
           <div class="mt-4 max-h-40 overflow-y-auto rounded-xl border bg-muted/20">
-            {#each importPreview.services.slice(0, 8) as service (service.id)}
+            {#each Object.values(importPreview.workspaceState.servicesById).slice(0, 8) as service (service.id)}
               <div class="flex items-center justify-between gap-3 border-b px-3 py-2 last:border-b-0">
                 <p class="min-w-0 truncate text-xs font-semibold text-foreground">{service.name}</p>
                 <p class="shrink-0 text-xs text-muted-foreground">{serviceHostname(service.url)}</p>
               </div>
             {/each}
-            {#if importPreview.services.length > 8}
+            {#if sharedServiceCount(importPreview.workspaceState) > 8}
               <p class="px-3 py-2 text-xs text-muted-foreground">
-                +{importPreview.services.length - 8} more
+                +{sharedServiceCount(importPreview.workspaceState) - 8} more
               </p>
             {/if}
           </div>

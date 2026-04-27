@@ -2,18 +2,31 @@
   import { invoke } from "@tauri-apps/api/core";
   import ListTodoIcon from "@lucide/svelte/icons/list-todo";
   import { Button } from "$lib/components/ui/button";
+  import WorkspaceSwitcher from "$lib/components/workspace/workspace-switcher.svelte";
   import { getServiceFaviconUrl, getServiceMonogram } from "$lib/services/service-icon";
   import type { PageService } from "$lib/services/workspace-state";
+  import type { WorkspaceGroup } from "$lib/services/workspace-groups";
+  import type { WorkspaceIconKey } from "$lib/services/workspace-icons";
 
   interface Props {
     services: PageService[];
     activeId: string;
+    workspaces: WorkspaceGroup[];
+    currentWorkspaceId: string;
     draggedId: string | null;
     dragOverId: string | null;
     isDnd: boolean;
     isTodosPanelOpen: boolean;
+    isWorkspaceSwitcherOpen: boolean;
     onPointerDown: (event: PointerEvent, id: string) => void;
     onSelectService: (id: string) => void;
+    onSelectWorkspace: (id: string) => void;
+    onCreateWorkspace: (input: { name: string; icon: WorkspaceIconKey }) => void;
+    onUpdateWorkspaceIcon: (input: { workspaceId: string; icon: WorkspaceIconKey }) => void;
+    onRenameWorkspace: (input: { workspaceId: string; name: string }) => void;
+    onSetWorkspaceDisabled: (input: { workspaceId: string; disabled: boolean }) => void;
+    onDeleteWorkspace: (workspaceId: string) => void;
+    onWorkspaceSwitcherOpenChange: (open: boolean) => void;
     onToggleDnd: () => void;
     onOpenAddModal: () => void;
     onToggleTodosPanel: () => void;
@@ -22,18 +35,33 @@
   let {
     services,
     activeId,
+    workspaces,
+    currentWorkspaceId,
     draggedId,
     dragOverId,
     isDnd,
     isTodosPanelOpen,
+    isWorkspaceSwitcherOpen = $bindable(false),
     onPointerDown,
     onSelectService,
+    onSelectWorkspace,
+    onCreateWorkspace,
+    onUpdateWorkspaceIcon,
+    onRenameWorkspace,
+    onSetWorkspaceDisabled,
+    onDeleteWorkspace,
+    onWorkspaceSwitcherOpenChange,
     onToggleDnd,
     onOpenAddModal,
     onToggleTodosPanel,
   }: Props = $props();
 
   let failedIcons = $state<Record<string, boolean>>({});
+
+  function selectService(id: string) {
+    isWorkspaceSwitcherOpen = false;
+    onSelectService(id);
+  }
 </script>
 
 <aside
@@ -41,6 +69,21 @@
   data-tauri-drag-region
 >
   <div class="flex flex-col items-center gap-4 w-full px-2">
+    <WorkspaceSwitcher
+      bind:open={isWorkspaceSwitcherOpen}
+      {workspaces}
+      {currentWorkspaceId}
+      onSelectWorkspace={onSelectWorkspace}
+      onCreateWorkspace={onCreateWorkspace}
+      onUpdateWorkspaceIcon={onUpdateWorkspaceIcon}
+      onRenameWorkspace={onRenameWorkspace}
+      onSetWorkspaceDisabled={onSetWorkspaceDisabled}
+      onDeleteWorkspace={onDeleteWorkspace}
+      onOpenChange={onWorkspaceSwitcherOpenChange}
+    />
+
+    <div class="w-10 h-[1px] bg-border"></div>
+
     {#each services as service, index (service.id)}
       <div
         role="listitem"
@@ -63,7 +106,7 @@
                    {activeId === service.id ? 'bg-foreground/10 ring-1 ring-border shadow-sm' : 'hover:bg-foreground/5'}
                    {service.disabled ? 'opacity-40 grayscale' : ''}"
             style={service.iconBgColor ? `box-shadow: inset 0 0 0 2.5px ${service.iconBgColor};` : ""}
-            onclick={() => onSelectService(service.id)}
+            onclick={() => selectService(service.id)}
             oncontextmenu={(event) => {
               event.preventDefault();
               invoke("show_context_menu", { id: service.id, disabled: !!service.disabled });

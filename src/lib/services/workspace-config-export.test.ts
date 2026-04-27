@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { PageService } from "./workspace-state";
+import { createDefaultWorkspaceGroupsState } from "./workspace-groups";
 import {
   buildWorkspaceConfigExportPayload,
   serializeWorkspaceConfigExport,
@@ -37,12 +38,11 @@ const services: PageService[] = [
 describe("workspace config export", () => {
   it("builds a versioned config-only payload without runtime badges", () => {
     const payload = buildWorkspaceConfigExportPayload({
-      services,
+      workspaceState: createDefaultWorkspaceGroupsState(services, "mail"),
       appSettings: {
         spellCheckEnabled: false,
         resourceUsageMonitoringEnabled: true,
       },
-      activeId: "mail",
       appVersion: "0.2.4",
       exportedAt: "2026-04-23T12:00:00.000Z",
     });
@@ -50,7 +50,7 @@ describe("workspace config export", () => {
     expect(payload).toEqual({
       ferxExport: {
         format: "ferx-workspace-config",
-        version: 1,
+        version: 2,
         exportedAt: "2026-04-23T12:00:00.000Z",
         appVersion: "0.2.4",
       },
@@ -58,67 +58,75 @@ describe("workspace config export", () => {
         spellCheckEnabled: false,
         resourceUsageMonitoringEnabled: true,
       },
-      services: [
-        {
-          id: "mail",
-          name: "Mail",
-          url: "https://mail.example.com/",
-          storageKey: "storage-mail",
-          notificationPrefs: {
-            showBadge: true,
-            affectTray: false,
-            allowNotifications: true,
+      workspaceState: expect.objectContaining({
+        version: 1,
+        currentWorkspaceId: "default",
+        workspaces: [
+          {
+            id: "default",
+            name: "Default",
+            serviceIds: ["mail", "chat"],
+            activeServiceId: "mail",
+            color: "#3B82F6",
+            icon: "briefcase",
           },
+        ],
+        servicesById: {
+          mail: expect.not.objectContaining({ badge: 4 }),
+          chat: expect.objectContaining({ disabled: true }),
         },
-        {
-          id: "chat",
-          name: "Chat",
-          url: "https://chat.example.com/",
-          storageKey: "storage-chat",
-          disabled: true,
-          iconBgColor: "#123456",
-          notificationPrefs: {
-            showBadge: false,
-            affectTray: true,
-            allowNotifications: false,
-          },
-        },
-      ],
-      activeServiceId: "mail",
+      }),
     });
   });
 
-  it("omits duplicate service ids and ignores disabled active service ids", () => {
+  it("preserves shared workspace service references", () => {
     const payload = buildWorkspaceConfigExportPayload({
-      services: [services[0], { ...services[0], name: "Duplicate" }, services[1]],
+      workspaceState: {
+        ...createDefaultWorkspaceGroupsState(services, "mail"),
+        workspaces: [
+          {
+            id: "work",
+            name: "Work",
+            serviceIds: ["mail", "chat"],
+            activeServiceId: "mail",
+          },
+          {
+            id: "personal",
+            name: "Personal",
+            serviceIds: ["mail"],
+            activeServiceId: "mail",
+          },
+        ],
+      },
       appSettings: {
         spellCheckEnabled: true,
         resourceUsageMonitoringEnabled: false,
       },
-      activeId: "chat",
       appVersion: "0.2.4",
       exportedAt: "2026-04-23T12:00:00.000Z",
     });
 
-    expect(payload.services.map((service) => service.name)).toEqual(["Mail", "Chat"]);
-    expect(payload.activeServiceId).toBeNull();
+    expect(payload.workspaceState.workspaces.map((workspace) => workspace.serviceIds)).toEqual([
+      ["mail", "chat"],
+      ["mail"],
+    ]);
+    expect(Object.keys(payload.workspaceState.servicesById)).toEqual(["mail", "chat"]);
   });
 
   it("serializes readable JSON", () => {
     const json = serializeWorkspaceConfigExport(
       buildWorkspaceConfigExportPayload({
-        services: [],
+        workspaceState: createDefaultWorkspaceGroupsState(),
         appSettings: {
           spellCheckEnabled: true,
           resourceUsageMonitoringEnabled: false,
         },
-        activeId: "",
         appVersion: "0.2.4",
         exportedAt: "2026-04-23T12:00:00.000Z",
       }),
     );
 
     expect(json).toContain('\n  "ferxExport": {');
-    expect(JSON.parse(json).ferxExport.version).toBe(1);
+    expect(JSON.parse(json).ferxExport.version).toBe(2);
   });
 });

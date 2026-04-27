@@ -32,13 +32,30 @@
   import {
     applySaveServiceResult,
     cleanupPageListeners,
-    readStartupState,
     saveServiceState,
-    serializeServicesForStorage,
     toggleServiceDisabled,
     WORKSPACE_ACTIVE_ID_KEY,
     type PageService,
   } from "$lib/services/workspace-state";
+  import {
+    WORKSPACES_STATE_KEY,
+    createDefaultWorkspaceGroupsState,
+    createWorkspaceGroup,
+    deleteWorkspaceGroup,
+    getWorkspace,
+    getWorkspaceServices,
+    normalizeWorkspaceGroupsState,
+    readWorkspaceGroupsStartupState,
+    serializeWorkspaceGroupsState,
+    setCurrentWorkspaceId,
+    setWorkspaceDisabled as setWorkspaceGroupDisabled,
+    setWorkspaceActiveService,
+    renameWorkspaceGroup,
+    updateWorkspaceGroupIcon,
+    updateWorkspaceServices,
+    type WorkspaceGroupsState,
+  } from "$lib/services/workspace-groups";
+  import type { WorkspaceIconKey } from "$lib/services/workspace-icons";
   import {
     TODO_NOTES_STORAGE_KEY,
     addTodoItem,
@@ -71,8 +88,7 @@
   type Service = PageService;
   let toastMessage = $state("");
   let toastTimeout = $state<ReturnType<typeof setTimeout> | null>(null);
-  let activeId = $state("");
-  let services = $state<Service[]>([]);
+  let workspaceState = $state<WorkspaceGroupsState>(createDefaultWorkspaceGroupsState());
   let badges = $state<Record<string, number | undefined>>({});
   let isInitialized = $state(false);
   let spellCheckEnabled = $state(DEFAULT_APP_SETTINGS.spellCheckEnabled);
@@ -83,17 +99,13 @@
   let isTodosPanelOpen = $state(false);
 
   let isAddModalOpen = $state(false);
+  let isWorkspaceSwitcherOpen = $state(false);
   let isDnd = $state(false);
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   let todoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   function writeWorkspaceToLocalStorage() {
-    localStorage.setItem("ferx-workspace-services", serializeServicesForStorage(services));
-    if (activeId) {
-      localStorage.setItem(WORKSPACE_ACTIVE_ID_KEY, activeId);
-    } else {
-      localStorage.removeItem(WORKSPACE_ACTIVE_ID_KEY);
-    }
+    localStorage.setItem(WORKSPACES_STATE_KEY, serializeWorkspaceGroupsState(workspaceState));
   }
 
   function flushWorkspaceToStorage() {
@@ -144,14 +156,30 @@
   let isPointerDragging = $state(false);
   let dragRafPending = false;
 
+  let currentWorkspace = $derived(getWorkspace(workspaceState));
+  let services = $derived(getWorkspaceServices(workspaceState));
+  let activeId = $derived(currentWorkspace?.activeServiceId ?? "");
+  let isCurrentWorkspaceDisabled = $derived(currentWorkspace?.disabled === true);
   let displayServices = $derived(
     services.map((service) => ({
       ...service,
+      disabled: isCurrentWorkspaceDisabled || service.disabled,
       badge: badges[service.id],
     })),
   );
   let resourceUsageSnapshots = $state<Record<string, ResourceUsageSnapshot | undefined>>({});
-  let activeService = $derived(services.find((s) => s.id === activeId));
+  let activeService = $derived.by(() => {
+    const service = activeId ? workspaceState.servicesById[activeId] : undefined;
+
+    if (!service) {
+      return undefined;
+    }
+
+    return {
+      ...service,
+      disabled: isCurrentWorkspaceDisabled || service.disabled,
+    };
+  });
   let activeResourceUsageSnapshot = $derived(
     activeId ? resourceUsageSnapshots[activeId] : undefined,
   );
@@ -191,21 +219,30 @@
       showToast(event.payload as string);
     });
 
-    const startupState = readStartupState(
+    const startupState = readWorkspaceGroupsStartupState(
+      localStorage.getItem(WORKSPACES_STATE_KEY),
       localStorage.getItem("ferx-workspace-services"),
+      localStorage.getItem(WORKSPACE_ACTIVE_ID_KEY),
     );
     const settings = readAppSettings(localStorage.getItem(APP_SETTINGS_STORAGE_KEY));
     spellCheckEnabled = settings.spellCheckEnabled;
     resourceUsageMonitoringEnabled = settings.resourceUsageMonitoringEnabled;
-    services = startupState.services;
-    activeId = startupState.activeId;
+    workspaceState = startupState.state;
     todoNotes = readTodoNotes(localStorage.getItem(TODO_NOTES_STORAGE_KEY));
 
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const openParam = params.get("open");
-      if (openParam && services.some((s) => s.id === openParam && !s.disabled)) {
-        activeId = openParam;
+      if (
+        openParam &&
+        !currentWorkspace?.disabled &&
+        services.some((s) => s.id === openParam && !s.disabled)
+      ) {
+        workspaceState = setWorkspaceActiveService(
+          workspaceState,
+          workspaceState.currentWorkspaceId,
+          openParam,
+        );
       }
       if (openParam) {
         params.delete("open");
@@ -221,7 +258,7 @@
 
     let preloadTimeoutId: ReturnType<typeof setTimeout> | null = null;
     let preloadCancelled = false;
-    if (services.length > 0) {
+    if (services.length > 0 && !currentWorkspace?.disabled) {
       preloadTimeoutId = setTimeout(async () => {
         if (preloadCancelled) {
           return;
@@ -361,8 +398,7 @@
 
   $effect(() => {
     if (isInitialized) {
-      void services;
-      void activeId;
+      void workspaceState;
       scheduleSave();
     }
   });
@@ -375,7 +411,12 @@
   });
 
   $effect(() => {
-    if (isAddModalOpen || (activeService && activeService.disabled)) {
+    if (
+      isAddModalOpen ||
+      isWorkspaceSwitcherOpen ||
+      isCurrentWorkspaceDisabled ||
+      (activeService && activeService.disabled)
+    ) {
       invoke("hide_all_webviews");
     } else if (activeService && !activeService.disabled) {
       invoke(
@@ -390,6 +431,17 @@
   });
 
   function handleKeydown(e: KeyboardEvent) {
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey) {
+      const key = parseInt(e.key);
+      if (!isNaN(key) && key >= 1 && key <= 9) {
+        const index = key - 1;
+        if (index < workspaceState.workspaces.length) {
+          e.preventDefault();
+          switchWorkspace(workspaceState.workspaces[index].id);
+        }
+      }
+    }
+
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
       const key = parseInt(e.key);
       if (!isNaN(key) && key >= 1 && key <= 9) {
@@ -451,7 +503,13 @@
 
   function handlePointerUp(e: PointerEvent) {
     if (isPointerDragging && draggedId && dragOverId) {
-      services = moveItemToTarget(services, draggedId, dragOverId);
+      const reorderedServices = moveItemToTarget(services, draggedId, dragOverId);
+      workspaceState = updateWorkspaceServices(
+        workspaceState,
+        workspaceState.currentWorkspaceId,
+        reorderedServices.map((service) => service.id),
+        activeId,
+      );
     }
 
     pointerDragId = null;
@@ -467,7 +525,22 @@
   }
 
   function switchService(id: string) {
-    activeId = id;
+    workspaceState = setWorkspaceActiveService(
+      workspaceState,
+      workspaceState.currentWorkspaceId,
+      id,
+    );
+  }
+
+  function switchWorkspace(id: string) {
+    workspaceState = setCurrentWorkspaceId(workspaceState, id);
+  }
+
+  function setWorkspaceSwitcherOpen(open: boolean) {
+    isWorkspaceSwitcherOpen = open;
+    if (open) {
+      void invoke("hide_all_webviews");
+    }
   }
 
   function reloadService(id: string) {
@@ -477,8 +550,7 @@
   function toggleDisable(id: string) {
     const nextState = toggleServiceDisabled(services, activeId, id);
 
-    services = nextState.services;
-    activeId = nextState.activeId;
+    applyCurrentWorkspaceServices(nextState.services, nextState.activeId);
 
     if (nextState.deleteWebview) {
       invoke("delete_webview", nextState.deleteWebview);
@@ -489,11 +561,21 @@
     id: string,
     updater: (prefs: NotificationPrefs) => NotificationPrefs,
   ) {
-    services = services.map((service) =>
-      service.id === id
-        ? { ...service, notificationPrefs: updater(service.notificationPrefs) }
-        : service,
-    );
+    const service = workspaceState.servicesById[id];
+    if (!service) {
+      return;
+    }
+
+    workspaceState = normalizeWorkspaceGroupsState({
+      ...workspaceState,
+      servicesById: {
+        ...workspaceState.servicesById,
+        [id]: {
+          ...service,
+          notificationPrefs: updater(service.notificationPrefs),
+        },
+      },
+    });
   }
 
   function deleteService(id: string) {
@@ -503,16 +585,41 @@
       return;
     }
 
-    services = services.filter((s) => s.id !== id);
+    const { [id]: _removedService, ...nextServicesById } = workspaceState.servicesById;
+    workspaceState = normalizeWorkspaceGroupsState({
+      ...workspaceState,
+      servicesById: nextServicesById,
+      workspaces: workspaceState.workspaces.map((workspace) => ({
+        ...workspace,
+        serviceIds: workspace.serviceIds.filter((serviceId) => serviceId !== id),
+        activeServiceId: workspace.activeServiceId === id ? "" : workspace.activeServiceId,
+      })),
+    });
     if (id in badges) {
       const { [id]: _removedBadge, ...remainingBadges } = badges;
       badges = remainingBadges;
     }
     invoke("delete_webview", createDeletePayload(serviceToDelete));
-    if (activeId === id) {
-      const nextAvailable = services.find((s) => !s.disabled);
-      activeId = nextAvailable ? nextAvailable.id : "";
+  }
+
+  function applyCurrentWorkspaceServices(nextServices: Service[], nextActiveId: string) {
+    const nextServicesById = {
+      ...workspaceState.servicesById,
+    };
+
+    for (const service of nextServices) {
+      nextServicesById[service.id] = service;
     }
+
+    workspaceState = updateWorkspaceServices(
+      {
+        ...workspaceState,
+        servicesById: nextServicesById,
+      },
+      workspaceState.currentWorkspaceId,
+      nextServices.map((service) => service.id),
+      nextActiveId,
+    );
   }
 
   function openEditModal(service: Service) {
@@ -532,6 +639,63 @@
     setTimeout(() => {
       isAddModalOpen = true;
     }, 50);
+  }
+
+  function createWorkspace(input: { name: string; icon: WorkspaceIconKey }) {
+    const id = `workspace-${crypto.randomUUID().slice(0, 8)}`;
+    workspaceState = setCurrentWorkspaceId(
+      createWorkspaceGroup(workspaceState, {
+        id,
+        name: input.name,
+        serviceIds: [],
+        activeServiceId: "",
+        color: pickWorkspaceColor(workspaceState.workspaces.length),
+        icon: input.icon,
+      }),
+      id,
+    );
+  }
+
+  function updateWorkspaceIcon(input: { workspaceId: string; icon: WorkspaceIconKey }) {
+    workspaceState = updateWorkspaceGroupIcon(
+      workspaceState,
+      input.workspaceId,
+      input.icon,
+    );
+  }
+
+  function renameWorkspace(input: { workspaceId: string; name: string }) {
+    workspaceState = renameWorkspaceGroup(workspaceState, input.workspaceId, input.name);
+  }
+
+  function setWorkspaceDisabled(input: { workspaceId: string; disabled: boolean }) {
+    const workspaceServices = getWorkspaceServices(workspaceState, input.workspaceId);
+    workspaceState = setWorkspaceGroupDisabled(
+      workspaceState,
+      input.workspaceId,
+      input.disabled,
+    );
+
+    if (!input.disabled) {
+      return;
+    }
+
+    for (const service of workspaceServices) {
+      void invoke("delete_webview", createDeletePayload(service));
+    }
+
+    if (input.workspaceId === workspaceState.currentWorkspaceId) {
+      void invoke("hide_all_webviews");
+    }
+  }
+
+  function deleteWorkspace(workspaceId: string) {
+    workspaceState = deleteWorkspaceGroup(workspaceState, workspaceId);
+  }
+
+  function pickWorkspaceColor(index: number) {
+    const colors = ["#3B82F6", "#22C55E", "#F59E0B", "#A855F7", "#EF4444", "#14B8A6"];
+    return colors[index % colors.length];
   }
 
   function createTodoId() {
@@ -580,8 +744,7 @@
       currentActiveId: activeId,
       showToast,
       setState: (next) => {
-        services = next.services;
-        activeId = next.activeId;
+        applyCurrentWorkspaceServices(next.services, next.activeId);
         isAddModalOpen = next.isAddModalOpen;
         if (!next.isAddModalOpen) {
           editingService = null;
@@ -614,12 +777,22 @@
   <WorkspaceSidebar
     services={displayServices}
     {activeId}
+    workspaces={workspaceState.workspaces}
+    currentWorkspaceId={workspaceState.currentWorkspaceId}
+    bind:isWorkspaceSwitcherOpen
     {draggedId}
     {dragOverId}
     {isDnd}
     {isTodosPanelOpen}
     onPointerDown={handlePointerDown}
     onSelectService={switchService}
+    onSelectWorkspace={switchWorkspace}
+    onCreateWorkspace={createWorkspace}
+    onUpdateWorkspaceIcon={updateWorkspaceIcon}
+    onRenameWorkspace={renameWorkspace}
+    onSetWorkspaceDisabled={setWorkspaceDisabled}
+    onDeleteWorkspace={deleteWorkspace}
+    onWorkspaceSwitcherOpenChange={setWorkspaceSwitcherOpen}
     onToggleDnd={() => (isDnd = !isDnd)}
     onOpenAddModal={openAddModal}
     onToggleTodosPanel={() => setTodosPanelOpen(!isTodosPanelOpen)}
@@ -654,7 +827,16 @@
     {/if}
 
     <div class="flex min-h-0 flex-1 items-center justify-center">
-      {#if !activeService}
+      {#if isCurrentWorkspaceDisabled && currentWorkspace}
+        <WorkspaceDisabledState
+          serviceName={currentWorkspace.name}
+          onEnable={() =>
+            setWorkspaceDisabled({
+              workspaceId: currentWorkspace.id,
+              disabled: false,
+            })}
+        />
+      {:else if !activeService}
         <WorkspaceEmptyState onOpenAddModal={openAddModal} />
       {:else if activeService.disabled}
         <WorkspaceDisabledState

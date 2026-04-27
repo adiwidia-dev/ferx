@@ -14,22 +14,13 @@
   <div
     class="h-24 w-24 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 text-blue-500 rounded-[2rem] flex items-center justify-center mb-8 shadow-inner ring-1 ring-blue-500/20"
   >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="40"
-      height="40"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <rect width="7" height="9" x="3" y="3" rx="1" />
-      <rect width="7" height="5" x="14" y="3" rx="1" />
-      <rect width="7" height="9" x="14" y="12" rx="1" />
-      <rect width="7" height="5" x="3" y="16" rx="1" />
-    </svg>
+    <img
+      src="/app-icon.png"
+      alt="Ferx app icon"
+      class="h-16 w-16 rounded-2xl object-contain"
+      loading="eager"
+      decoding="async"
+    />
   </div>
 
   <h1 class="text-4xl font-extrabold tracking-tight mb-4 text-foreground">

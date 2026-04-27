@@ -284,6 +284,7 @@ describe("settings page", () => {
     expect(URL.createObjectURL).not.toHaveBeenCalled();
     expect(document.querySelector('[data-testid="export-config-dialog"]')).toBeTruthy();
     expect(document.body.textContent).toContain("Export configuration?");
+    expect(document.body.textContent).toContain("1 workspace");
     expect(document.body.textContent).toContain("1 service");
 
     const confirmButton = document.querySelector(
@@ -386,20 +387,27 @@ describe("settings page", () => {
     expect(localStorage.getItem("ferx-app-settings")).toBe(
       '{"spellCheckEnabled":false,"resourceUsageMonitoringEnabled":false}',
     );
-    expect(localStorage.getItem("ferx-workspace-active-id")).toBe("mail");
-    expect(JSON.parse(localStorage.getItem("ferx-workspace-services") ?? "")).toEqual([
-      {
-        id: "mail",
-        name: "Mail",
-        url: "https://mail.example.com/",
-        storageKey: "storage-mail",
-        notificationPrefs: {
-          showBadge: true,
-          affectTray: true,
-          allowNotifications: true,
+    expect(localStorage.getItem("ferx-workspace-active-id")).toBeNull();
+    expect(localStorage.getItem("ferx-workspace-services")).toBeNull();
+    expect(JSON.parse(localStorage.getItem("ferx-workspaces-state") ?? "")).toMatchObject({
+      currentWorkspaceId: "default",
+      workspaces: [
+        {
+          id: "default",
+          name: "Default",
+          serviceIds: ["mail"],
+          activeServiceId: "mail",
+        },
+      ],
+      servicesById: {
+        mail: {
+          id: "mail",
+          name: "Mail",
+          url: "https://mail.example.com/",
+          storageKey: "storage-mail",
         },
       },
-    ]);
+    });
     expect(document.body.textContent).toContain("Configuration imported. Reload Ferx to apply it.");
 
     unmount(component);

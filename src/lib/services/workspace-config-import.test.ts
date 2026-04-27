@@ -5,8 +5,8 @@ import {
   parseWorkspaceConfigImport,
   writeWorkspaceConfigImportToStorage,
 } from "./workspace-config-import";
-import { WORKSPACE_ACTIVE_ID_KEY } from "./workspace-state";
 import { APP_SETTINGS_STORAGE_KEY } from "./app-settings";
+import { DEFAULT_WORKSPACE_ID, WORKSPACES_STATE_KEY } from "./workspace-groups";
 
 const validFile = {
   ferxExport: {
@@ -49,20 +49,24 @@ describe("workspace config import", () => {
       spellCheckEnabled: false,
       resourceUsageMonitoringEnabled: false,
     });
-    expect(result.value.activeId).toBe("mail");
-    expect(result.value.services).toEqual([
-      {
-        id: "mail",
-        name: "Mail",
-        url: "https://mail.example.com/",
-        storageKey: "storage-mail",
-        notificationPrefs: {
-          showBadge: false,
-          affectTray: true,
-          allowNotifications: true,
-        },
+    expect(result.value.workspaceState.currentWorkspaceId).toBe(DEFAULT_WORKSPACE_ID);
+    expect(result.value.workspaceState.workspaces[0]).toMatchObject({
+      id: DEFAULT_WORKSPACE_ID,
+      name: "Default",
+      serviceIds: ["mail"],
+      activeServiceId: "mail",
+    });
+    expect(result.value.workspaceState.servicesById.mail).toEqual({
+      id: "mail",
+      name: "Mail",
+      url: "https://mail.example.com/",
+      storageKey: "storage-mail",
+      notificationPrefs: {
+        showBadge: false,
+        affectTray: true,
+        allowNotifications: true,
       },
-    ]);
+    });
   });
 
   it("rejects invalid JSON before changing storage", () => {
@@ -92,7 +96,7 @@ describe("workspace config import", () => {
     const result = parseWorkspaceConfigImport(
       JSON.stringify({
         ...validFile,
-        ferxExport: { ...validFile.ferxExport, version: 2 },
+        ferxExport: { ...validFile.ferxExport, version: 3 },
       }),
     );
 
@@ -178,7 +182,7 @@ describe("workspace config import", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.services.map((service) => service.storageKey)).toEqual([
+    expect(Object.values(result.value.workspaceState.servicesById).map((service) => service.storageKey)).toEqual([
       "storage-11111111",
       "storage-one",
       "storage-22222222",
@@ -196,7 +200,66 @@ describe("workspace config import", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.activeId).toBe("");
+    expect(result.value.workspaceState.workspaces[0].activeServiceId).toBe("");
+  });
+
+  it("accepts a valid v2 workspace export", () => {
+    const result = parseWorkspaceConfigImport(
+      JSON.stringify({
+        ferxExport: {
+          format: "ferx-workspace-config",
+          version: 2,
+          exportedAt: "2026-04-23T12:00:00.000Z",
+          appVersion: "0.2.4",
+        },
+        appSettings: {
+          spellCheckEnabled: true,
+          resourceUsageMonitoringEnabled: true,
+        },
+        workspaceState: {
+          version: 1,
+          currentWorkspaceId: "work",
+          workspaces: [
+            {
+              id: "work",
+              name: "Work",
+              serviceIds: ["mail"],
+              activeServiceId: "mail",
+              icon: "building-2",
+            },
+            {
+              id: "personal",
+              name: "Personal",
+              serviceIds: ["mail"],
+              activeServiceId: "mail",
+              icon: "unknown-icon",
+            },
+          ],
+          servicesById: {
+            mail: {
+              id: "mail",
+              name: "Mail",
+              url: "mail.example.com",
+              storageKey: "storage-mail",
+            },
+          },
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.workspaceState.currentWorkspaceId).toBe("work");
+    expect(result.value.workspaceState.workspaces.map((workspace) => workspace.icon)).toEqual([
+      "building-2",
+      "briefcase",
+    ]);
+    expect(result.value.workspaceState.workspaces.map((workspace) => workspace.serviceIds)).toEqual([
+      ["mail"],
+      ["mail"],
+    ]);
+    expect(result.value.workspaceState.servicesById.mail.url).toBe("https://mail.example.com/");
   });
 
   it("writes validated import data transactionally to localStorage", () => {
@@ -210,19 +273,18 @@ describe("workspace config import", () => {
     expect(localStorage.getItem(APP_SETTINGS_STORAGE_KEY)).toBe(
       '{"spellCheckEnabled":false,"resourceUsageMonitoringEnabled":false}',
     );
-    expect(localStorage.getItem(WORKSPACE_ACTIVE_ID_KEY)).toBe("mail");
-    expect(JSON.parse(localStorage.getItem("ferx-workspace-services") ?? "")).toEqual([
-      {
-        id: "mail",
-        name: "Mail",
-        url: "https://mail.example.com/",
-        storageKey: "storage-mail",
-        notificationPrefs: {
-          showBadge: false,
-          affectTray: true,
-          allowNotifications: true,
+    expect(localStorage.getItem("ferx-workspace-active-id")).toBeNull();
+    expect(localStorage.getItem("ferx-workspace-services")).toBeNull();
+    expect(JSON.parse(localStorage.getItem(WORKSPACES_STATE_KEY) ?? "")).toMatchObject({
+      currentWorkspaceId: DEFAULT_WORKSPACE_ID,
+      servicesById: {
+        mail: {
+          id: "mail",
+          name: "Mail",
+          url: "https://mail.example.com/",
+          storageKey: "storage-mail",
         },
       },
-    ]);
+    });
   });
 });

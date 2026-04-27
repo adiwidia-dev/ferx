@@ -1,9 +1,13 @@
 import type { AppSettings } from "./app-settings";
 import type { NotificationPrefs } from "./notification-prefs";
-import type { PageService } from "./workspace-state";
+import {
+  normalizeWorkspaceGroupsState,
+  type WorkspaceGroupsState,
+} from "./workspace-groups";
 
 export const WORKSPACE_CONFIG_EXPORT_FORMAT = "ferx-workspace-config";
-export const WORKSPACE_CONFIG_EXPORT_VERSION = 1;
+export const WORKSPACE_CONFIG_EXPORT_VERSION = 2;
+export const WORKSPACE_CONFIG_EXPORT_LEGACY_VERSION = 1;
 
 export interface ExportedWorkspaceServiceV1 {
   id: string;
@@ -18,7 +22,7 @@ export interface ExportedWorkspaceServiceV1 {
 export interface FerxWorkspaceConfigFileV1 {
   ferxExport: {
     format: typeof WORKSPACE_CONFIG_EXPORT_FORMAT;
-    version: typeof WORKSPACE_CONFIG_EXPORT_VERSION;
+    version: typeof WORKSPACE_CONFIG_EXPORT_LEGACY_VERSION;
     exportedAt: string;
     appVersion: string;
   };
@@ -27,44 +31,32 @@ export interface FerxWorkspaceConfigFileV1 {
   activeServiceId: string | null;
 }
 
+export interface FerxWorkspaceConfigFileV2 {
+  ferxExport: {
+    format: typeof WORKSPACE_CONFIG_EXPORT_FORMAT;
+    version: typeof WORKSPACE_CONFIG_EXPORT_VERSION;
+    exportedAt: string;
+    appVersion: string;
+  };
+  appSettings: AppSettings;
+  workspaceState: WorkspaceGroupsState;
+}
+
+export type FerxWorkspaceConfigFile =
+  | FerxWorkspaceConfigFileV1
+  | FerxWorkspaceConfigFileV2;
+
 export function buildWorkspaceConfigExportPayload({
-  services,
+  workspaceState,
   appSettings,
-  activeId,
   appVersion,
   exportedAt = new Date().toISOString(),
 }: {
-  services: PageService[];
+  workspaceState: WorkspaceGroupsState;
   appSettings: AppSettings;
-  activeId: string;
   appVersion: string;
   exportedAt?: string;
-}): FerxWorkspaceConfigFileV1 {
-  const seenIds = new Set<string>();
-  const exportedServices = services.flatMap<ExportedWorkspaceServiceV1>((service) => {
-    if (seenIds.has(service.id)) {
-      return [];
-    }
-    seenIds.add(service.id);
-
-    return [
-      {
-        id: service.id,
-        name: service.name,
-        url: service.url,
-        storageKey: service.storageKey,
-        ...(service.disabled === undefined ? {} : { disabled: service.disabled }),
-        ...(service.iconBgColor === undefined ? {} : { iconBgColor: service.iconBgColor }),
-        notificationPrefs: { ...service.notificationPrefs },
-      },
-    ];
-  });
-  const activeServiceId = exportedServices.some(
-    (service) => service.id === activeId && !service.disabled,
-  )
-    ? activeId
-    : null;
-
+}): FerxWorkspaceConfigFileV2 {
   return {
     ferxExport: {
       format: WORKSPACE_CONFIG_EXPORT_FORMAT,
@@ -76,11 +68,10 @@ export function buildWorkspaceConfigExportPayload({
       spellCheckEnabled: appSettings.spellCheckEnabled,
       resourceUsageMonitoringEnabled: appSettings.resourceUsageMonitoringEnabled,
     },
-    services: exportedServices,
-    activeServiceId,
+    workspaceState: normalizeWorkspaceGroupsState(workspaceState),
   };
 }
 
-export function serializeWorkspaceConfigExport(payload: FerxWorkspaceConfigFileV1): string {
+export function serializeWorkspaceConfigExport(payload: FerxWorkspaceConfigFile): string {
   return JSON.stringify(payload, null, 2);
 }
