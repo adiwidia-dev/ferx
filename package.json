@@ -1,6 +1,6 @@
 {
   "name": "ferx",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "private": true,
   "description": "Desktop app for managing messaging and productivity web apps in one workspace.",
   "repository": "https://github.com/adiwidia-dev/ferx",
