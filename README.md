@@ -19,15 +19,35 @@ Ferx is a lightweight desktop application for running services like WhatsApp, Sl
 - Custom unread badge handling
 - Native context menus for sidebar actions
 - Camera and microphone support for meeting-oriented services
+- Multiple workspace support with create, rename, and delete
+- In-workspace todo notes panel with local storage persistence
+- Resource usage monitoring per active service (opt-in from Settings)
+- Spell check toggle for service webviews (opt-in from Settings)
+- File drag-and-drop into service webviews
+- Native file download dialog for downloads triggered inside services
 - Config-only backup and restore from Settings, exported as plain JSON
 
 ## Current Status
 
 Ferx is usable today and still early in its public release, with core desktop workflows already in place.
 
-Application updates are installed in-app. The updater checks GitHub Releases, verifies the download with a minisign signature, and swaps the bundle on relaunch. Because Ferx is not notarized with an Apple Developer ID, macOS will still ask you to approve the app the first time you install it; subsequent in-app updates do not re-prompt.
-
 Configuration exports contain workspace service names, URLs, and app settings only. They do not include passwords, cookies, or logged-in service sessions, and the JSON file is not encrypted.
+
+## Installation
+
+Download the latest release from the [GitHub Releases page](https://github.com/adiwidia-dev/ferx/releases). Choose the `.dmg` file for macOS.
+
+### macOS
+
+1. Open the downloaded `.dmg` file.
+2. Drag Ferx into your Applications folder.
+3. On first launch, macOS will block the app because it is not notarized with an Apple Developer ID.
+4. Open **System Settings → Privacy & Security**, scroll down to the security prompt, and click **Open Anyway**.
+5. Subsequent launches and in-app updates do not re-prompt.
+
+### In-app updates
+
+Once installed, Ferx checks GitHub Releases for new versions automatically. When an update is available you will be notified inside the app. The updater verifies the download with a minisign signature before applying it. The update is applied on the next relaunch.
 
 ## Platform Support
 
