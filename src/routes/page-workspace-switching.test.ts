@@ -6,6 +6,7 @@ import { DEFAULT_NOTIFICATION_PREFS } from "$lib/services/notification-prefs";
 import {
   WORKSPACES_STATE_KEY,
   WORKSPACES_STATE_VERSION,
+  type WorkspaceGroupsState,
 } from "$lib/services/workspace-groups";
 import WorkspacePage from "./+page.svelte";
 
@@ -20,7 +21,7 @@ vi.mock("@tauri-apps/api/event", () => ({
   listen,
 }));
 
-function createWorkspaceState() {
+function createWorkspaceState(): WorkspaceGroupsState {
   return {
     version: WORKSPACES_STATE_VERSION,
     currentWorkspaceId: "default",
@@ -118,6 +119,77 @@ describe("workspace switching webview commands", () => {
 
     expect(invoke).toHaveBeenCalledWith(
       "open_service",
+      expect.objectContaining({ id: "gemini" }),
+    );
+
+    unmount(component);
+  });
+
+  it("closes disabled workspace services without deleting their session storage", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+    invoke.mockClear();
+
+    document.querySelector<HTMLButtonElement>(
+      '[data-testid="workspace-switcher-trigger"]',
+    )?.click();
+    await settle();
+
+    document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Disable Personal workspace"]',
+    )?.click();
+    await settle();
+
+    expect(invoke).toHaveBeenCalledWith("close_webview", { id: "gemini" });
+    expect(invoke).not.toHaveBeenCalledWith(
+      "delete_webview",
+      expect.objectContaining({ id: "gemini" }),
+    );
+
+    unmount(component);
+  });
+
+  it("closes only orphaned service webviews when deleting a workspace", async () => {
+    const state = createWorkspaceState();
+    state.workspaces[0].serviceIds.push("shared");
+    state.workspaces[1].serviceIds.push("shared");
+    state.servicesById.shared = {
+      id: "shared",
+      name: "Shared",
+      url: "https://shared.example.com/",
+      storageKey: "storage-shared",
+      notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+    };
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(state));
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+    invoke.mockClear();
+
+    document.querySelector<HTMLButtonElement>(
+      '[data-testid="workspace-switcher-trigger"]',
+    )?.click();
+    await settle();
+
+    document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Delete Personal workspace"]',
+    )?.click();
+    await settle();
+    document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Confirm delete Personal workspace"]',
+    )?.click();
+    await settle();
+
+    expect(invoke).toHaveBeenCalledWith("close_webview", { id: "gemini" });
+    expect(invoke).not.toHaveBeenCalledWith("close_webview", { id: "shared" });
+    expect(invoke).not.toHaveBeenCalledWith(
+      "delete_webview",
       expect.objectContaining({ id: "gemini" }),
     );
 

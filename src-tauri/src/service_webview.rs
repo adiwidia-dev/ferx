@@ -340,50 +340,76 @@ fn resource_usage_monitor_script() -> &'static str {
             if (window.__ferx_resource_usage_upload_hooks_active) return;
             window.__ferx_resource_usage_upload_hooks_active = true;
 
-            const originalFetch = window.fetch;
-            if (typeof originalFetch === 'function') {
+            window.__ferx_resource_usage_original_fetch = window.fetch;
+            if (typeof window.__ferx_resource_usage_original_fetch === 'function') {
                 window.fetch = function(input, init) {
                     try {
                         const body = init && 'body' in init ? init.body : input instanceof Request ? input.body : null;
                         recordUploadBytes(bodyByteLength(body));
                     } catch (_error) {}
-                    return originalFetch.apply(this, arguments);
+                    return window.__ferx_resource_usage_original_fetch.apply(this, arguments);
                 };
             }
 
-            const originalSend = XMLHttpRequest.prototype.send;
-            if (typeof originalSend === 'function') {
+            window.__ferx_resource_usage_original_xhr_send = XMLHttpRequest.prototype.send;
+            if (typeof window.__ferx_resource_usage_original_xhr_send === 'function') {
                 XMLHttpRequest.prototype.send = function(body) {
                     try {
                         recordUploadBytes(bodyByteLength(body));
                     } catch (_error) {}
-                    return originalSend.apply(this, arguments);
+                    return window.__ferx_resource_usage_original_xhr_send.apply(this, arguments);
                 };
             }
 
-            const originalSendBeacon = navigator.sendBeacon?.bind(navigator);
-            if (typeof originalSendBeacon === 'function') {
+            window.__ferx_resource_usage_original_send_beacon = navigator.sendBeacon;
+            if (typeof window.__ferx_resource_usage_original_send_beacon === 'function') {
                 navigator.sendBeacon = function(url, data) {
                     try {
                         recordUploadBytes(bodyByteLength(data));
                     } catch (_error) {}
-                    return originalSendBeacon(url, data);
+                    return window.__ferx_resource_usage_original_send_beacon.call(navigator, url, data);
                 };
             }
         };
 
-        if (typeof PerformanceObserver === 'function') {
+        const restoreNetworkUploadHooks = () => {
+            if (!window.__ferx_resource_usage_upload_hooks_active) return;
+            window.__ferx_resource_usage_upload_hooks_active = false;
+
+            if (typeof window.__ferx_resource_usage_original_fetch === 'function') {
+                window.fetch = window.__ferx_resource_usage_original_fetch;
+            }
+            if (typeof window.__ferx_resource_usage_original_xhr_send === 'function') {
+                XMLHttpRequest.prototype.send = window.__ferx_resource_usage_original_xhr_send;
+            }
+            if (typeof window.__ferx_resource_usage_original_send_beacon === 'function') {
+                navigator.sendBeacon = window.__ferx_resource_usage_original_send_beacon;
+            }
+
+            window.__ferx_resource_usage_original_fetch = null;
+            window.__ferx_resource_usage_original_xhr_send = null;
+            window.__ferx_resource_usage_original_send_beacon = null;
+        };
+
+        const installLongTaskObserver = () => {
+            if (window.__ferx_resource_usage_long_task_observer) return;
+            if (typeof PerformanceObserver !== 'function') return;
             try {
-                const observer = new PerformanceObserver((list) => {
+                window.__ferx_resource_usage_long_task_observer = new PerformanceObserver((list) => {
                     for (const entry of list.getEntries()) {
                         if (Number.isFinite(entry.duration)) {
                             window.__ferx_resource_usage_long_task_ms += entry.duration;
                         }
                     }
                 });
-                observer.observe({ type: 'longtask', buffered: true });
+                window.__ferx_resource_usage_long_task_observer.observe({ type: 'longtask', buffered: true });
             } catch (_error) {}
-        }
+        };
+
+        const disconnectLongTaskObserver = () => {
+            window.__ferx_resource_usage_long_task_observer?.disconnect();
+            window.__ferx_resource_usage_long_task_observer = null;
+        };
 
         const sample = async () => {
             if (!window.__ferxResourceUsageMonitoringEnabled) return;
@@ -427,14 +453,20 @@ fn resource_usage_monitor_script() -> &'static str {
                 clearInterval(window.__ferx_resource_usage_timer);
                 window.__ferx_resource_usage_timer = null;
             }
-            if (!enabled) return;
+            if (!enabled) {
+                restoreNetworkUploadHooks();
+                disconnectLongTaskObserver();
+                return;
+            }
+
+            installNetworkUploadHooks();
+            installLongTaskObserver();
             window.__ferx_resource_usage_last_sample = performance.now();
             window.__ferx_resource_usage_last_network_bytes = totalNetworkBytes();
             window.__ferx_resource_usage_timer = setInterval(() => void sample(), 1000);
             void sample();
         };
 
-        installNetworkUploadHooks();
         window.__ferxSetResourceUsageMonitoring(true);
     })();
 "#

@@ -686,7 +686,7 @@
     }
 
     for (const service of workspaceServices) {
-      void invoke("delete_webview", createDeletePayload(service));
+      void invoke("close_webview", { id: service.id });
     }
 
     if (input.workspaceId === workspaceState.currentWorkspaceId) {
@@ -695,7 +695,19 @@
   }
 
   function deleteWorkspace(workspaceId: string) {
-    workspaceState = deleteWorkspaceGroup(workspaceState, workspaceId);
+    const deletedWorkspaceServices = getWorkspaceServices(workspaceState, workspaceId);
+    const nextState = deleteWorkspaceGroup(workspaceState, workspaceId);
+    workspaceState = nextState;
+
+    for (const service of deletedWorkspaceServices) {
+      const stillReferenced = nextState.workspaces.some((workspace) =>
+        workspace.serviceIds.includes(service.id),
+      );
+
+      if (!stillReferenced) {
+        void invoke("close_webview", { id: service.id });
+      }
+    }
   }
 
   function pickWorkspaceColor(index: number) {

@@ -143,10 +143,10 @@ fn apply_active_child_webview_bounds(
     let sidebar_width = sidebar_physical_width(scale_factor);
     let top_offset = service_content_top_offset(
         scale_factor,
-        active_resource_usage_monitoring(&window.app_handle()),
+        active_resource_usage_monitoring(window.app_handle()),
     );
     let right_panel_width =
-        right_panel_physical_width(scale_factor, right_panel_width(&window.app_handle()));
+        right_panel_physical_width(scale_factor, right_panel_width(window.app_handle()));
 
     if let Some(webview) = window.get_webview(&active_id) {
         let _ = webview.set_bounds(tauri::Rect {
@@ -195,8 +195,7 @@ mod tests {
 
     #[test]
     fn outlook_badge_script_uses_command_bridge_payloads() {
-        let Some((_, script)) =
-            service_webview_setup("https://outlook.office.com/mail", false)
+        let Some((_, script)) = service_webview_setup("https://outlook.office.com/mail", false)
         else {
             panic!("expected valid outlook setup");
         };
@@ -311,18 +310,16 @@ mod tests {
             super::safe_export_file_name("/tmp/ferx-workspace-config.json"),
             "ferx-workspace-config.json"
         );
-        assert_eq!(super::safe_export_file_name("   "), "ferx-workspace-config.json");
+        assert_eq!(
+            super::safe_export_file_name("   "),
+            "ferx-workspace-config.json"
+        );
     }
 
     #[test]
     fn effective_service_content_size_excludes_sidebar_top_offset_and_right_panel() {
         assert_eq!(
-            super::effective_service_content_size(
-                tauri::PhysicalSize::new(1200, 800),
-                80,
-                32,
-                360,
-            ),
+            super::effective_service_content_size(tauri::PhysicalSize::new(1200, 800), 80, 32, 360,),
             tauri::PhysicalSize::new(760, 768)
         );
     }
@@ -330,12 +327,7 @@ mod tests {
     #[test]
     fn effective_service_content_size_preserves_current_width_without_right_panel() {
         assert_eq!(
-            super::effective_service_content_size(
-                tauri::PhysicalSize::new(1200, 800),
-                80,
-                0,
-                0,
-            ),
+            super::effective_service_content_size(tauri::PhysicalSize::new(1200, 800), 80, 0, 0,),
             tauri::PhysicalSize::new(1120, 800)
         );
     }
@@ -343,12 +335,7 @@ mod tests {
     #[test]
     fn effective_service_content_size_saturates_when_chrome_exceeds_window_size() {
         assert_eq!(
-            super::effective_service_content_size(
-                tauri::PhysicalSize::new(300, 120),
-                80,
-                150,
-                360,
-            ),
+            super::effective_service_content_size(tauri::PhysicalSize::new(300, 120), 80, 150, 360,),
             tauri::PhysicalSize::new(0, 0)
         );
     }
@@ -527,8 +514,7 @@ mod tests {
 
     #[test]
     fn outlook_badge_script_uses_screen_reader_and_folder_fallbacks() {
-        let Some((_, script)) =
-            service_webview_setup("https://outlook.office.com/mail", false)
+        let Some((_, script)) = service_webview_setup("https://outlook.office.com/mail", false)
         else {
             panic!("expected valid outlook setup");
         };
@@ -545,8 +531,7 @@ mod tests {
 
     #[test]
     fn service_webview_setup_skips_notification_shim_for_microsoft_apps() {
-        let Some((_, teams_script)) =
-            service_webview_setup("https://teams.microsoft.com", false)
+        let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
         else {
             panic!("expected valid teams setup");
         };
@@ -563,8 +548,7 @@ mod tests {
 
     #[test]
     fn service_webview_setup_skips_badge_navigation_for_microsoft_apps() {
-        let Some((_, teams_script)) =
-            service_webview_setup("https://teams.microsoft.com", false)
+        let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
         else {
             panic!("expected valid teams setup");
         };
@@ -583,8 +567,7 @@ mod tests {
 
     #[test]
     fn teams_setup_keeps_common_navigation_hooks() {
-        let Some((_, teams_script)) =
-            service_webview_setup("https://teams.microsoft.com", false)
+        let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
         else {
             panic!("expected valid teams setup");
         };
@@ -619,8 +602,7 @@ mod tests {
 
     #[test]
     fn service_webview_setup_keeps_notification_shim_for_supported_apps() {
-        let Some((_, script)) =
-            service_webview_setup("https://discord.com/channels/@me", false)
+        let Some((_, script)) = service_webview_setup("https://discord.com/channels/@me", false)
         else {
             panic!("expected valid discord setup");
         };
@@ -666,6 +648,28 @@ mod tests {
         assert!(script.contains("window.fetch = function"));
         assert!(script.contains("XMLHttpRequest.prototype.send"));
         assert!(script.contains("navigator.sendBeacon = function"));
+    }
+
+    #[test]
+    fn resource_usage_monitor_restores_page_hooks_when_disabled() {
+        let Some((_, script)) = service_webview_setup_with_resource_monitoring(
+            "https://discord.com/channels/@me",
+            false,
+            true,
+            true,
+        ) else {
+            panic!("expected valid discord setup");
+        };
+
+        assert!(script.contains("__ferx_resource_usage_original_fetch"));
+        assert!(script.contains("__ferx_resource_usage_long_task_observer"));
+        assert!(script.contains("window.fetch = window.__ferx_resource_usage_original_fetch"));
+        assert!(script.contains(
+            "XMLHttpRequest.prototype.send = window.__ferx_resource_usage_original_xhr_send",
+        ));
+        assert!(script
+            .contains("navigator.sendBeacon = window.__ferx_resource_usage_original_send_beacon",));
+        assert!(script.contains("window.__ferx_resource_usage_long_task_observer?.disconnect()",));
     }
 
     #[test]
@@ -724,8 +728,7 @@ mod tests {
 
     #[test]
     fn youtube_music_setup_includes_google_auth_compat() {
-        let Some((_, script)) = service_webview_setup("https://music.youtube.com/", false)
-        else {
+        let Some((_, script)) = service_webview_setup("https://music.youtube.com/", false) else {
             panic!("expected valid youtube music setup");
         };
 
@@ -751,8 +754,7 @@ mod tests {
 
     #[test]
     fn non_google_setup_omits_google_auth_compat() {
-        let Some((_, script)) =
-            service_webview_setup("https://discord.com/channels/@me", false)
+        let Some((_, script)) = service_webview_setup("https://discord.com/channels/@me", false)
         else {
             panic!("expected valid discord setup");
         };
@@ -940,7 +942,26 @@ fn report_teams_badge(app: AppHandle, webview: tauri::Webview, payload: String) 
 
 #[tauri::command]
 fn report_resource_usage(app: AppHandle, webview: tauri::Webview, payload: String) {
-    let _ = app.emit("resource-usage-update", format!("{}:{payload}", webview.label()));
+    let _ = app.emit(
+        "resource-usage-update",
+        format!("{}:{payload}", webview.label()),
+    );
+}
+
+#[tauri::command]
+async fn close_webview(app: AppHandle, id: String) {
+    if let Some(webview) = app.get_webview(&id) {
+        let _ = webview.close();
+    }
+    remove_badge_monitoring_pref(&app, &id);
+
+    let state = app.state::<ActiveWebview>();
+    if let Ok(mut active) = state.0.lock() {
+        if *active == id {
+            *active = String::new();
+            set_active_resource_usage_monitoring(&app, false);
+        }
+    };
 }
 
 #[tauri::command]
@@ -1007,6 +1028,7 @@ fn badge_strategy_for_url(url: &str) -> &'static str {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn open_service(
     app: tauri::AppHandle,
     id: String,
@@ -1024,8 +1046,7 @@ async fn open_service(
         allow_notifications,
         spell_check_enabled,
         resource_usage_monitoring_enabled,
-    )
-    else {
+    ) else {
         eprintln!("Invalid external url for open_service: {url}");
         let _ = app.emit("show-toast", "Invalid service URL");
         return;
@@ -1134,6 +1155,7 @@ async fn open_service(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn load_service(
     app: tauri::AppHandle,
     id: String,
@@ -1316,6 +1338,7 @@ pub fn run() {
             report_outlook_badge,
             report_teams_badge,
             report_resource_usage,
+            close_webview,
             delete_webview,
             show_context_menu,
             load_service,
