@@ -4,8 +4,15 @@ import { describe, expect, it, vi } from "vitest";
 
 import ServiceEditorDialog from "./service-editor-dialog.svelte";
 
+async function waitForDialogCleanup() {
+  flushSync();
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  flushSync();
+}
+
 describe("ServiceEditorDialog", () => {
-  it("uses service terminology for add and edit modes", () => {
+  it("uses service terminology for add and edit modes", async () => {
     const addComponent = mount(ServiceEditorDialog, {
       target: document.body,
       props: {
@@ -21,6 +28,7 @@ describe("ServiceEditorDialog", () => {
     expect(document.body.textContent).not.toContain("Add New Workspace");
 
     unmount(addComponent);
+    await waitForDialogCleanup();
     document.body.innerHTML = "";
 
     const editComponent = mount(ServiceEditorDialog, {
@@ -47,9 +55,10 @@ describe("ServiceEditorDialog", () => {
     );
 
     unmount(editComponent);
+    await waitForDialogCleanup();
   });
 
-  it("keeps required service fields and saves the selected icon ring color", () => {
+  it("keeps required service fields and saves the selected icon ring color", async () => {
     const onSave = vi.fn();
     const component = mount(ServiceEditorDialog, {
       target: document.body,
@@ -89,5 +98,6 @@ describe("ServiceEditorDialog", () => {
     });
 
     unmount(component);
+    await waitForDialogCleanup();
   });
 });
