@@ -72,6 +72,7 @@ yarn tauri dev
 ## Project Docs
 
 - [Contributing](./CONTRIBUTING.md)
+- [Changelog](./CHANGELOG.md)
 - [Architecture Notes](./docs/architecture.md)
 - [Release Process](./docs/release-process.md)
 - [Project Structure](./docs/project-structure.md)
