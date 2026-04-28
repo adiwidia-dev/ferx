@@ -1,23 +1,19 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { openUrl } from "@tauri-apps/plugin-opener";
-  import ActivityIcon from "@lucide/svelte/icons/activity";
   import AppWindowIcon from "@lucide/svelte/icons/app-window";
-  import DownloadIcon from "@lucide/svelte/icons/download";
-  import HardDriveIcon from "@lucide/svelte/icons/hard-drive";
-  import InfoIcon from "@lucide/svelte/icons/info";
-  import KeyboardIcon from "@lucide/svelte/icons/keyboard";
   import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
-  import RotateCwIcon from "@lucide/svelte/icons/rotate-cw";
-  import ShieldCheckIcon from "@lucide/svelte/icons/shield-check";
-  import UploadIcon from "@lucide/svelte/icons/upload";
   import { onMount } from "svelte";
   import { Button } from "$lib/components/ui/button";
+  import SettingsConfigurationDialogs from "$lib/components/settings/settings-configuration-dialogs.svelte";
+  import SettingsConfigurationSection from "$lib/components/settings/settings-configuration-section.svelte";
+  import SettingsPreferencesSection from "$lib/components/settings/settings-preferences-section.svelte";
+  import SettingsRestartDialogs from "$lib/components/settings/settings-restart-dialogs.svelte";
+  import SettingsUpdatesSection from "$lib/components/settings/settings-updates-section.svelte";
   import WorkspaceSidebar from "$lib/components/workspace/workspace-sidebar.svelte";
   import { getAppInfo } from "$lib/services/app-info";
   import {
     APP_SETTINGS_STORAGE_KEY,
-    readAppSettings,
     serializeAppSettings,
   } from "$lib/services/app-settings";
   import {
@@ -37,21 +33,24 @@
     relaunchApp,
     type UpdaterState,
   } from "$lib/services/updater";
-  import { WORKSPACE_ACTIVE_ID_KEY } from "$lib/services/workspace-state";
   import {
-    WORKSPACES_STATE_KEY,
     createDefaultWorkspaceGroupsState,
-    createWorkspaceGroup,
     deleteWorkspaceGroup,
-    getWorkspaceServices,
-    readWorkspaceGroupsStartupState,
     renameWorkspaceGroup,
-    serializeWorkspaceGroupsState,
     setCurrentWorkspaceId,
     setWorkspaceDisabled as setWorkspaceGroupDisabled,
     updateWorkspaceGroupIcon,
     type WorkspaceGroupsState,
   } from "$lib/services/workspace-groups";
+  import {
+    commitSettingsWorkspaceState,
+    createSettingsWorkspace,
+    getSettingsActiveServiceId,
+    getSettingsServices,
+    readSettingsPageStartupState,
+    resolveSettingsServiceRoute,
+    scheduleSettingsWorkspaceReload,
+  } from "$lib/services/settings-page-state";
   import type { WorkspaceIconKey } from "$lib/services/workspace-icons";
 
   const appInfo = getAppInfo();
@@ -63,11 +62,8 @@
   ];
 
   let workspaceState = $state<WorkspaceGroupsState>(createDefaultWorkspaceGroupsState());
-  let services = $derived(getWorkspaceServices(workspaceState));
-  let activeId = $derived(
-    workspaceState.workspaces.find((workspace) => workspace.id === workspaceState.currentWorkspaceId)
-      ?.activeServiceId ?? "",
-  );
+  let services = $derived(getSettingsServices(workspaceState));
+  let activeId = $derived(getSettingsActiveServiceId(workspaceState));
   let isDnd = $state(false);
   let isTodosPanelOpen = $state(false);
   let isWorkspaceSwitcherOpen = $state(false);
@@ -91,16 +87,11 @@
   onMount(() => {
     void invoke("hide_all_webviews");
 
-    const startup = readWorkspaceGroupsStartupState(
-      localStorage.getItem(WORKSPACES_STATE_KEY),
-      localStorage.getItem("ferx-workspace-services"),
-      localStorage.getItem(WORKSPACE_ACTIVE_ID_KEY),
-    );
-    const settings = readAppSettings(localStorage.getItem(APP_SETTINGS_STORAGE_KEY));
-    workspaceState = startup.state;
-    spellCheckEnabled = settings.spellCheckEnabled;
-    resourceUsageMonitoringEnabled = settings.resourceUsageMonitoringEnabled;
-    initialSpellCheckEnabled = settings.spellCheckEnabled;
+    const startup = readSettingsPageStartupState(localStorage);
+    workspaceState = startup.workspaceState;
+    spellCheckEnabled = startup.spellCheckEnabled;
+    resourceUsageMonitoringEnabled = startup.resourceUsageMonitoringEnabled;
+    initialSpellCheckEnabled = startup.initialSpellCheckEnabled;
     showRestartPrompt = false;
     showRestartConfirm = false;
     restartError = "";
@@ -154,12 +145,6 @@
     }
   }
 
-  function formatBytes(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
   function handleSpellCheckChange(enabled: boolean) {
     spellCheckEnabled = enabled;
     localStorage.setItem(
@@ -202,15 +187,13 @@
     configStatus = "";
 
     try {
-      const startup = readWorkspaceGroupsStartupState(
-        localStorage.getItem(WORKSPACES_STATE_KEY),
-        localStorage.getItem("ferx-workspace-services"),
-        localStorage.getItem(WORKSPACE_ACTIVE_ID_KEY),
-      );
-      const settings = readAppSettings(localStorage.getItem(APP_SETTINGS_STORAGE_KEY));
+      const startup = readSettingsPageStartupState(localStorage);
       pendingExport = buildWorkspaceConfigExportPayload({
-        workspaceState: startup.state,
-        appSettings: settings,
+        workspaceState: startup.workspaceState,
+        appSettings: {
+          spellCheckEnabled: startup.spellCheckEnabled,
+          resourceUsageMonitoringEnabled: startup.resourceUsageMonitoringEnabled,
+        },
         appVersion: appInfo.version,
       });
       showExportConfirm = true;
@@ -299,49 +282,15 @@
       showImportConfirm = false;
       importPreview = null;
       configStatus = "Configuration imported. Reload Ferx to apply it.";
-      scheduleWorkspaceReload();
+      scheduleSettingsWorkspaceReload(window);
     } catch (error) {
       importError = formatErrorMessage(error);
     }
   }
 
-  function scheduleWorkspaceReload() {
-    if (!("__TAURI_INTERNALS__" in window)) {
-      return;
-    }
-
-    window.setTimeout(() => {
-      try {
-        window.location.replace("/");
-      } catch {
-        window.location.href = "/";
-      }
-    }, 250);
-  }
-
-  function formatServiceCount(count: number) {
-    return `${count} ${count === 1 ? "service" : "services"}`;
-  }
-
-  function formatWorkspaceCount(count: number) {
-    return `${count} ${count === 1 ? "workspace" : "workspaces"}`;
-  }
-
-  function sharedServiceCount(state: WorkspaceGroupsState) {
-    return Object.keys(state.servicesById).length;
-  }
-
-  function serviceHostname(url: string) {
-    try {
-      return new URL(url).hostname;
-    } catch {
-      return url;
-    }
-  }
-
   function commitWorkspaceState(nextState: WorkspaceGroupsState) {
     workspaceState = nextState;
-    localStorage.setItem(WORKSPACES_STATE_KEY, serializeWorkspaceGroupsState(nextState));
+    commitSettingsWorkspaceState(localStorage, nextState);
   }
 
   function switchWorkspace(id: string) {
@@ -361,32 +310,13 @@
   }
 
   function handleSelectService(id: string) {
-    const service = workspaceState.servicesById[id];
-    if (!service || service.disabled) {
-      openRoute("/");
-      return;
-    }
-
-    openRoute(`/?open=${encodeURIComponent(id)}`);
+    openRoute(resolveSettingsServiceRoute(workspaceState, id));
   }
 
   function handleSidebarPointerDown(_event: PointerEvent, _id: string) {}
 
   function createWorkspace(input: { name: string; icon: WorkspaceIconKey }) {
-    const id = `workspace-${crypto.randomUUID().slice(0, 8)}`;
-    const nextState = setCurrentWorkspaceId(
-      createWorkspaceGroup(workspaceState, {
-        id,
-        name: input.name,
-        serviceIds: [],
-        activeServiceId: "",
-        color: pickWorkspaceColor(workspaceState.workspaces.length),
-        icon: input.icon,
-      }),
-      id,
-    );
-
-    commitWorkspaceState(nextState);
+    commitWorkspaceState(createSettingsWorkspace(workspaceState, input));
   }
 
   function updateWorkspaceIcon(input: { workspaceId: string; icon: WorkspaceIconKey }) {
@@ -407,11 +337,6 @@
 
   function deleteWorkspace(workspaceId: string) {
     commitWorkspaceState(deleteWorkspaceGroup(workspaceState, workspaceId));
-  }
-
-  function pickWorkspaceColor(index: number) {
-    const colors = ["#3B82F6", "#22C55E", "#F59E0B", "#A855F7", "#EF4444", "#14B8A6"];
-    return colors[index % colors.length];
   }
 </script>
 
@@ -447,196 +372,28 @@
   <main
     class="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col bg-background/50"
   >
-    {#if showRestartPrompt}
-      <div
-        data-testid="spell-check-restart-prompt-overlay"
-        class="absolute inset-0 z-50 flex items-start justify-center bg-background/45 px-4 pt-24 backdrop-blur-sm sm:pt-32"
-        role="presentation"
-      >
-        <div
-          data-testid="spell-check-restart-prompt"
-          class="w-full max-w-md rounded-2xl border bg-card p-5 text-left shadow-2xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-200"
-          role="status"
-        >
-          <p class="text-base font-semibold text-foreground">
-            Spell checking will update after restart.
-          </p>
-          <p class="mt-2 text-sm text-muted-foreground">
-            Restart Ferx now or use the restart button in Settings later.
-          </p>
-          <div class="mt-5 flex justify-end gap-2">
-            <Button
-              variant="outline"
-              class="h-9 rounded-xl px-3 text-xs"
-              aria-label="Dismiss restart prompt"
-              onclick={() => (showRestartPrompt = false)}
-            >
-              Later
-            </Button>
-            <Button
-              class="h-9 rounded-xl px-3 text-xs"
-              data-testid="prompt-restart-button"
-              onclick={handleRestartFerx}
-            >
-              Restart Ferx
-            </Button>
-          </div>
-        </div>
-      </div>
-    {/if}
+    <SettingsRestartDialogs
+      {showRestartPrompt}
+      {showRestartConfirm}
+      {restartError}
+      onDismissRestartPrompt={() => (showRestartPrompt = false)}
+      onRestartFromPrompt={handleRestartFerx}
+      onCancelRestart={cancelRestartFerx}
+      onConfirmRestart={handleRestartFerx}
+    />
 
-    {#if showRestartConfirm}
-      <div
-        class="absolute inset-0 z-[60] flex items-start justify-center bg-background/45 px-4 pt-24 backdrop-blur-sm sm:pt-32"
-        role="presentation"
-      >
-        <div
-          data-testid="restart-confirm-dialog"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="restart-confirm-title"
-          class="w-full max-w-md rounded-2xl border bg-card p-5 text-left shadow-2xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-200"
-        >
-          <p id="restart-confirm-title" class="text-base font-semibold text-foreground">
-            Restart Ferx?
-          </p>
-          <p class="mt-2 text-sm text-muted-foreground">
-            Are you sure you want to restart Ferx? The app will close and reopen.
-          </p>
-          {#if restartError}
-            <p class="mt-3 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs font-medium text-red-500">
-              {restartError}
-            </p>
-          {/if}
-          <div class="mt-5 flex justify-end gap-2">
-            <Button
-              variant="outline"
-              class="h-9 rounded-xl px-3 text-xs"
-              data-testid="cancel-restart-button"
-              onclick={cancelRestartFerx}
-            >
-              Cancel
-            </Button>
-            <Button
-              class="h-9 rounded-xl px-3 text-xs"
-              data-testid="confirm-restart-button"
-              onclick={handleRestartFerx}
-            >
-              Restart Ferx
-            </Button>
-          </div>
-        </div>
-      </div>
-    {/if}
-
-    {#if showExportConfirm && pendingExport}
-      <div
-        class="absolute inset-0 z-[60] flex items-start justify-center bg-background/45 px-4 pt-24 backdrop-blur-sm sm:pt-32"
-        role="presentation"
-      >
-        <div
-          data-testid="export-config-dialog"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="export-config-title"
-          class="w-full max-w-md rounded-2xl border bg-card p-5 text-left shadow-2xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-200"
-        >
-          <p id="export-config-title" class="text-base font-semibold text-foreground">
-            Export configuration?
-          </p>
-          <p class="mt-2 text-sm text-muted-foreground">
-            Ferx will create a plain JSON file with {formatWorkspaceCount(pendingExport.workspaceState.workspaces.length)},
-            {formatServiceCount(sharedServiceCount(pendingExport.workspaceState))}, service URLs,
-            names, and app settings. It does not include passwords or login sessions.
-          </p>
-          <p class="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs font-medium text-amber-700">
-            The file is not encrypted. Store it somewhere you trust.
-          </p>
-          {#if exportError}
-            <p class="mt-3 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs font-medium text-red-500">
-              {exportError}
-            </p>
-          {/if}
-          <div class="mt-5 flex justify-end gap-2">
-            <Button
-              variant="outline"
-              class="h-9 rounded-xl px-3 text-xs"
-              onclick={cancelExportConfiguration}
-            >
-              Cancel
-            </Button>
-            <Button
-              class="h-9 rounded-xl px-3 text-xs"
-              data-testid="confirm-export-config-button"
-              onclick={confirmExportConfiguration}
-            >
-              Export
-            </Button>
-          </div>
-        </div>
-      </div>
-    {/if}
-
-    {#if showImportConfirm && importPreview}
-      <div
-        class="absolute inset-0 z-[60] flex items-start justify-center bg-background/45 px-4 pt-24 backdrop-blur-sm sm:pt-32"
-        role="presentation"
-      >
-        <div
-          data-testid="import-config-dialog"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="import-config-title"
-          class="w-full max-w-md rounded-2xl border bg-card p-5 text-left shadow-2xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-200"
-        >
-          <p id="import-config-title" class="text-base font-semibold text-foreground">
-            Import configuration?
-          </p>
-          <p class="mt-2 text-sm text-muted-foreground">
-            This will replace the current configuration with {formatWorkspaceCount(importPreview.workspaceState.workspaces.length)},
-            {formatServiceCount(sharedServiceCount(importPreview.workspaceState))}, and app settings.
-          </p>
-          <div class="mt-4 max-h-40 overflow-y-auto rounded-xl border bg-muted/20">
-            {#each Object.values(importPreview.workspaceState.servicesById).slice(0, 8) as service (service.id)}
-              <div class="flex items-center justify-between gap-3 border-b px-3 py-2 last:border-b-0">
-                <p class="min-w-0 truncate text-xs font-semibold text-foreground">{service.name}</p>
-                <p class="shrink-0 text-xs text-muted-foreground">{serviceHostname(service.url)}</p>
-              </div>
-            {/each}
-            {#if sharedServiceCount(importPreview.workspaceState) > 8}
-              <p class="px-3 py-2 text-xs text-muted-foreground">
-                +{sharedServiceCount(importPreview.workspaceState) - 8} more
-              </p>
-            {/if}
-          </div>
-          <p class="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs font-medium text-amber-700">
-            Existing sessions are not imported. Replacing configuration does not erase old session
-            data from disk.
-          </p>
-          {#if importError}
-            <p class="mt-3 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs font-medium text-red-500">
-              {importError}
-            </p>
-          {/if}
-          <div class="mt-5 flex justify-end gap-2">
-            <Button
-              variant="outline"
-              class="h-9 rounded-xl px-3 text-xs"
-              onclick={cancelImportConfiguration}
-            >
-              Cancel
-            </Button>
-            <Button
-              class="h-9 rounded-xl px-3 text-xs"
-              data-testid="confirm-import-config-button"
-              onclick={confirmImportConfiguration}
-            >
-              Replace
-            </Button>
-          </div>
-        </div>
-      </div>
-    {/if}
+    <SettingsConfigurationDialogs
+      {showExportConfirm}
+      {pendingExport}
+      {exportError}
+      {showImportConfirm}
+      {importPreview}
+      {importError}
+      onCancelExportConfiguration={cancelExportConfiguration}
+      onConfirmExportConfiguration={confirmExportConfiguration}
+      onCancelImportConfiguration={cancelImportConfiguration}
+      onConfirmImportConfiguration={confirmImportConfiguration}
+    />
 
     <div
       class="relative z-10 flex min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-muted/30"
@@ -734,285 +491,36 @@
               </div>
             </section>
 
-            <section id="preferences" class="scroll-mt-8 rounded-lg border bg-card text-card-foreground shadow-sm">
-              <div class="border-b px-5 py-4">
-                <div class="flex items-center gap-3">
-                  <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                    <KeyboardIcon class="size-4" />
-                  </div>
-                  <div>
-                    <h2 class="text-sm font-semibold text-foreground">Preferences</h2>
-                    <p class="mt-0.5 text-xs text-muted-foreground">Input and workspace activity controls.</p>
-                  </div>
-                </div>
-              </div>
+            <SettingsPreferencesSection
+              {spellCheckEnabled}
+              {resourceUsageMonitoringEnabled}
+              {spellCheckRestartRequired}
+              {restartError}
+              onSpellCheckChange={handleSpellCheckChange}
+              onResourceUsageMonitoringChange={handleResourceUsageMonitoringChange}
+              onRequestRestart={requestRestartFerx}
+            />
 
-              <div class="divide-y">
-                <div class="flex items-center justify-between gap-4 px-5 py-4">
-                  <div class="min-w-0">
-                    <p class="text-sm font-semibold text-foreground">Enable Spell Checking</p>
-                    <p class="mt-1 text-xs text-muted-foreground">
-                      Uses the built-in spell checker for service inputs.
-                    </p>
-                    {#if spellCheckRestartRequired}
-                      <p class="mt-2 inline-flex rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700">
-                        Restart Ferx to apply spell checking changes.
-                      </p>
-                    {/if}
-                  </div>
+            <SettingsConfigurationSection
+              {configStatus}
+              {exportError}
+              {importError}
+              bind:importInput
+              onRequestExportConfiguration={requestExportConfiguration}
+              onRequestImportConfiguration={requestImportConfiguration}
+              onImportFileChange={handleImportFileChange}
+            />
 
-                  <label class="relative inline-flex shrink-0 cursor-pointer items-center">
-                    <input
-                      name="spell-check-enabled"
-                      type="checkbox"
-                      class="peer sr-only"
-                      checked={spellCheckEnabled}
-                      onchange={(event) =>
-                        handleSpellCheckChange((event.currentTarget as HTMLInputElement).checked)}
-                    />
-                    <span class="h-6 w-11 rounded-full bg-muted transition-colors peer-checked:bg-blue-500"></span>
-                    <span class="pointer-events-none absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-background shadow-sm transition-transform peer-checked:translate-x-5"></span>
-                  </label>
-                </div>
-
-                <div class="flex items-center justify-between gap-4 px-5 py-4">
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                      <ActivityIcon class="size-4 text-muted-foreground" />
-                      <p class="text-sm font-semibold text-foreground">Resource Usage Monitoring</p>
-                    </div>
-                    <p class="mt-1 text-xs text-muted-foreground">
-                      Shows estimated resource activity for the active service.
-                    </p>
-                  </div>
-
-                  <label class="relative inline-flex shrink-0 cursor-pointer items-center">
-                    <input
-                      name="resource-usage-monitoring-enabled"
-                      type="checkbox"
-                      class="peer sr-only"
-                      checked={resourceUsageMonitoringEnabled}
-                      onchange={(event) =>
-                        handleResourceUsageMonitoringChange(
-                          (event.currentTarget as HTMLInputElement).checked,
-                        )}
-                    />
-                    <span class="h-6 w-11 rounded-full bg-muted transition-colors peer-checked:bg-blue-500"></span>
-                    <span class="pointer-events-none absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-background shadow-sm transition-transform peer-checked:translate-x-5"></span>
-                  </label>
-                </div>
-
-                <div class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                      <RotateCwIcon class="size-4 text-muted-foreground" />
-                      <p class="text-sm font-semibold text-foreground">Restart Ferx</p>
-                    </div>
-                    <p class="mt-1 text-xs text-muted-foreground">
-                      Relaunch the app to apply pending settings changes.
-                    </p>
-                    {#if restartError}
-                      <p class="mt-2 text-xs font-medium text-red-500">{restartError}</p>
-                    {/if}
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    class="h-9 w-fit rounded-lg px-3 text-xs"
-                    data-testid="manual-restart-button"
-                    onclick={requestRestartFerx}
-                  >
-                    Restart Ferx
-                  </Button>
-                </div>
-              </div>
-            </section>
-
-            <section id="configuration" class="scroll-mt-8 rounded-lg border bg-card text-card-foreground shadow-sm">
-              <div class="border-b px-5 py-4">
-                <div class="flex items-center gap-3">
-                  <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                    <HardDriveIcon class="size-4" />
-                  </div>
-                  <div>
-                    <h2 class="text-sm font-semibold text-foreground">Configuration</h2>
-                    <p class="mt-0.5 text-xs text-muted-foreground">Back up or replace service metadata.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="px-5 py-4">
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div class="min-w-0">
-                    <p class="text-sm font-semibold text-foreground">Import / Export Configuration</p>
-                    <p class="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
-                      Back up service names, URLs, and app settings as plain JSON.
-                    </p>
-                    <div class="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-800">
-                      <ShieldCheckIcon class="mt-0.5 size-4 shrink-0" />
-                      <p>The export is not encrypted and does not include passwords or login sessions.</p>
-                    </div>
-                    {#if configStatus}
-                      <p class="mt-3 text-xs font-medium text-emerald-600">{configStatus}</p>
-                    {/if}
-                    {#if exportError || importError}
-                      <p class="mt-3 text-xs font-medium text-red-500">{exportError || importError}</p>
-                    {/if}
-                  </div>
-
-                  <div class="flex shrink-0 items-center gap-2">
-                    <Button
-                      variant="outline"
-                      class="h-9 rounded-lg px-3 text-xs"
-                      data-testid="export-config-button"
-                      onclick={requestExportConfiguration}
-                    >
-                      <DownloadIcon class="size-3.5" />
-                      Export
-                    </Button>
-                    <Button
-                      variant="outline"
-                      class="h-9 rounded-lg px-3 text-xs"
-                      data-testid="import-config-button"
-                      onclick={requestImportConfiguration}
-                    >
-                      <UploadIcon class="size-3.5" />
-                      Import
-                    </Button>
-                    <input
-                      bind:this={importInput}
-                      data-testid="import-config-input"
-                      type="file"
-                      accept=".json,application/json"
-                      class="hidden"
-                      onchange={handleImportFileChange}
-                    />
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section id="updates" class="scroll-mt-8 rounded-lg border bg-card text-card-foreground shadow-sm">
-              <div class="border-b px-5 py-4">
-                <div class="flex items-center gap-3">
-                  <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                    <RefreshCwIcon class="size-4" />
-                  </div>
-                  <div>
-                    <h2 class="text-sm font-semibold text-foreground">Updates</h2>
-                    <p class="mt-0.5 text-xs text-muted-foreground">Verified release checks and installation.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="px-5 py-4">
-                {#if updater.status === "idle"}
-                  <div class="mb-4 flex items-start gap-3 rounded-lg border bg-muted/30 p-4 text-left">
-                    <InfoIcon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <div class="min-w-0">
-                      <p class="text-sm font-semibold text-foreground">Automatic updates</p>
-                      <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                        Check for a new release. Updates are verified with a signing key before they
-                        are applied.
-                      </p>
-                    </div>
-                  </div>
-
-                  <Button class="h-10 w-full rounded-lg shadow-sm" onclick={handleCheckForUpdates}>
-                    Check for Updates
-                  </Button>
-                {:else if updater.status === "checking"}
-                  <div class="mb-4 rounded-lg border bg-muted/30 p-4 text-left">
-                    <p class="text-sm font-semibold text-foreground">Checking for updates...</p>
-                    <p class="mt-1 text-xs text-muted-foreground">Contacting the release server.</p>
-                  </div>
-
-                  <Button class="h-10 w-full rounded-lg shadow-sm" disabled>Checking...</Button>
-                {:else if updater.status === "up-to-date"}
-                  <div class="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 text-left">
-                    <p class="text-sm font-semibold text-foreground">You're up to date</p>
-                    <p class="mt-1 text-xs text-muted-foreground">
-                      {appInfo.name} v{appInfo.version} is the latest release.
-                    </p>
-                  </div>
-
-                  <Button class="h-10 w-full rounded-lg shadow-sm" onclick={handleCheckForUpdates}>
-                    Check Again
-                  </Button>
-                {:else if updater.status === "available"}
-                  <div class="mb-4 rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 text-left">
-                    <p class="text-sm font-semibold text-foreground">
-                      Version {updater.version} is available
-                    </p>
-                    {#if updater.notes}
-                      <p class="mt-1 whitespace-pre-line text-xs text-muted-foreground">{updater.notes}</p>
-                    {:else}
-                      <p class="mt-1 text-xs text-muted-foreground">
-                        Download and install to upgrade from v{appInfo.version}.
-                      </p>
-                    {/if}
-                  </div>
-
-                  <Button class="h-10 w-full rounded-lg shadow-sm" onclick={handleDownloadAndInstall}>
-                    Download and Install
-                  </Button>
-                {:else if updater.status === "downloading"}
-                  <div class="mb-4 rounded-lg border bg-muted/30 p-4 text-left">
-                    <p class="text-sm font-semibold text-foreground">Downloading v{updater.version}</p>
-                    <p class="mt-1 text-xs text-muted-foreground">
-                      {#if updater.total}
-                        {formatBytes(updater.downloaded)} / {formatBytes(updater.total)}
-                      {:else}
-                        {formatBytes(updater.downloaded)} downloaded
-                      {/if}
-                    </p>
-                    <div class="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-foreground/10">
-                      <div
-                        class="h-full rounded-full bg-blue-500 transition-[width]"
-                        style={`width: ${
-                          updater.total
-                            ? Math.min(100, (updater.downloaded / updater.total) * 100)
-                            : 0
-                        }%`}
-                      ></div>
-                    </div>
-                  </div>
-
-                  <Button class="h-10 w-full rounded-lg shadow-sm" disabled>Installing...</Button>
-                {:else if updater.status === "installed"}
-                  <div class="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 text-left">
-                    <p class="text-sm font-semibold text-foreground">
-                      Update v{updater.version} installed
-                    </p>
-                    <p class="mt-1 text-xs text-muted-foreground">
-                      Relaunch {appInfo.name} to start the new version.
-                    </p>
-                  </div>
-
-                  <Button class="h-10 w-full rounded-lg shadow-sm" onclick={handleRelaunch}>
-                    Relaunch Now
-                  </Button>
-                {:else if updater.status === "error"}
-                  <div class="mb-4 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-left">
-                    <p class="text-sm font-semibold text-foreground">Update failed</p>
-                    <p class="mt-1 break-words text-xs text-muted-foreground">{updater.message}</p>
-                  </div>
-
-                  <div class="flex gap-2">
-                    <Button class="h-10 flex-1 rounded-lg shadow-sm" onclick={handleCheckForUpdates}>
-                      Try Again
-                    </Button>
-                    <Button
-                      variant="outline"
-                      class="h-10 flex-1 rounded-lg"
-                      onclick={() => appInfo.releasesUrl && openUrl(appInfo.releasesUrl)}
-                    >
-                      View Releases
-                    </Button>
-                  </div>
-                {/if}
-              </div>
-            </section>
+            <SettingsUpdatesSection
+              appName={appInfo.name}
+              appVersion={appInfo.version}
+              releasesUrl={appInfo.releasesUrl}
+              {updater}
+              onCheckForUpdates={handleCheckForUpdates}
+              onDownloadAndInstall={handleDownloadAndInstall}
+              onRelaunch={handleRelaunch}
+              onOpenReleases={() => appInfo.releasesUrl && openUrl(appInfo.releasesUrl)}
+            />
           </div>
         </div>
       </div>
