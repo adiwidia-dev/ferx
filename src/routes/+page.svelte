@@ -17,10 +17,16 @@
     readAppSettings,
   } from "$lib/services/app-settings";
   import {
-    createDeletePayload,
-    createServiceLoadPayload,
-    shouldPreloadService,
-  } from "$lib/services/service-runtime";
+    closeServiceWebview,
+    createWebviewCommandQueue,
+    deleteServiceWebview,
+    hideAllWebviews,
+    openServiceWebview,
+    preloadBackgroundServices,
+    preloadServiceWebview,
+    reloadServiceWebview,
+    setRightPanelWidth,
+  } from "$lib/services/webview-commands";
   import {
     countTrayRelevantUnreadServices,
     type NotificationPrefs,
@@ -103,7 +109,7 @@
   let isDnd = $state(false);
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   let todoSaveTimer: ReturnType<typeof setTimeout> | null = null;
-  let webviewCommandQueue: Promise<unknown> = Promise.resolve();
+  const webviewCommands = createWebviewCommandQueue();
 
   function writeWorkspaceToLocalStorage() {
     localStorage.setItem(WORKSPACES_STATE_KEY, serializeWorkspaceGroupsState(workspaceState));
@@ -149,10 +155,6 @@
     }, WORKSPACE_SAVE_DEBOUNCE_MS);
   }
 
-  function queueWebviewCommand(run: () => Promise<unknown>) {
-    webviewCommandQueue = webviewCommandQueue.then(run, run);
-    void webviewCommandQueue;
-  }
   // --- BULLETPROOF DRAG STATE (Tracking IDs instead of Indexes) ---
   let draggedId = $state<string | null>(null);
   let dragOverId = $state<string | null>(null);
@@ -269,25 +271,14 @@
         if (preloadCancelled) {
           return;
         }
-        let preloaded = 0;
-        for (const service of services) {
-          if (preloadCancelled) {
-            break;
-          }
-          if (preloaded >= MAX_BACKGROUND_PRELOADS) break;
-          if (shouldPreloadService(service, activeId)) {
-            await invoke(
-              "load_service",
-              createServiceLoadPayload(
-                service,
-                spellCheckEnabled,
-                false,
-              ),
-            );
-            preloaded++;
-            await new Promise((resolve) => setTimeout(resolve, PRELOAD_GAP_MS));
-          }
-        }
+        await preloadBackgroundServices({
+          services,
+          activeId,
+          spellCheckEnabled,
+          maxPreloads: MAX_BACKGROUND_PRELOADS,
+          gapMs: PRELOAD_GAP_MS,
+          shouldCancel: () => preloadCancelled,
+        });
       }, PRELOAD_START_MS);
     }
 
@@ -390,7 +381,7 @@
       window.removeEventListener("pagehide", flushOnExit);
       document.removeEventListener("visibilitychange", onVisibilityForFlush);
       flushOnExit();
-      void invoke("set_right_panel_width", { width: 0 });
+      void setRightPanelWidth(0);
       cleanupPageListeners({
         unlistenToastPromise,
         unlistenMenuPromise: unlistenPromise,
@@ -423,16 +414,13 @@
       isCurrentWorkspaceDisabled ||
       (activeService && activeService.disabled)
     ) {
-      queueWebviewCommand(() => invoke("hide_all_webviews"));
+      webviewCommands.run(hideAllWebviews);
     } else if (activeService && !activeService.disabled) {
-      queueWebviewCommand(() =>
-        invoke(
-          "open_service",
-          createServiceLoadPayload(
-            activeService,
-            spellCheckEnabled,
-            resourceUsageMonitoringEnabled,
-          ),
+      webviewCommands.run(() =>
+        openServiceWebview(
+          activeService,
+          spellCheckEnabled,
+          resourceUsageMonitoringEnabled,
         ),
       );
     }
@@ -549,7 +537,7 @@
   }
 
   function reloadService(id: string) {
-    invoke("reload_webview", { id });
+    void reloadServiceWebview(id);
   }
 
   function toggleDisable(id: string) {
@@ -558,7 +546,7 @@
     applyCurrentWorkspaceServices(nextState.services, nextState.activeId);
 
     if (nextState.deleteWebview) {
-      invoke("delete_webview", nextState.deleteWebview);
+      void deleteServiceWebview(nextState.deleteWebview);
     }
   }
 
@@ -604,7 +592,7 @@
       const { [id]: _removedBadge, ...remainingBadges } = badges;
       badges = remainingBadges;
     }
-    invoke("delete_webview", createDeletePayload(serviceToDelete));
+    void deleteServiceWebview(serviceToDelete);
   }
 
   function applyCurrentWorkspaceServices(nextServices: Service[], nextActiveId: string) {
@@ -686,11 +674,11 @@
     }
 
     for (const service of workspaceServices) {
-      void invoke("close_webview", { id: service.id });
+      void closeServiceWebview(service.id);
     }
 
     if (input.workspaceId === workspaceState.currentWorkspaceId) {
-      void invoke("hide_all_webviews");
+      void hideAllWebviews();
     }
   }
 
@@ -705,7 +693,7 @@
       );
 
       if (!stillReferenced) {
-        void invoke("close_webview", { id: service.id });
+        void closeServiceWebview(service.id);
       }
     }
   }
@@ -721,9 +709,7 @@
 
   function setTodosPanelOpen(open: boolean) {
     isTodosPanelOpen = open;
-    void invoke("set_right_panel_width", {
-      width: open ? TODOS_PANEL_WIDTH : 0,
-    });
+    void setRightPanelWidth(open ? TODOS_PANEL_WIDTH : 0);
   }
 
   function addTodoNote() {
@@ -767,16 +753,9 @@
           editingService = null;
         }
       },
-      deleteWebview: async (payload) => invoke("delete_webview", payload),
+      deleteWebview: deleteServiceWebview,
       loadService: async (service) =>
-        invoke(
-          "load_service",
-          createServiceLoadPayload(
-            service,
-            spellCheckEnabled,
-            false,
-          ),
-        ),
+        preloadServiceWebview(service, spellCheckEnabled),
     });
   }
 </script>
