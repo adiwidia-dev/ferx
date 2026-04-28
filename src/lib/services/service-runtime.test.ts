@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  createDeletePayload,
-  createServiceLoadPayload,
+  createDeleteWebviewPayload,
+  createRightPanelWidthPayload,
+  createServiceWebviewPayload,
+  createWebviewIdPayload,
   shouldPreloadService,
 } from "./service-runtime";
 
@@ -28,10 +30,10 @@ function createService(overrides: {
   };
 }
 
-describe("createServiceLoadPayload", () => {
+describe("createServiceWebviewPayload", () => {
   it("returns the runtime load payload for a service", () => {
     expect(
-      createServiceLoadPayload(
+      createServiceWebviewPayload(
         createService({
           id: "docs",
           url: "https://docs.example.com/",
@@ -52,14 +54,14 @@ describe("createServiceLoadPayload", () => {
   });
 
   it("includes resource usage monitoring when requested", () => {
-    expect(createServiceLoadPayload(createService(), true, true)).toMatchObject({
+    expect(createServiceWebviewPayload(createService(), true, true)).toMatchObject({
       resourceUsageMonitoringEnabled: true,
     });
   });
 
   it("disables badge monitoring only when both badge and tray are off", () => {
     expect(
-      createServiceLoadPayload(
+      createServiceWebviewPayload(
         createService({
           showBadge: false,
           affectTray: false,
@@ -73,16 +75,26 @@ describe("createServiceLoadPayload", () => {
   });
 });
 
-describe("createDeletePayload", () => {
+describe("createDeleteWebviewPayload", () => {
   it("returns the runtime delete payload for a service", () => {
     expect(
-      createDeletePayload(
+      createDeleteWebviewPayload(
         createService({ id: "chat", storageKey: "storage-chat" }),
       ),
     ).toEqual({
       id: "chat",
       storageKey: "storage-chat",
     });
+  });
+});
+
+describe("shared command payload helpers", () => {
+  it("creates webview id payloads", () => {
+    expect(createWebviewIdPayload("chat")).toEqual({ id: "chat" });
+  });
+
+  it("creates right panel width payloads", () => {
+    expect(createRightPanelWidthPayload(360)).toEqual({ width: 360 });
   });
 });
 

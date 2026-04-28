@@ -54,11 +54,13 @@ describe("workspace spell-check startup setting", () => {
     expect(invoke).toHaveBeenCalledWith(
       "open_service",
       expect.objectContaining({
-        id: "chat",
-        allowNotifications: true,
-        badgeMonitoringEnabled: true,
-        spellCheckEnabled: false,
-        resourceUsageMonitoringEnabled: false,
+        payload: expect.objectContaining({
+          id: "chat",
+          allowNotifications: true,
+          badgeMonitoringEnabled: true,
+          spellCheckEnabled: false,
+          resourceUsageMonitoringEnabled: false,
+        }),
       }),
     );
 
@@ -103,8 +105,10 @@ describe("workspace spell-check startup setting", () => {
     expect(invoke).toHaveBeenCalledWith(
       "open_service",
       expect.objectContaining({
-        id: "chat",
-        resourceUsageMonitoringEnabled: true,
+        payload: expect.objectContaining({
+          id: "chat",
+          resourceUsageMonitoringEnabled: true,
+        }),
       }),
     );
 

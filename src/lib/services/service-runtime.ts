@@ -1,4 +1,4 @@
-type ServiceRuntimeService = {
+export type ServiceWebviewService = {
   id: string;
   url: string;
   storageKey: string;
@@ -10,11 +10,34 @@ type ServiceRuntimeService = {
   };
 };
 
-export function createServiceLoadPayload(
-  service: ServiceRuntimeService,
+export type ServiceWebviewCommandPayload = {
+  id: string;
+  url: string;
+  storageKey: string;
+  allowNotifications: boolean;
+  badgeMonitoringEnabled: boolean;
+  spellCheckEnabled: boolean;
+  resourceUsageMonitoringEnabled: boolean;
+};
+
+export type DeleteWebviewPayload = {
+  id: string;
+  storageKey: string;
+};
+
+export type WebviewIdPayload = {
+  id: string;
+};
+
+export type RightPanelWidthPayload = {
+  width: number;
+};
+
+export function createServiceWebviewPayload(
+  service: ServiceWebviewService,
   spellCheckEnabled: boolean,
   resourceUsageMonitoringEnabled = false,
-) {
+): ServiceWebviewCommandPayload {
   const badgeMonitoringEnabled =
     service.notificationPrefs.showBadge !== false ||
     service.notificationPrefs.affectTray !== false;
@@ -30,15 +53,25 @@ export function createServiceLoadPayload(
   };
 }
 
-export function createDeletePayload(service: Pick<ServiceRuntimeService, "id" | "storageKey">) {
+export function createDeleteWebviewPayload(
+  service: Pick<ServiceWebviewService, "id" | "storageKey">,
+): DeleteWebviewPayload {
   return {
     id: service.id,
     storageKey: service.storageKey,
   };
 }
 
+export function createWebviewIdPayload(id: string): WebviewIdPayload {
+  return { id };
+}
+
+export function createRightPanelWidthPayload(width: number): RightPanelWidthPayload {
+  return { width };
+}
+
 export function shouldPreloadService(
-  service: Pick<ServiceRuntimeService, "id" | "disabled">,
+  service: Pick<ServiceWebviewService, "id" | "disabled">,
   activeId: string,
 ) {
   return !service.disabled && service.id !== activeId;

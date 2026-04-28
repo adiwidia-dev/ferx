@@ -38,9 +38,11 @@ mod tests {
     use crate::webview_commands::{
         badge_strategy_for_url, close_all_service_webviews, report_outlook_badge,
         report_resource_usage, report_teams_badge, safe_export_file_name,
-        save_workspace_config_export,
+        save_workspace_config_export, DeleteWebviewPayload, RightPanelWidthPayload,
+        ServiceWebviewCommandPayload, WebviewIdPayload,
     };
     use crate::window_layout::effective_service_content_size;
+    use serde_json::json;
 
     #[test]
     fn extract_hostname_returns_hostname_without_port() {
@@ -161,6 +163,49 @@ mod tests {
         let _command = report_resource_usage;
 
         assert!(source.contains("report_resource_usage,"));
+    }
+
+    #[test]
+    fn service_webview_command_payload_deserializes_from_camel_case() {
+        let payload: ServiceWebviewCommandPayload = serde_json::from_value(json!({
+            "id": "chat",
+            "url": "https://chat.example.com",
+            "storageKey": "storage-chat",
+            "allowNotifications": true,
+            "badgeMonitoringEnabled": false,
+            "spellCheckEnabled": true,
+            "resourceUsageMonitoringEnabled": true
+        }))
+        .expect("expected camelCase service payload");
+
+        assert_eq!(payload.id, "chat");
+        assert_eq!(payload.storage_key, "storage-chat");
+        assert!(payload.allow_notifications);
+        assert!(!payload.badge_monitoring_enabled);
+        assert!(payload.spell_check_enabled);
+        assert!(payload.resource_usage_monitoring_enabled);
+    }
+
+    #[test]
+    fn auxiliary_webview_command_payloads_deserialize_from_camel_case() {
+        let delete_payload: DeleteWebviewPayload = serde_json::from_value(json!({
+            "id": "chat",
+            "storageKey": "storage-chat"
+        }))
+        .expect("expected camelCase delete payload");
+        let close_payload: WebviewIdPayload = serde_json::from_value(json!({
+            "id": "chat"
+        }))
+        .expect("expected webview id payload");
+        let width_payload: RightPanelWidthPayload = serde_json::from_value(json!({
+            "width": 360.0
+        }))
+        .expect("expected right panel width payload");
+
+        assert_eq!(delete_payload.id, "chat");
+        assert_eq!(delete_payload.storage_key, "storage-chat");
+        assert_eq!(close_payload.id, "chat");
+        assert_eq!(width_payload.width, 360.0);
     }
 
     #[test]

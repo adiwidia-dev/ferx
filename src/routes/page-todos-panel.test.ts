@@ -94,7 +94,9 @@ describe("workspace todos panel", () => {
 
     expect(document.querySelector('[data-testid="todos-panel"]')).toBeTruthy();
     expect(document.body.textContent).toContain("Todos");
-    expect(invoke).toHaveBeenCalledWith("set_right_panel_width", { width: 360 });
+    expect(invoke).toHaveBeenCalledWith("set_right_panel_width", {
+      payload: { width: 360 },
+    });
 
     const closeButton = document.querySelector(
       'button[aria-label="Close todos panel"]',
@@ -104,7 +106,9 @@ describe("workspace todos panel", () => {
     await Promise.resolve();
 
     expect(document.querySelector('[data-testid="todos-panel"]')).toBeFalsy();
-    expect(invoke).toHaveBeenCalledWith("set_right_panel_width", { width: 0 });
+    expect(invoke).toHaveBeenCalledWith("set_right_panel_width", {
+      payload: { width: 0 },
+    });
 
     unmount(component);
   });

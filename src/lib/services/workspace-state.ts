@@ -6,7 +6,7 @@ import {
   normalizeServiceUrl,
   readStoredServices,
 } from "$lib/services/service-config";
-import { createDeletePayload } from "$lib/services/service-runtime";
+import { createDeleteWebviewPayload } from "$lib/services/service-runtime";
 import { createStorageKey } from "$lib/services/storage-key";
 
 /** Last focused service in the workspace sidebar (survives navigation to /settings). */
@@ -253,7 +253,7 @@ export function toggleServiceDisabled(
   return {
     services: nextServices,
     activeId: nextActiveId,
-    deleteWebview: createDeletePayload(targetService),
+    deleteWebview: createDeleteWebviewPayload(targetService),
   };
 }
 

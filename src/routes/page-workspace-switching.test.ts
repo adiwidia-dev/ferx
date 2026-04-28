@@ -109,7 +109,7 @@ describe("workspace switching webview commands", () => {
 
     expect(invoke).not.toHaveBeenCalledWith(
       "open_service",
-      expect.objectContaining({ id: "gemini" }),
+      expect.objectContaining({ payload: expect.objectContaining({ id: "gemini" }) }),
     );
 
     for (const resolveHide of hideResolvers) {
@@ -119,7 +119,7 @@ describe("workspace switching webview commands", () => {
 
     expect(invoke).toHaveBeenCalledWith(
       "open_service",
-      expect.objectContaining({ id: "gemini" }),
+      expect.objectContaining({ payload: expect.objectContaining({ id: "gemini" }) }),
     );
 
     unmount(component);
@@ -144,10 +144,10 @@ describe("workspace switching webview commands", () => {
     )?.click();
     await settle();
 
-    expect(invoke).toHaveBeenCalledWith("close_webview", { id: "gemini" });
+    expect(invoke).toHaveBeenCalledWith("close_webview", { payload: { id: "gemini" } });
     expect(invoke).not.toHaveBeenCalledWith(
       "delete_webview",
-      expect.objectContaining({ id: "gemini" }),
+      expect.objectContaining({ payload: expect.objectContaining({ id: "gemini" }) }),
     );
 
     unmount(component);
@@ -186,11 +186,11 @@ describe("workspace switching webview commands", () => {
     )?.click();
     await settle();
 
-    expect(invoke).toHaveBeenCalledWith("close_webview", { id: "gemini" });
-    expect(invoke).not.toHaveBeenCalledWith("close_webview", { id: "shared" });
+    expect(invoke).toHaveBeenCalledWith("close_webview", { payload: { id: "gemini" } });
+    expect(invoke).not.toHaveBeenCalledWith("close_webview", { payload: { id: "shared" } });
     expect(invoke).not.toHaveBeenCalledWith(
       "delete_webview",
-      expect.objectContaining({ id: "gemini" }),
+      expect.objectContaining({ payload: expect.objectContaining({ id: "gemini" }) }),
     );
 
     unmount(component);

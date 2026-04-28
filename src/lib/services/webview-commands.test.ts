@@ -42,22 +42,32 @@ describe("webview command wrappers", () => {
       2,
       "open_service",
       expect.objectContaining({
-        id: "chat",
-        url: "https://chat.example.com",
-        storageKey: "storage-chat",
-        allowNotifications: true,
-        badgeMonitoringEnabled: true,
-        spellCheckEnabled: false,
-        resourceUsageMonitoringEnabled: true,
+        payload: expect.objectContaining({
+          id: "chat",
+          url: "https://chat.example.com",
+          storageKey: "storage-chat",
+          allowNotifications: true,
+          badgeMonitoringEnabled: true,
+          spellCheckEnabled: false,
+          resourceUsageMonitoringEnabled: true,
+        }),
       }),
     );
-    expect(invokeCommand).toHaveBeenNthCalledWith(3, "reload_webview", { id: "chat" });
-    expect(invokeCommand).toHaveBeenNthCalledWith(4, "close_webview", { id: "chat" });
-    expect(invokeCommand).toHaveBeenNthCalledWith(5, "delete_webview", {
-      id: "chat",
-      storageKey: "storage-chat",
+    expect(invokeCommand).toHaveBeenNthCalledWith(3, "reload_webview", {
+      payload: { id: "chat" },
     });
-    expect(invokeCommand).toHaveBeenNthCalledWith(6, "set_right_panel_width", { width: 360 });
+    expect(invokeCommand).toHaveBeenNthCalledWith(4, "close_webview", {
+      payload: { id: "chat" },
+    });
+    expect(invokeCommand).toHaveBeenNthCalledWith(5, "delete_webview", {
+      payload: {
+        id: "chat",
+        storageKey: "storage-chat",
+      },
+    });
+    expect(invokeCommand).toHaveBeenNthCalledWith(6, "set_right_panel_width", {
+      payload: { width: 360 },
+    });
   });
 });
 
@@ -117,12 +127,22 @@ describe("preloadBackgroundServices", () => {
     expect(invokeCommand).toHaveBeenNthCalledWith(
       1,
       "load_service",
-      expect.objectContaining({ id: "one", resourceUsageMonitoringEnabled: false }),
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          id: "one",
+          resourceUsageMonitoringEnabled: false,
+        }),
+      }),
     );
     expect(invokeCommand).toHaveBeenNthCalledWith(
       2,
       "load_service",
-      expect.objectContaining({ id: "two", resourceUsageMonitoringEnabled: false }),
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          id: "two",
+          resourceUsageMonitoringEnabled: false,
+        }),
+      }),
     );
     expect(sleep).toHaveBeenCalledTimes(2);
     expect(sleep).toHaveBeenCalledWith(1000);

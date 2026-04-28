@@ -21,8 +21,40 @@ use crate::window_layout::{
     apply_active_child_webview_bounds, effective_service_content_size,
     right_panel_physical_width, service_content_top_offset, sidebar_physical_width,
 };
+use serde::Deserialize;
 use tauri::webview::Color;
 use tauri::{AppHandle, Emitter, Manager};
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WebviewIdPayload {
+    pub(crate) id: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DeleteWebviewPayload {
+    pub(crate) id: String,
+    pub(crate) storage_key: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RightPanelWidthPayload {
+    pub(crate) width: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ServiceWebviewCommandPayload {
+    pub(crate) id: String,
+    pub(crate) url: String,
+    pub(crate) storage_key: String,
+    pub(crate) allow_notifications: bool,
+    pub(crate) badge_monitoring_enabled: bool,
+    pub(crate) spell_check_enabled: bool,
+    pub(crate) resource_usage_monitoring_enabled: bool,
+}
 
 fn set_badge_monitoring(webview: &tauri::Webview, enabled: bool) {
     let enabled_literal = if enabled { "true" } else { "false" };
@@ -118,8 +150,8 @@ pub async fn close_all_service_webviews(app: AppHandle) {
 }
 
 #[tauri::command]
-pub async fn set_right_panel_width(app: AppHandle, width: f64) {
-    set_stored_right_panel_width(&app, width);
+pub async fn set_right_panel_width(app: AppHandle, payload: RightPanelWidthPayload) {
+    set_stored_right_panel_width(&app, payload.width);
 
     if let Some(window) = app.get_window("main") {
         let physical_size = window.inner_size().unwrap_or_default();
@@ -162,7 +194,9 @@ pub async fn restart_app(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn reload_webview(app: AppHandle, id: String) {
+pub async fn reload_webview(app: AppHandle, payload: WebviewIdPayload) {
+    let WebviewIdPayload { id } = payload;
+
     if let Some(webview) = app.get_webview(&id) {
         let _ = webview.eval("window.location.reload()");
     }
@@ -187,7 +221,9 @@ pub fn report_resource_usage(app: AppHandle, webview: tauri::Webview, payload: S
 }
 
 #[tauri::command]
-pub async fn close_webview(app: AppHandle, id: String) {
+pub async fn close_webview(app: AppHandle, payload: WebviewIdPayload) {
+    let WebviewIdPayload { id } = payload;
+
     if let Some(webview) = app.get_webview(&id) {
         let _ = webview.close();
     }
@@ -203,7 +239,9 @@ pub async fn close_webview(app: AppHandle, id: String) {
 }
 
 #[tauri::command]
-pub async fn delete_webview(app: AppHandle, id: String, storage_key: String) {
+pub async fn delete_webview(app: AppHandle, payload: DeleteWebviewPayload) {
+    let DeleteWebviewPayload { id, storage_key } = payload;
+
     if let Some(webview) = app.get_webview(&id) {
         let _ = webview.close();
     }
@@ -233,18 +271,18 @@ pub async fn delete_webview(app: AppHandle, id: String, storage_key: String) {
 }
 
 #[tauri::command]
-#[allow(clippy::too_many_arguments)]
-pub async fn open_service(
-    app: tauri::AppHandle,
-    id: String,
-    url: String,
-    storage_key: String,
-    allow_notifications: bool,
-    badge_monitoring_enabled: bool,
-    spell_check_enabled: bool,
-    resource_usage_monitoring_enabled: bool,
-) {
+pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandPayload) {
     use tauri::PhysicalPosition;
+
+    let ServiceWebviewCommandPayload {
+        id,
+        url,
+        storage_key,
+        allow_notifications,
+        badge_monitoring_enabled,
+        spell_check_enabled,
+        resource_usage_monitoring_enabled,
+    } = payload;
 
     let Some((webview_url, initialization_script)) = service_webview_setup_with_resource_monitoring(
         &url,
@@ -358,18 +396,18 @@ pub async fn open_service(
 }
 
 #[tauri::command]
-#[allow(clippy::too_many_arguments)]
-pub async fn load_service(
-    app: tauri::AppHandle,
-    id: String,
-    url: String,
-    storage_key: String,
-    allow_notifications: bool,
-    badge_monitoring_enabled: bool,
-    spell_check_enabled: bool,
-    resource_usage_monitoring_enabled: bool,
-) {
+pub async fn load_service(app: tauri::AppHandle, payload: ServiceWebviewCommandPayload) {
     use tauri::PhysicalPosition;
+
+    let ServiceWebviewCommandPayload {
+        id,
+        url,
+        storage_key,
+        allow_notifications,
+        badge_monitoring_enabled,
+        spell_check_enabled,
+        resource_usage_monitoring_enabled,
+    } = payload;
 
     if app.get_webview(&id).is_some() {
         return;
