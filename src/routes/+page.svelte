@@ -36,10 +36,17 @@
     type ResourceUsageSnapshot,
   } from "$lib/services/resource-usage";
   import {
+    applyCurrentWorkspaceServices,
+    deleteServiceFromWorkspaceState,
+    deleteWorkspaceWithEffects,
+    setWorkspaceDisabledWithEffects,
+    toggleWorkspaceServiceDisabled,
+    updateServiceNotificationPrefs as updateWorkspaceServiceNotificationPrefs,
+  } from "$lib/services/workspace-actions";
+  import {
     applySaveServiceResult,
     cleanupPageListeners,
     saveServiceState,
-    toggleServiceDisabled,
     WORKSPACE_ACTIVE_ID_KEY,
     type PageService,
   } from "$lib/services/workspace-state";
@@ -47,18 +54,15 @@
     WORKSPACES_STATE_KEY,
     createDefaultWorkspaceGroupsState,
     createWorkspaceGroup,
-    deleteWorkspaceGroup,
     getWorkspace,
     getWorkspaceServices,
-    normalizeWorkspaceGroupsState,
     readWorkspaceGroupsStartupState,
     serializeWorkspaceGroupsState,
     setCurrentWorkspaceId,
-    setWorkspaceDisabled as setWorkspaceGroupDisabled,
     setWorkspaceActiveService,
     renameWorkspaceGroup,
-    updateWorkspaceGroupIcon,
     updateWorkspaceServices,
+    updateWorkspaceGroupIcon,
     type WorkspaceGroupsState,
   } from "$lib/services/workspace-groups";
   import type { WorkspaceIconKey } from "$lib/services/workspace-icons";
@@ -541,9 +545,8 @@
   }
 
   function toggleDisable(id: string) {
-    const nextState = toggleServiceDisabled(services, activeId, id);
-
-    applyCurrentWorkspaceServices(nextState.services, nextState.activeId);
+    const nextState = toggleWorkspaceServiceDisabled(workspaceState, id);
+    workspaceState = nextState.state;
 
     if (nextState.deleteWebview) {
       void deleteServiceWebview(nextState.deleteWebview);
@@ -554,65 +557,21 @@
     id: string,
     updater: (prefs: NotificationPrefs) => NotificationPrefs,
   ) {
-    const service = workspaceState.servicesById[id];
-    if (!service) {
-      return;
-    }
-
-    workspaceState = normalizeWorkspaceGroupsState({
-      ...workspaceState,
-      servicesById: {
-        ...workspaceState.servicesById,
-        [id]: {
-          ...service,
-          notificationPrefs: updater(service.notificationPrefs),
-        },
-      },
-    });
+    workspaceState = updateWorkspaceServiceNotificationPrefs(
+      workspaceState,
+      id,
+      updater,
+    );
   }
 
   function deleteService(id: string) {
-    const serviceToDelete = services.find((s) => s.id === id);
+    const nextState = deleteServiceFromWorkspaceState(workspaceState, badges, id);
+    workspaceState = nextState.state;
+    badges = nextState.badges;
 
-    if (!serviceToDelete) {
-      return;
+    if (nextState.deletedService) {
+      void deleteServiceWebview(nextState.deletedService);
     }
-
-    const { [id]: _removedService, ...nextServicesById } = workspaceState.servicesById;
-    workspaceState = normalizeWorkspaceGroupsState({
-      ...workspaceState,
-      servicesById: nextServicesById,
-      workspaces: workspaceState.workspaces.map((workspace) => ({
-        ...workspace,
-        serviceIds: workspace.serviceIds.filter((serviceId) => serviceId !== id),
-        activeServiceId: workspace.activeServiceId === id ? "" : workspace.activeServiceId,
-      })),
-    });
-    if (id in badges) {
-      const { [id]: _removedBadge, ...remainingBadges } = badges;
-      badges = remainingBadges;
-    }
-    void deleteServiceWebview(serviceToDelete);
-  }
-
-  function applyCurrentWorkspaceServices(nextServices: Service[], nextActiveId: string) {
-    const nextServicesById = {
-      ...workspaceState.servicesById,
-    };
-
-    for (const service of nextServices) {
-      nextServicesById[service.id] = service;
-    }
-
-    workspaceState = updateWorkspaceServices(
-      {
-        ...workspaceState,
-        servicesById: nextServicesById,
-      },
-      workspaceState.currentWorkspaceId,
-      nextServices.map((service) => service.id),
-      nextActiveId,
-    );
   }
 
   function openEditModal(service: Service) {
@@ -662,39 +621,24 @@
   }
 
   function setWorkspaceDisabled(input: { workspaceId: string; disabled: boolean }) {
-    const workspaceServices = getWorkspaceServices(workspaceState, input.workspaceId);
-    workspaceState = setWorkspaceGroupDisabled(
-      workspaceState,
-      input.workspaceId,
-      input.disabled,
-    );
+    const nextState = setWorkspaceDisabledWithEffects(workspaceState, input);
+    workspaceState = nextState.state;
 
-    if (!input.disabled) {
-      return;
+    for (const serviceId of nextState.closeWebviewIds) {
+      void closeServiceWebview(serviceId);
     }
 
-    for (const service of workspaceServices) {
-      void closeServiceWebview(service.id);
-    }
-
-    if (input.workspaceId === workspaceState.currentWorkspaceId) {
+    if (nextState.shouldHideWebviews) {
       void hideAllWebviews();
     }
   }
 
   function deleteWorkspace(workspaceId: string) {
-    const deletedWorkspaceServices = getWorkspaceServices(workspaceState, workspaceId);
-    const nextState = deleteWorkspaceGroup(workspaceState, workspaceId);
-    workspaceState = nextState;
+    const nextState = deleteWorkspaceWithEffects(workspaceState, workspaceId);
+    workspaceState = nextState.state;
 
-    for (const service of deletedWorkspaceServices) {
-      const stillReferenced = nextState.workspaces.some((workspace) =>
-        workspace.serviceIds.includes(service.id),
-      );
-
-      if (!stillReferenced) {
-        void closeServiceWebview(service.id);
-      }
+    for (const serviceId of nextState.closeWebviewIds) {
+      void closeServiceWebview(serviceId);
     }
   }
 
@@ -747,7 +691,11 @@
       currentActiveId: activeId,
       showToast,
       setState: (next) => {
-        applyCurrentWorkspaceServices(next.services, next.activeId);
+        workspaceState = applyCurrentWorkspaceServices(
+          workspaceState,
+          next.services,
+          next.activeId,
+        );
         isAddModalOpen = next.isAddModalOpen;
         if (!next.isAddModalOpen) {
           editingService = null;
