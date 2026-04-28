@@ -11,11 +11,7 @@
   import WorkspaceDisabledState from "$lib/components/workspace/workspace-disabled-state.svelte";
   import WorkspaceEmptyState from "$lib/components/workspace/workspace-empty-state.svelte";
   import WorkspaceSidebar from "$lib/components/workspace/workspace-sidebar.svelte";
-  import {
-    DEFAULT_APP_SETTINGS,
-    APP_SETTINGS_STORAGE_KEY,
-    readAppSettings,
-  } from "$lib/services/app-settings";
+  import { DEFAULT_APP_SETTINGS } from "$lib/services/app-settings";
   import {
     closeServiceWebview,
     createWebviewCommandQueue,
@@ -36,6 +32,18 @@
     type ResourceUsageSnapshot,
   } from "$lib/services/resource-usage";
   import {
+    consumeOpenServiceParam,
+    createDebouncedStorageWriter,
+    MAX_BACKGROUND_PRELOADS,
+    PRELOAD_GAP_MS,
+    PRELOAD_START_MS,
+    readWorkspacePageStartupState,
+    registerFlushOnExit,
+    scheduleCancellableTask,
+    WORKSPACE_PAGE_STORAGE_KEYS,
+    WORKSPACE_SAVE_DEBOUNCE_MS,
+  } from "$lib/services/workspace-page-lifecycle";
+  import {
     applyCurrentWorkspaceServices,
     deleteServiceFromWorkspaceState,
     deleteWorkspaceWithEffects,
@@ -51,12 +59,10 @@
     type PageService,
   } from "$lib/services/workspace-state";
   import {
-    WORKSPACES_STATE_KEY,
     createDefaultWorkspaceGroupsState,
     createWorkspaceGroup,
     getWorkspace,
     getWorkspaceServices,
-    readWorkspaceGroupsStartupState,
     serializeWorkspaceGroupsState,
     setCurrentWorkspaceId,
     setWorkspaceActiveService,
@@ -67,14 +73,12 @@
   } from "$lib/services/workspace-groups";
   import type { WorkspaceIconKey } from "$lib/services/workspace-icons";
   import {
-    TODO_NOTES_STORAGE_KEY,
     addTodoItem,
     createTodoItem,
     createTodoNote,
     deleteTodoItem,
     deleteTodoNote,
     insertTodoItemsAfter,
-    readTodoNotes,
     reorderTodoItems,
     reorderTodoNotes,
     serializeTodoNotes,
@@ -87,12 +91,6 @@
   } from "$lib/services/todos";
   import { onMount } from "svelte";
 
-  /** Debounced write after the last workspace change (ms). */
-  const WORKSPACE_SAVE_DEBOUNCE_MS = 1200;
-  /** Background preloads: start after launch, cap count, delay between each (reduces main-process churn). */
-  const PRELOAD_START_MS = 2000;
-  const PRELOAD_GAP_MS = 1000;
-  const MAX_BACKGROUND_PRELOADS = 3;
   const TODOS_PANEL_WIDTH = 360;
 
   type Service = PageService;
@@ -111,53 +109,19 @@
   let isAddModalOpen = $state(false);
   let isWorkspaceSwitcherOpen = $state(false);
   let isDnd = $state(false);
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
-  let todoSaveTimer: ReturnType<typeof setTimeout> | null = null;
   const webviewCommands = createWebviewCommandQueue();
-
-  function writeWorkspaceToLocalStorage() {
-    localStorage.setItem(WORKSPACES_STATE_KEY, serializeWorkspaceGroupsState(workspaceState));
-  }
-
-  function flushWorkspaceToStorage() {
-    if (saveTimer) {
-      clearTimeout(saveTimer);
-      saveTimer = null;
-    }
-    writeWorkspaceToLocalStorage();
-  }
-
-  function scheduleSave() {
-    if (saveTimer) {
-      clearTimeout(saveTimer);
-    }
-    saveTimer = setTimeout(() => {
-      saveTimer = null;
-      writeWorkspaceToLocalStorage();
-    }, WORKSPACE_SAVE_DEBOUNCE_MS);
-  }
-
-  function writeTodosToLocalStorage() {
-    localStorage.setItem(TODO_NOTES_STORAGE_KEY, serializeTodoNotes(todoNotes));
-  }
-
-  function flushTodosToStorage() {
-    if (todoSaveTimer) {
-      clearTimeout(todoSaveTimer);
-      todoSaveTimer = null;
-    }
-    writeTodosToLocalStorage();
-  }
-
-  function scheduleTodoSave() {
-    if (todoSaveTimer) {
-      clearTimeout(todoSaveTimer);
-    }
-    todoSaveTimer = setTimeout(() => {
-      todoSaveTimer = null;
-      writeTodosToLocalStorage();
-    }, WORKSPACE_SAVE_DEBOUNCE_MS);
-  }
+  const workspaceStorage = createDebouncedStorageWriter({
+    storageKey: WORKSPACE_PAGE_STORAGE_KEYS.workspaceState,
+    delayMs: WORKSPACE_SAVE_DEBOUNCE_MS,
+    serialize: serializeWorkspaceGroupsState,
+    getStorage: () => (typeof localStorage === "undefined" ? null : localStorage),
+  });
+  const todoStorage = createDebouncedStorageWriter({
+    storageKey: WORKSPACE_PAGE_STORAGE_KEYS.todoNotes,
+    delayMs: WORKSPACE_SAVE_DEBOUNCE_MS,
+    serialize: serializeTodoNotes,
+    getStorage: () => (typeof localStorage === "undefined" ? null : localStorage),
+  });
 
   // --- BULLETPROOF DRAG STATE (Tracking IDs instead of Indexes) ---
   let draggedId = $state<string | null>(null);
@@ -231,73 +195,57 @@
       showToast(event.payload as string);
     });
 
-    const startupState = readWorkspaceGroupsStartupState(
-      localStorage.getItem(WORKSPACES_STATE_KEY),
-      localStorage.getItem("ferx-workspace-services"),
-      localStorage.getItem(WORKSPACE_ACTIVE_ID_KEY),
-    );
-    const settings = readAppSettings(localStorage.getItem(APP_SETTINGS_STORAGE_KEY));
-    spellCheckEnabled = settings.spellCheckEnabled;
-    resourceUsageMonitoringEnabled = settings.resourceUsageMonitoringEnabled;
-    workspaceState = startupState.state;
-    todoNotes = readTodoNotes(localStorage.getItem(TODO_NOTES_STORAGE_KEY));
+    const { openServiceId, nextSearch } =
+      typeof window === "undefined"
+        ? { openServiceId: null, nextSearch: "" }
+        : consumeOpenServiceParam(window.location.search);
+    const startupState = readWorkspacePageStartupState({
+      savedWorkspaceState: localStorage.getItem(WORKSPACE_PAGE_STORAGE_KEYS.workspaceState),
+      legacySavedServices: localStorage.getItem("ferx-workspace-services"),
+      legacyActiveServiceId: localStorage.getItem(WORKSPACE_ACTIVE_ID_KEY),
+      savedAppSettings: localStorage.getItem(WORKSPACE_PAGE_STORAGE_KEYS.appSettings),
+      savedTodoNotes: localStorage.getItem(WORKSPACE_PAGE_STORAGE_KEYS.todoNotes),
+      openServiceId,
+    });
+    spellCheckEnabled = startupState.spellCheckEnabled;
+    resourceUsageMonitoringEnabled = startupState.resourceUsageMonitoringEnabled;
+    workspaceState = startupState.workspaceState;
+    todoNotes = startupState.todoNotes;
 
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const openParam = params.get("open");
-      if (
-        openParam &&
-        !currentWorkspace?.disabled &&
-        services.some((s) => s.id === openParam && !s.disabled)
-      ) {
-        workspaceState = setWorkspaceActiveService(
-          workspaceState,
-          workspaceState.currentWorkspaceId,
-          openParam,
-        );
-      }
-      if (openParam) {
-        params.delete("open");
-        const next = params.toString();
-        const path = window.location.pathname + (next ? `?${next}` : "");
-        window.history.replaceState(null, "", path);
-      }
+    if (typeof window !== "undefined" && openServiceId) {
+      const path = window.location.pathname + (nextSearch ? `?${nextSearch}` : "");
+      window.history.replaceState(null, "", path);
     }
 
     if (startupState.toastMessage) {
       showToast(startupState.toastMessage);
     }
 
-    let preloadTimeoutId: ReturnType<typeof setTimeout> | null = null;
-    let preloadCancelled = false;
-    if (services.length > 0 && !currentWorkspace?.disabled) {
-      preloadTimeoutId = setTimeout(async () => {
-        if (preloadCancelled) {
-          return;
-        }
-        await preloadBackgroundServices({
-          services,
-          activeId,
-          spellCheckEnabled,
-          maxPreloads: MAX_BACKGROUND_PRELOADS,
-          gapMs: PRELOAD_GAP_MS,
-          shouldCancel: () => preloadCancelled,
-        });
-      }, PRELOAD_START_MS);
+    const startupWorkspace = getWorkspace(workspaceState);
+    const startupServices = getWorkspaceServices(workspaceState);
+    const startupActiveId = startupWorkspace?.activeServiceId ?? "";
+
+    let cancelPreload: () => void = () => {};
+    if (startupServices.length > 0 && !startupWorkspace?.disabled) {
+      cancelPreload = scheduleCancellableTask({
+        delayMs: PRELOAD_START_MS,
+        run: (isCancelled) =>
+          preloadBackgroundServices({
+            services: startupServices,
+            activeId: startupActiveId,
+            spellCheckEnabled,
+            maxPreloads: MAX_BACKGROUND_PRELOADS,
+            gapMs: PRELOAD_GAP_MS,
+            shouldCancel: isCancelled,
+          }),
+      });
     }
 
     const flushOnExit = () => {
-      flushWorkspaceToStorage();
-      flushTodosToStorage();
+      workspaceStorage.flush(workspaceState);
+      todoStorage.flush(todoNotes);
     };
-    window.addEventListener("beforeunload", flushOnExit);
-    window.addEventListener("pagehide", flushOnExit);
-    const onVisibilityForFlush = () => {
-      if (document.visibilityState === "hidden") {
-        flushOnExit();
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityForFlush);
+    const cleanupFlushOnExit = registerFlushOnExit(flushOnExit);
 
     const unlistenPromise = listen("menu-action", (event) => {
         const actionStr = event.payload as string;
@@ -377,13 +325,8 @@
     isInitialized = true;
 
     return () => {
-      preloadCancelled = true;
-      if (preloadTimeoutId !== null) {
-        clearTimeout(preloadTimeoutId);
-      }
-      window.removeEventListener("beforeunload", flushOnExit);
-      window.removeEventListener("pagehide", flushOnExit);
-      document.removeEventListener("visibilitychange", onVisibilityForFlush);
+      cancelPreload();
+      cleanupFlushOnExit();
       flushOnExit();
       void setRightPanelWidth(0);
       cleanupPageListeners({
@@ -400,14 +343,14 @@
   $effect(() => {
     if (isInitialized) {
       void workspaceState;
-      scheduleSave();
+      workspaceStorage.schedule(workspaceState);
     }
   });
 
   $effect(() => {
     if (isInitialized) {
       void todoNotes;
-      scheduleTodoSave();
+      todoStorage.schedule(todoNotes);
     }
   });
 
