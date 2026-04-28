@@ -1407,10 +1407,10 @@ svelte-toolbelt@^0.10.6:
     runed "^0.35.1"
     style-to-object "^1.0.8"
 
-svelte@^5.55.4:
-  version "5.55.4"
-  resolved "https://registry.npmmirror.com/svelte/-/svelte-5.55.4.tgz"
-  integrity sha512-q8DFohk6vUswSng95IZb9nzWJnbINZsK7OiM1snAa3qCjJBL0ZQpvMyAaVXjUukdM75J/m8UE8xwqat8Ors/zQ==
+svelte@^5.55.5:
+  version "5.55.5"
+  resolved "https://registry.yarnpkg.com/svelte/-/svelte-5.55.5.tgz#2d7160eb18a10c6f6a124bfbb010d353a937c069"
+  integrity sha512-2uCs/LZ9us+AktdzYJM8OcxQ8qnPS1kpaO7syGT/MgO+6Qr1Ybl+TqPq+97u7PHqmmMlye5ZkoyXONy5mjjAbw==
   dependencies:
     "@jridgewell/remapping" "^2.3.4"
     "@jridgewell/sourcemap-codec" "^1.5.0"
