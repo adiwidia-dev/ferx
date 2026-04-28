@@ -4,6 +4,9 @@ mod desktop_ui;
 mod download_dialog;
 mod file_drop;
 mod navigation_bridge;
+mod service_webview_badge_scripts;
+mod service_webview_resource_usage;
+mod service_webview_runtime_scripts;
 mod service_runtime;
 mod service_storage;
 mod service_webview;
@@ -18,6 +21,14 @@ use tauri::Manager;
 mod tests {
     use crate::service_runtime::{
         extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
+    };
+    use crate::service_webview_badge_scripts::{
+        badge_engine_script, outlook_badge_engine_script, teams_badge_engine_script,
+    };
+    use crate::service_webview_resource_usage::resource_usage_monitor_script;
+    use crate::service_webview_runtime_scripts::{
+        common_webview_script, google_auth_compat_script, notification_script,
+        spellcheck_script,
     };
     use crate::service_webview::{
         external_webview_url, injected_js, service_webview_setup,
@@ -646,6 +657,23 @@ mod tests {
         assert!(discord_script.contains("window.__ferx_badge_strategy = 'unsupported'"));
         assert!(discord_script.contains("https://ferx.notify/"));
         assert!(!discord_script.contains("invoke('report_outlook_badge'"));
+    }
+
+    #[test]
+    fn extracted_runtime_script_modules_preserve_known_markers() {
+        assert!(google_auth_compat_script().contains("window.webkit"));
+        assert!(notification_script(false).contains("permission: 'denied'"));
+        assert!(spellcheck_script(false).contains("window.__ferx_spellcheck_control_active"));
+        assert!(common_webview_script().contains("https://ferx.download/"));
+    }
+
+    #[test]
+    fn extracted_resource_and_badge_script_modules_preserve_known_markers() {
+        assert!(resource_usage_monitor_script().contains("report_resource_usage"));
+        assert!(badge_engine_script("unsupported").contains("https://ferx.notify/"));
+        assert!(outlook_badge_engine_script("outlook-folder-dom")
+            .contains("invoke('report_outlook_badge'"));
+        assert!(teams_badge_engine_script().contains("invoke('report_teams_badge'"));
     }
 
     #[test]
