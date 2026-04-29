@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
   import ListTodoIcon from "@lucide/svelte/icons/list-todo";
   import { Button } from "$lib/components/ui/button";
   import WorkspaceSwitcher from "$lib/components/workspace/workspace-switcher.svelte";
@@ -27,6 +26,7 @@
     onSetWorkspaceDisabled: (input: { workspaceId: string; disabled: boolean }) => void;
     onDeleteWorkspace: (workspaceId: string) => void;
     onWorkspaceSwitcherOpenChange: (open: boolean) => void;
+    onOpenServiceContextMenu: (input: { id: string; disabled: boolean }) => void;
     onToggleDnd: () => void;
     onOpenAddModal: () => void;
     onToggleTodosPanel: () => void;
@@ -51,6 +51,7 @@
     onSetWorkspaceDisabled,
     onDeleteWorkspace,
     onWorkspaceSwitcherOpenChange,
+    onOpenServiceContextMenu,
     onToggleDnd,
     onOpenAddModal,
     onToggleTodosPanel,
@@ -109,7 +110,10 @@
             onclick={() => selectService(service.id)}
             oncontextmenu={(event) => {
               event.preventDefault();
-              invoke("show_context_menu", { id: service.id, disabled: !!service.disabled });
+              onOpenServiceContextMenu({
+                id: service.id,
+                disabled: !!service.disabled,
+              });
             }}
           >
             <div

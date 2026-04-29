@@ -143,6 +143,28 @@ fn report_resource_usage_command_exists() {
 }
 
 #[test]
+fn hide_all_webviews_closes_child_webviews_without_storage_deletion() {
+    let source = include_str!("webview_commands.rs");
+    let hide_start = source
+        .find("pub async fn hide_all_webviews")
+        .expect("expected hide_all_webviews command");
+    let next_command = source[hide_start + 1..]
+        .find("#[tauri::command]")
+        .map(|offset| hide_start + 1 + offset)
+        .unwrap_or(source.len());
+    let hide_command = &source[hide_start..next_command];
+
+    assert!(hide_command.contains("webview.set_bounds"));
+    assert!(hide_command.contains("PhysicalPosition::new(-10000, -10000)"));
+    assert!(hide_command.contains("PhysicalSize::new(1, 1)"));
+    assert!(hide_command.contains("let _ = webview.hide();"));
+    assert!(hide_command.contains("let _ = webview.close();"));
+    assert!(hide_command.contains("Duration::from_millis(180)"));
+    assert!(!hide_command.contains("remove_data_store"));
+    assert!(!hide_command.contains("remove_dir_all"));
+}
+
+#[test]
 fn service_webview_command_payload_deserializes_from_camel_case() {
     let payload: ServiceWebviewCommandPayload = serde_json::from_value(json!({
         "id": "chat",

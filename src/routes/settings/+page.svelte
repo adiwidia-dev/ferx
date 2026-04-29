@@ -51,6 +51,7 @@
     resolveSettingsServiceRoute,
     scheduleSettingsWorkspaceReload,
   } from "$lib/services/settings-page-state";
+  import { showServiceContextMenu } from "$lib/services/webview-commands";
   import type { WorkspaceIconKey } from "$lib/services/workspace-icons";
 
   const appInfo = getAppInfo();
@@ -338,6 +339,10 @@
   function deleteWorkspace(workspaceId: string) {
     commitWorkspaceState(deleteWorkspaceGroup(workspaceState, workspaceId));
   }
+
+  function openServiceContextMenu(input: { id: string; disabled: boolean }) {
+    void showServiceContextMenu(input.id, input.disabled);
+  }
 </script>
 
 <svelte:head>
@@ -364,6 +369,7 @@
     onSetWorkspaceDisabled={setWorkspaceDisabled}
     onDeleteWorkspace={deleteWorkspace}
     onWorkspaceSwitcherOpenChange={setWorkspaceSwitcherOpen}
+    onOpenServiceContextMenu={openServiceContextMenu}
     onToggleDnd={() => (isDnd = !isDnd)}
     onOpenAddModal={() => openRoute("/")}
     onToggleTodosPanel={() => openRoute("/")}

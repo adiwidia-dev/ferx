@@ -116,32 +116,24 @@ pub(crate) fn badge_strategy_for_url(url: &str) -> &'static str {
 
 #[tauri::command]
 pub async fn hide_all_webviews(app: AppHandle) {
-    use tauri::PhysicalPosition;
+    use tauri::{PhysicalPosition, PhysicalSize};
 
     clear_active_webview(&app);
     set_active_resource_usage_monitoring(&app, false);
 
-    if let Some(window) = app.get_window("main") {
-        let scale_factor = window.scale_factor().unwrap_or(1.0);
-        let physical_size = window.inner_size().unwrap_or_default();
-        let sidebar_width = sidebar_physical_width(scale_factor);
-        let right_panel_width =
-            right_panel_physical_width(scale_factor, crate::app_state::right_panel_width(&app));
-
-        let active_size =
-            effective_service_content_size(physical_size, sidebar_width, 0, right_panel_width);
-        let offscreen_pos = PhysicalPosition::new(-10000, -10000);
-
-        for (name, webview) in app.webviews() {
-            if name != "main" {
-                set_badge_monitoring(&webview, false);
-                let _ = webview.set_bounds(tauri::Rect {
-                    position: tauri::Position::Physical(offscreen_pos),
-                    size: tauri::Size::Physical(active_size),
-                });
-            }
+    for (name, webview) in app.webviews() {
+        if name != "main" {
+            set_badge_monitoring(&webview, false);
+            let _ = webview.set_bounds(tauri::Rect {
+                position: tauri::Position::Physical(PhysicalPosition::new(-10000, -10000)),
+                size: tauri::Size::Physical(PhysicalSize::new(1, 1)),
+            });
+            let _ = webview.hide();
+            let _ = webview.close();
         }
     }
+
+    tokio::time::sleep(std::time::Duration::from_millis(180)).await;
 }
 
 #[tauri::command]

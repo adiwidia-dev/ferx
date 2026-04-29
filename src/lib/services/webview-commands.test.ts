@@ -9,6 +9,7 @@ import {
   preloadBackgroundServices,
   reloadServiceWebview,
   setRightPanelWidth,
+  showServiceContextMenu,
 } from "./webview-commands";
 
 function createService(overrides: Partial<Parameters<typeof openServiceWebview>[0]> = {}) {
@@ -36,6 +37,7 @@ describe("webview command wrappers", () => {
     await closeServiceWebview("chat", invokeCommand);
     await deleteServiceWebview({ id: "chat", storageKey: "storage-chat" }, invokeCommand);
     await setRightPanelWidth(360, invokeCommand);
+    await showServiceContextMenu("chat", true, invokeCommand);
 
     expect(invokeCommand).toHaveBeenNthCalledWith(1, "hide_all_webviews");
     expect(invokeCommand).toHaveBeenNthCalledWith(
@@ -67,6 +69,10 @@ describe("webview command wrappers", () => {
     });
     expect(invokeCommand).toHaveBeenNthCalledWith(6, "set_right_panel_width", {
       payload: { width: 360 },
+    });
+    expect(invokeCommand).toHaveBeenNthCalledWith(7, "show_context_menu", {
+      id: "chat",
+      disabled: true,
     });
   });
 });

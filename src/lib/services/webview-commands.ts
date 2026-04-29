@@ -31,6 +31,14 @@ export function hideAllWebviews(invokeCommand: InvokeCommand = invoke) {
   return invokeCommand("hide_all_webviews");
 }
 
+export function showServiceContextMenu(
+  id: string,
+  disabled: boolean,
+  invokeCommand: InvokeCommand = invoke,
+) {
+  return invokeCommand("show_context_menu", { id, disabled });
+}
+
 export function openServiceWebview(
   service: ServiceWebviewService,
   spellCheckEnabled: boolean,

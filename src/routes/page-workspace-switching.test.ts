@@ -198,6 +198,28 @@ describe("workspace switching webview commands", () => {
     unmount(component);
   });
 
+  it("shows the existing native service context menu directly", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+    invoke.mockResolvedValue(undefined);
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+    invoke.mockClear();
+
+    document.querySelector<HTMLButtonElement>('button[title="YouTube Music (Cmd+1)"]')
+      ?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    await settle();
+
+    expect(invoke).toHaveBeenCalledWith("show_context_menu", {
+      id: "youtube",
+      disabled: false,
+    });
+
+    unmount(component);
+  });
+
   it("closes disabled workspace services without deleting their session storage", async () => {
     localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
 

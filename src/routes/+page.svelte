@@ -22,6 +22,7 @@
     preloadServiceWebview,
     reloadServiceWebview,
     setRightPanelWidth,
+    showServiceContextMenu,
   } from "$lib/services/webview-commands";
   import {
     countTrayRelevantUnreadServices,
@@ -480,7 +481,7 @@
   }
 
   async function hideActiveWebviewsForOverlay() {
-    await webviewCommands.run(hideAllWebviews);
+    await hideAllWebviews();
   }
 
   async function setWorkspaceSwitcherOpen(open: boolean) {
@@ -490,6 +491,7 @@
     }
 
     await hideActiveWebviewsForOverlay();
+    isWorkspaceSwitcherOpen = true;
   }
 
   function reloadService(id: string) {
@@ -544,6 +546,10 @@
 
   function openAddModal() {
     void openServiceEditor(null);
+  }
+
+  async function openServiceContextMenu(input: { id: string; disabled: boolean }) {
+    await showServiceContextMenu(input.id, input.disabled);
   }
 
   function createWorkspace(input: { name: string; icon: WorkspaceIconKey }) {
@@ -690,6 +696,7 @@
     onSetWorkspaceDisabled={setWorkspaceDisabled}
     onDeleteWorkspace={deleteWorkspace}
     onWorkspaceSwitcherOpenChange={setWorkspaceSwitcherOpen}
+    onOpenServiceContextMenu={(input) => void openServiceContextMenu(input)}
     onToggleDnd={() => (isDnd = !isDnd)}
     onOpenAddModal={openAddModal}
     onToggleTodosPanel={() => setTodosPanelOpen(!isTodosPanelOpen)}
