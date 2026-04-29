@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { Popover } from "bits-ui";
   import BikeIcon from "@lucide/svelte/icons/bike";
   import BookOpenIcon from "@lucide/svelte/icons/book-open";
   import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
@@ -81,7 +80,7 @@
     onRenameWorkspace: (input: { workspaceId: string; name: string }) => void;
     onSetWorkspaceDisabled: (input: { workspaceId: string; disabled: boolean }) => void;
     onDeleteWorkspace: (workspaceId: string) => void;
-    onOpenChange?: (open: boolean) => void;
+    onOpenChange?: (open: boolean) => void | Promise<void>;
   }
 
   let {
@@ -111,13 +110,26 @@
   let SelectedIcon = $derived(getWorkspaceIconComponent(selectedIcon));
   let CurrentIcon = $derived(getWorkspaceIconComponent(currentWorkspace?.icon));
 
-  function getOpen() {
-    return open;
-  }
-
   function setOpen(nextOpen: boolean) {
     open = nextOpen;
-    onOpenChange?.(nextOpen);
+    void onOpenChange?.(nextOpen);
+  }
+
+  function toggleOpen() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+
+    const next = onOpenChange?.(true);
+    if (next && typeof (next as Promise<void>).then === "function") {
+      void next.then(() => {
+        open = true;
+      });
+      return;
+    }
+
+    open = true;
   }
 
   function selectWorkspace(id: string) {
@@ -194,13 +206,15 @@
   }
 </script>
 
-<Popover.Root bind:open={getOpen, setOpen}>
-  <Popover.Trigger
+<button
+  type="button"
     data-testid="workspace-switcher-trigger"
     title={`Switch workspace: ${currentWorkspaceName}`}
     aria-label={`Switch workspace: ${currentWorkspaceName}`}
     class="grid min-h-11 w-14 grid-cols-[1fr_0.625rem] items-center gap-0.5 rounded-2xl border bg-background px-1.5 text-left shadow-xs transition-all hover:bg-muted focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
     style="-webkit-app-region: no-drag;"
+    aria-expanded={open}
+    onclick={toggleOpen}
   >
     <span
       data-testid="workspace-trigger-icon"
@@ -211,7 +225,7 @@
       <CurrentIcon class="h-4 w-4" />
     </span>
     <ChevronDownIcon class="h-3 w-3 text-muted-foreground" />
-  </Popover.Trigger>
+  </button>
   {#if open}
     <div
       data-testid="workspace-picker-overlay"
@@ -462,4 +476,3 @@
       </div>
     </div>
   {/if}
-</Popover.Root>

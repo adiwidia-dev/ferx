@@ -479,8 +479,17 @@
     workspaceState = setCurrentWorkspaceId(workspaceState, id);
   }
 
-  function setWorkspaceSwitcherOpen(open: boolean) {
-    isWorkspaceSwitcherOpen = open;
+  async function hideActiveWebviewsForOverlay() {
+    await webviewCommands.run(hideAllWebviews);
+  }
+
+  async function setWorkspaceSwitcherOpen(open: boolean) {
+    if (!open) {
+      isWorkspaceSwitcherOpen = false;
+      return;
+    }
+
+    await hideActiveWebviewsForOverlay();
   }
 
   function reloadService(id: string) {
@@ -517,6 +526,12 @@
     }
   }
 
+  async function openServiceEditor(service: ServiceEditorService | null) {
+    editingService = service;
+    await hideActiveWebviewsForOverlay();
+    isAddModalOpen = true;
+  }
+
   function openEditModal(service: Service) {
     editingService = {
       id: service.id,
@@ -524,16 +539,11 @@
       url: service.url,
       iconBgColor: service.iconBgColor,
     };
-    setTimeout(() => {
-      isAddModalOpen = true;
-    }, 50);
+    void openServiceEditor(editingService);
   }
 
   function openAddModal() {
-    editingService = null;
-    setTimeout(() => {
-      isAddModalOpen = true;
-    }, 50);
+    void openServiceEditor(null);
   }
 
   function createWorkspace(input: { name: string; icon: WorkspaceIconKey }) {

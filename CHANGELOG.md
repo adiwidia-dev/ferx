@@ -6,6 +6,18 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ---
 
+## [Unreleased]
+
+### Added
+
+### Changed
+
+### Fixed
+
+- Restored the Add Service dialog, Edit Service dialog, and workspace picker so they appear correctly above active service webviews
+
+---
+
 ## [0.3.1] — 2026-04-27
 
 ### Changed

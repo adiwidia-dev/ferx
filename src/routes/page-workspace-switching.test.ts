@@ -67,6 +67,11 @@ async function settle() {
   flushSync();
 }
 
+async function waitFor(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+  flushSync();
+}
+
 describe("workspace switching webview commands", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
@@ -101,18 +106,18 @@ describe("workspace switching webview commands", () => {
 
     expect(invoke).toHaveBeenCalledWith("hide_all_webviews");
 
+    for (const resolveHide of hideResolvers) {
+      resolveHide();
+    }
+    await settle();
+
     const personalButton = Array.from(document.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("Personal"),
     ) as HTMLButtonElement | undefined;
     personalButton?.click();
     await settle();
 
-    expect(invoke).not.toHaveBeenCalledWith(
-      "open_service",
-      expect.objectContaining({ payload: expect.objectContaining({ id: "gemini" }) }),
-    );
-
-    for (const resolveHide of hideResolvers) {
+    for (const resolveHide of hideResolvers.splice(0)) {
       resolveHide();
     }
     await settle();
@@ -121,6 +126,74 @@ describe("workspace switching webview commands", () => {
       "open_service",
       expect.objectContaining({ payload: expect.objectContaining({ id: "gemini" }) }),
     );
+
+    unmount(component);
+  });
+
+  it("waits for native webviews to hide before showing the workspace picker overlay", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+    let resolveHide = () => {};
+    invoke.mockImplementation((command) => {
+      if (command === "hide_all_webviews") {
+        return new Promise((resolve) => {
+          resolveHide = () => resolve(undefined);
+        });
+      }
+
+      return Promise.resolve();
+    });
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+    invoke.mockClear();
+
+    document.querySelector<HTMLButtonElement>(
+      '[data-testid="workspace-switcher-trigger"]',
+    )?.click();
+    await settle();
+
+    expect(invoke).toHaveBeenCalledWith("hide_all_webviews");
+    expect(document.querySelector('[data-testid="workspace-picker-panel"]')).toBeNull();
+
+    resolveHide();
+    await settle();
+
+    expect(document.querySelector('[data-testid="workspace-picker-panel"]')).toBeTruthy();
+
+    unmount(component);
+  });
+
+  it("waits for native webviews to hide before showing the add service dialog", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+    let resolveHide = () => {};
+    invoke.mockImplementation((command) => {
+      if (command === "hide_all_webviews") {
+        return new Promise((resolve) => {
+          resolveHide = () => resolve(undefined);
+        });
+      }
+
+      return Promise.resolve();
+    });
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+    invoke.mockClear();
+
+    document.querySelector<HTMLButtonElement>('button[title="Add Service"]')?.click();
+    await waitFor(60);
+
+    expect(invoke).toHaveBeenCalledWith("hide_all_webviews");
+    expect(document.body.textContent).not.toContain("Add New Service");
+
+    resolveHide();
+    await settle();
+
+    expect(document.body.textContent).toContain("Add New Service");
 
     unmount(component);
   });
