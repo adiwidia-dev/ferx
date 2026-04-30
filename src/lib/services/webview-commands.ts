@@ -58,9 +58,26 @@ export function hideAllWebviews(invokeCommand: InvokeCommand = invoke) {
 export function showServiceContextMenu(
   id: string,
   disabled: boolean,
+  notificationPrefs: { showBadge: boolean; affectTray: boolean; muteAudio: boolean },
   invokeCommand: InvokeCommand = invoke,
 ) {
-  return invokeCommand("show_context_menu", { id, disabled });
+  return invokeCommand("show_context_menu", {
+    id,
+    disabled,
+    showBadge: notificationPrefs.showBadge,
+    affectTray: notificationPrefs.affectTray,
+    muteAudio: notificationPrefs.muteAudio,
+  });
+}
+
+export function setServiceWebviewAudioMuted(
+  id: string,
+  muted: boolean,
+  invokeCommand: InvokeCommand = invoke,
+) {
+  return invokeCommand("set_service_webview_audio_muted", {
+    payload: { id, muted },
+  });
 }
 
 export function openServiceWebview(
