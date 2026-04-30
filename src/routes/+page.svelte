@@ -21,6 +21,7 @@
     preloadServiceWebview,
     reloadServiceWebview,
     setAllServiceWebviewsAudioMuted,
+    setServiceWebviewAudioMuted,
     setRightPanelWidth,
     showServiceContextMenu,
   } from "$lib/services/webview-commands";
@@ -200,10 +201,14 @@
     ) {
       webviewCommands.run(hideAllWebviews);
     } else if (activeService && !activeService.disabled) {
+      const service = activeService;
       webviewCommands.run(
-        () => openServiceWebview(activeService, spellCheckEnabled, resourceUsageMonitoringEnabled),
+        () => openServiceWebview(service, spellCheckEnabled, resourceUsageMonitoringEnabled),
         { interruptible: true },
       );
+      if (service.notificationPrefs.muteAudio) {
+        void webviewCommands.run(() => setServiceWebviewAudioMuted(service.id, true));
+      }
     }
   });
 
@@ -292,11 +297,12 @@
         }));
       }
       if (action === "toggle-notifications") {
-        updateServiceNotificationPrefs(targetId, (prefs) => ({
-          ...prefs,
-          allowNotifications: !prefs.allowNotifications,
-        }));
-        toastMessage = "Notification setting will apply after reload";
+        let newMuteAudio = false;
+        updateServiceNotificationPrefs(targetId, (prefs) => {
+          newMuteAudio = !prefs.muteAudio;
+          return { ...prefs, muteAudio: newMuteAudio };
+        });
+        void webviewCommands.run(() => setServiceWebviewAudioMuted(targetId, newMuteAudio));
       }
       if (action === "delete") deleteService(targetId);
     });
@@ -441,8 +447,18 @@
     }
   }
 
-  async function openServiceContextMenu(input: { id: string; disabled: boolean }) {
-    await showServiceContextMenu(input.id, input.disabled);
+  async function openServiceContextMenu(input: {
+    id: string;
+    disabled: boolean;
+    showBadge: boolean;
+    affectTray: boolean;
+    muteAudio: boolean;
+  }) {
+    await showServiceContextMenu(input.id, input.disabled, {
+      showBadge: input.showBadge,
+      affectTray: input.affectTray,
+      muteAudio: input.muteAudio,
+    });
   }
 
   function createWorkspace(input: { name: string; icon: WorkspaceIconKey }) {

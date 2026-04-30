@@ -223,6 +223,9 @@ describe("workspace switching webview commands", () => {
     expect(invoke).toHaveBeenCalledWith("show_context_menu", {
       id: "youtube",
       disabled: false,
+      showBadge: true,
+      affectTray: true,
+      muteAudio: false,
     });
 
     unmount(component);
