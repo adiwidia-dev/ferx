@@ -105,6 +105,40 @@ describe("createWebviewCommandQueue", () => {
 
     expect(order).toEqual(["first:start", "first:end", "second"]);
   });
+
+  it("skips pending stale commands when an interrupting command is queued", async () => {
+    const queue = createWebviewCommandQueue();
+    const order: string[] = [];
+    let resolveFirst: () => void = () => {};
+
+    queue.run(
+      () =>
+        new Promise<void>((resolve) => {
+          order.push("first:start");
+          resolveFirst = () => {
+            order.push("first:end");
+            resolve();
+          };
+        }),
+    );
+    queue.run(
+      async () => {
+        order.push("stale-open");
+      },
+      { interruptible: true },
+    );
+    queue.interrupt(async () => {
+      order.push("hide");
+    });
+
+    await Promise.resolve();
+    expect(order).toEqual(["first:start"]);
+
+    resolveFirst();
+    await queue.idle();
+
+    expect(order).toEqual(["first:start", "first:end", "hide"]);
+  });
 });
 
 describe("preloadBackgroundServices", () => {

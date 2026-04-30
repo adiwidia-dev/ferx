@@ -3,9 +3,23 @@ import { flushSync, mount, unmount } from "svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const invoke = vi.hoisted(() => vi.fn());
+const goto = vi.hoisted(() => vi.fn());
+const listen = vi.hoisted(() =>
+  vi.fn((_event: string, _callback: (event: { payload: unknown }) => void) =>
+    Promise.resolve(() => {}),
+  ),
+);
+
+vi.mock("$app/navigation", () => ({
+  goto,
+}));
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke,
+}));
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen,
 }));
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
@@ -17,6 +31,10 @@ vi.mock("@tauri-apps/plugin-updater", () => ({
 }));
 
 import packageJson from "../../../package.json";
+import {
+  clearRuntimeBadges,
+  setRuntimeBadge,
+} from "$lib/services/runtime-badges.svelte";
 import SettingsPage from "./+page.svelte";
 
 describe("settings page", () => {
@@ -24,6 +42,9 @@ describe("settings page", () => {
     document.body.innerHTML = "";
     localStorage.clear();
     invoke.mockClear();
+    goto.mockClear();
+    listen.mockClear();
+    clearRuntimeBadges();
     Object.defineProperty(URL, "createObjectURL", {
       configurable: true,
       value: vi.fn(() => "blob:ferx-export"),
@@ -301,6 +322,71 @@ describe("settings page", () => {
     ) as HTMLElement | null;
     expect(serviceButton?.className).toContain("h-14 w-16");
     expect(serviceButton?.className).toContain("rounded-2xl");
+
+    unmount(component);
+  });
+
+  it("keeps runtime notification badges visible on the settings sidebar", () => {
+    localStorage.setItem(
+      "ferx-workspace-services",
+      JSON.stringify([
+        {
+          id: "mail",
+          name: "Mail",
+          url: "https://mail.example.com/",
+          storageKey: "storage-mail",
+          notificationPrefs: {
+            showBadge: true,
+            affectTray: true,
+            allowNotifications: true,
+          },
+        },
+      ]),
+    );
+    setRuntimeBadge("mail", 4);
+
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    const serviceButton = document.querySelector(
+      '[title="Mail (Cmd+1)"]',
+    ) as HTMLElement | null;
+    expect(serviceButton?.textContent).toContain("4");
+
+    unmount(component);
+  });
+
+  it("uses client navigation when selecting a service from settings", () => {
+    localStorage.setItem(
+      "ferx-workspace-services",
+      JSON.stringify([
+        {
+          id: "mail",
+          name: "Mail",
+          url: "https://mail.example.com/",
+          storageKey: "storage-mail",
+          notificationPrefs: {
+            showBadge: true,
+            affectTray: true,
+            allowNotifications: true,
+          },
+        },
+      ]),
+    );
+
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    document.querySelector<HTMLElement>('[title="Mail (Cmd+1)"]')?.click();
+    flushSync();
+
+    expect(goto).toHaveBeenCalledWith("/?open=mail");
 
     unmount(component);
   });

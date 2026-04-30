@@ -10,21 +10,39 @@ import {
 
 type InvokeCommand = (command: string, args?: Record<string, unknown>) => Promise<unknown>;
 type Sleep = (ms: number) => Promise<unknown>;
+type QueueOptions = {
+  interruptible?: boolean;
+};
 
 export function createWebviewCommandQueue() {
   let queue: Promise<unknown> = Promise.resolve();
+  let generation = 0;
+
+  function enqueue(fn: () => Promise<unknown>, commandGeneration: number | null) {
+    const result = queue.then(() => {
+      if (commandGeneration !== null && commandGeneration !== generation) {
+        return undefined;
+      }
+
+      return fn();
+    });
+    // Keep the queue moving even if this command fails, but don't silently
+    // swallow the error — log it so it shows up in Tauri's dev console.
+    queue = result.catch((error: unknown) => {
+      console.error("[ferx] webview command failed:", error);
+    });
+    // Return the un-caught promise so callers that need to sequence on
+    // success/failure (e.g. hideActiveWebviewsForOverlay) still can.
+    return result;
+  }
 
   return {
-    run(fn: () => Promise<unknown>) {
-      const result = queue.then(fn);
-      // Keep the queue moving even if this command fails, but don't silently
-      // swallow the error — log it so it shows up in Tauri's dev console.
-      queue = result.catch((error: unknown) => {
-        console.error("[ferx] webview command failed:", error);
-      });
-      // Return the un-caught promise so callers that need to sequence on
-      // success/failure (e.g. hideActiveWebviewsForOverlay) still can.
-      return result;
+    run(fn: () => Promise<unknown>, options: QueueOptions = {}) {
+      return enqueue(fn, options.interruptible ? generation : null);
+    },
+    interrupt(fn: () => Promise<unknown>) {
+      generation += 1;
+      return enqueue(fn, null);
     },
     idle() {
       return queue;

@@ -32,6 +32,11 @@
     type ResourceUsageSnapshot,
   } from "$lib/services/resource-usage";
   import {
+    applyRuntimeBadgePayload,
+    replaceRuntimeBadges,
+    runtimeBadges,
+  } from "$lib/services/runtime-badges.svelte";
+  import {
     consumeOpenServiceParam,
     createDebouncedStorageWriter,
     MAX_BACKGROUND_PRELOADS,
@@ -83,7 +88,6 @@
   let toastMessage = $state("");
   let toastTimeout = $state<ReturnType<typeof setTimeout> | null>(null);
   let workspaceState = $state<WorkspaceGroupsState>(createDefaultWorkspaceGroupsState());
-  let badges = $state<Record<string, number | undefined>>({});
   let isInitialized = $state(false);
   let spellCheckEnabled = $state(DEFAULT_APP_SETTINGS.spellCheckEnabled);
   let resourceUsageMonitoringEnabled = $state(
@@ -130,7 +134,7 @@
     services.map((service) => ({
       ...service,
       disabled: isCurrentWorkspaceDisabled || service.disabled,
-      badge: badges[service.id],
+      badge: runtimeBadges[service.id],
     })),
   );
   let resourceUsageSnapshots = $state<Record<string, ResourceUsageSnapshot | undefined>>({});
@@ -181,8 +185,9 @@
     ) {
       webviewCommands.run(hideAllWebviews);
     } else if (activeService && !activeService.disabled) {
-      webviewCommands.run(() =>
-        openServiceWebview(activeService, spellCheckEnabled, resourceUsageMonitoringEnabled),
+      webviewCommands.run(
+        () => openServiceWebview(activeService, spellCheckEnabled, resourceUsageMonitoringEnabled),
+        { interruptible: true },
       );
     }
   });
@@ -282,12 +287,7 @@
     });
 
     const unlistenBadgePromise = listen("update-badge", (event) => {
-      const [targetId, countStr] = (event.payload as string).split(":");
-      const count = Number.parseInt(countStr, 10);
-      if (!targetId || Number.isNaN(count)) return;
-      if (services.some((service) => service.id === targetId) && badges[targetId] !== count) {
-        badges = { ...badges, [targetId]: count };
-      }
+      applyRuntimeBadgePayload(event.payload, services);
     });
 
     const unlistenResourceUsagePromise = listen("resource-usage-update", (event) => {
@@ -374,7 +374,7 @@
   // ---------------------------------------------------------------------------
 
   async function hideActiveWebviewsForOverlay() {
-    await webviewCommands.run(hideAllWebviews);
+    await webviewCommands.interrupt(hideAllWebviews);
   }
 
   // ---------------------------------------------------------------------------
@@ -418,9 +418,9 @@
   }
 
   function deleteService(id: string) {
-    const nextState = deleteServiceFromWorkspaceState(workspaceState, badges, id);
+    const nextState = deleteServiceFromWorkspaceState(workspaceState, runtimeBadges, id);
     workspaceState = nextState.state;
-    badges = nextState.badges;
+    replaceRuntimeBadges(nextState.badges);
     if (nextState.deletedService) {
       void webviewCommands.run(() => deleteServiceWebview(nextState.deletedService!));
     }

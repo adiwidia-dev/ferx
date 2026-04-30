@@ -1,5 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
+  import { goto } from "$app/navigation";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import AppWindowIcon from "@lucide/svelte/icons/app-window";
   import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
@@ -34,6 +36,10 @@
     type UpdaterState,
   } from "$lib/services/updater";
   import {
+    applyRuntimeBadgePayload,
+    runtimeBadges,
+  } from "$lib/services/runtime-badges.svelte";
+  import {
     createDefaultWorkspaceGroupsState,
     createNewWorkspace,
     deleteWorkspaceGroup,
@@ -63,7 +69,12 @@
   ];
 
   let workspaceState = $state<WorkspaceGroupsState>(createDefaultWorkspaceGroupsState());
-  let services = $derived(getWorkspaceServices(workspaceState));
+  let services = $derived(
+    getWorkspaceServices(workspaceState).map((service) => ({
+      ...service,
+      badge: runtimeBadges[service.id],
+    })),
+  );
   let activeId = $derived(getSettingsActiveServiceId(workspaceState));
   let isDnd = $state(false);
   let isTodosPanelOpen = $state(false);
@@ -103,6 +114,14 @@
     showImportConfirm = false;
     importError = "";
     configStatus = "";
+
+    const unlistenBadgePromise = listen("update-badge", (event) => {
+      applyRuntimeBadgePayload(event.payload, services);
+    });
+
+    return () => {
+      void unlistenBadgePromise.then((unlisten) => unlisten());
+    };
   });
 
   async function handleCheckForUpdates() {
@@ -307,7 +326,7 @@
       return;
     }
 
-    window.location.href = path;
+    void goto(path);
   }
 
   function handleSelectService(id: string) {
