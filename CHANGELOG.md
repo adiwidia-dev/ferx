@@ -22,6 +22,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 - Fixed remaining webview command sequencing gaps for todo panel resizing, service add/edit saves, and page cleanup
 - Fixed Add Service and workspace switcher overlays so one click opens them after active service webviews are moved offscreen
 - Fixed service notification badges disappearing from the sidebar after opening Settings
+- Do Not Disturb now mutes service webview audio in addition to suppressing unread tray state
 
 ---
 

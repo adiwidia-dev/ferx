@@ -14,6 +14,7 @@
   import SettingsUpdatesSection from "$lib/components/settings/settings-updates-section.svelte";
   import WorkspaceSidebar from "$lib/components/workspace/workspace-sidebar.svelte";
   import { getAppInfo } from "$lib/services/app-info";
+  import { dndState, toggleDndEnabled } from "$lib/services/dnd-state.svelte";
   import {
     APP_SETTINGS_STORAGE_KEY,
     serializeAppSettings,
@@ -57,7 +58,10 @@
     resolveSettingsServiceRoute,
     scheduleSettingsWorkspaceReload,
   } from "$lib/services/settings-page-state";
-  import { showServiceContextMenu } from "$lib/services/webview-commands";
+  import {
+    setAllServiceWebviewsAudioMuted,
+    showServiceContextMenu,
+  } from "$lib/services/webview-commands";
   import type { WorkspaceIconKey } from "$lib/services/workspace-icons";
 
   const appInfo = getAppInfo();
@@ -76,7 +80,6 @@
     })),
   );
   let activeId = $derived(getSettingsActiveServiceId(workspaceState));
-  let isDnd = $state(false);
   let isTodosPanelOpen = $state(false);
   let isWorkspaceSwitcherOpen = $state(false);
   let updater = $state<UpdaterState>({ status: "idle" });
@@ -362,6 +365,11 @@
   function openServiceContextMenu(input: { id: string; disabled: boolean }) {
     void showServiceContextMenu(input.id, input.disabled);
   }
+
+  function toggleDnd() {
+    const enabled = toggleDndEnabled();
+    void setAllServiceWebviewsAudioMuted(enabled);
+  }
 </script>
 
 <svelte:head>
@@ -376,7 +384,7 @@
     currentWorkspaceId={workspaceState.currentWorkspaceId}
     draggedId={null}
     dragOverId={null}
-    {isDnd}
+    isDnd={dndState.enabled}
     {isTodosPanelOpen}
     bind:isWorkspaceSwitcherOpen
     onPointerDown={handleSidebarPointerDown}
@@ -389,7 +397,7 @@
     onDeleteWorkspace={deleteWorkspace}
     onWorkspaceSwitcherOpenChange={setWorkspaceSwitcherOpen}
     onOpenServiceContextMenu={openServiceContextMenu}
-    onToggleDnd={() => (isDnd = !isDnd)}
+    onToggleDnd={toggleDnd}
     onOpenAddModal={() => openRoute("/")}
     onToggleTodosPanel={() => openRoute("/")}
   />

@@ -7,8 +7,8 @@ use crate::service_webview_badge_scripts::{
 };
 use crate::service_webview_resource_usage::resource_usage_monitor_script;
 use crate::service_webview_runtime_scripts::{
-    common_webview_script, google_auth_compat_script, notification_script,
-    spellcheck_script,
+    audio_mute_controller_script, common_webview_script, google_auth_compat_script,
+    notification_script, spellcheck_script,
 };
 
 pub(crate) fn external_webview_url(raw: &str) -> Option<tauri::WebviewUrl> {
@@ -81,13 +81,14 @@ fn injected_js_for_url(
     };
 
     format!(
-        "{}{}{}{}{}{}",
+        "{}{}{}{}{}{}{}",
         google_compat,
         if should_skip_notification_shim(url) {
             ""
         } else {
             notification_script(allow_notifications)
         },
+        audio_mute_controller_script(),
         spellcheck_script(spell_check_enabled),
         resource_usage_monitor_eval_script(resource_usage_monitoring_enabled),
         common_webview_script(),

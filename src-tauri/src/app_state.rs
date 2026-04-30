@@ -8,6 +8,7 @@ pub struct ActiveWebview(pub Mutex<String>);
 pub struct ActiveResourceUsageMonitoring(pub Mutex<bool>);
 pub struct BadgeMonitoringPrefs(pub Mutex<HashMap<String, bool>>);
 pub struct RightPanelWidth(pub Mutex<f64>);
+pub struct ServiceAudioMuted(pub Mutex<bool>);
 
 /// Coalesces rapid `Resized` events: only the latest resize may apply `set_bounds` (see debounce in `on_window_event`).
 pub struct MainWindowResizeGen(pub AtomicU64);
@@ -53,6 +54,18 @@ pub fn set_active_resource_usage_monitoring(app: &AppHandle, enabled: bool) {
 pub fn active_resource_usage_monitoring(app: &AppHandle) -> bool {
     let state = app.state::<ActiveResourceUsageMonitoring>();
     state.0.lock().map(|active| *active).unwrap_or(false)
+}
+
+pub fn set_service_audio_muted(app: &AppHandle, muted: bool) {
+    let state = app.state::<ServiceAudioMuted>();
+    if let Ok(mut active) = state.0.lock() {
+        *active = muted;
+    };
+}
+
+pub fn service_audio_muted(app: &AppHandle) -> bool {
+    let state = app.state::<ServiceAudioMuted>();
+    state.0.lock().map(|muted| *muted).unwrap_or(false)
 }
 
 pub fn set_stored_right_panel_width(app: &AppHandle, width: f64) {

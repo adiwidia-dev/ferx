@@ -2,12 +2,19 @@
 // there so this file never drifts from the actual Tauri command signatures.
 import type {
   ServiceWebviewCommandPayload,
+  AudioMutedPayload,
   DeleteWebviewPayload,
   WebviewIdPayload,
   RightPanelWidthPayload,
 } from "$lib/tauri-commands";
 
-export type { ServiceWebviewCommandPayload, DeleteWebviewPayload, WebviewIdPayload, RightPanelWidthPayload };
+export type {
+  ServiceWebviewCommandPayload,
+  AudioMutedPayload,
+  DeleteWebviewPayload,
+  WebviewIdPayload,
+  RightPanelWidthPayload,
+};
 
 export type ServiceWebviewService = {
   id: string;
@@ -56,6 +63,10 @@ export function createWebviewIdPayload(id: string): WebviewIdPayload {
 
 export function createRightPanelWidthPayload(width: number): RightPanelWidthPayload {
   return { width };
+}
+
+export function createAudioMutedPayload(muted: boolean): AudioMutedPayload {
+  return { muted };
 }
 
 export function shouldPreloadService(

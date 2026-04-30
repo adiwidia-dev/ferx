@@ -3,6 +3,7 @@ import { flushSync, mount, unmount } from "svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_NOTIFICATION_PREFS } from "$lib/services/notification-prefs";
+import { clearDndState } from "$lib/services/dnd-state.svelte";
 import { clearRuntimeBadges } from "$lib/services/runtime-badges.svelte";
 import {
   WORKSPACES_STATE_KEY,
@@ -83,6 +84,7 @@ describe("workspace switching webview commands", () => {
     localStorage.clear();
     invoke.mockReset();
     listen.mockClear();
+    clearDndState();
     clearRuntimeBadges();
   });
 
@@ -328,6 +330,58 @@ describe("workspace switching webview commands", () => {
     expect(
       document.querySelector<HTMLElement>('[title="YouTube Music (Cmd+1)"]')?.textContent,
     ).toContain("8");
+
+    unmount(component);
+  });
+
+  it("mutes and unmutes service webviews when Do Not Disturb changes", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+    invoke.mockClear();
+
+    document.querySelector<HTMLButtonElement>('[title="Turn On Do Not Disturb"]')?.click();
+    await settle();
+
+    expect(invoke).toHaveBeenCalledWith("set_all_service_webviews_audio_muted", {
+      payload: { muted: true },
+    });
+
+    invoke.mockClear();
+    document.querySelector<HTMLButtonElement>('[title="Turn Off Do Not Disturb"]')?.click();
+    await settle();
+
+    expect(invoke).toHaveBeenCalledWith("set_all_service_webviews_audio_muted", {
+      payload: { muted: false },
+    });
+
+    unmount(component);
+  });
+
+  it("keeps Do Not Disturb enabled after the workspace page remounts", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+
+    let component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+
+    document.querySelector<HTMLButtonElement>('[title="Turn On Do Not Disturb"]')?.click();
+    await settle();
+    expect(document.querySelector('[title="Turn Off Do Not Disturb"]')).toBeTruthy();
+
+    unmount(component);
+    document.body.innerHTML = "";
+
+    component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+
+    expect(document.querySelector('[title="Turn Off Do Not Disturb"]')).toBeTruthy();
 
     unmount(component);
   });

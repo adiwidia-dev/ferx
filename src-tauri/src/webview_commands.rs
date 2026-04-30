@@ -1,7 +1,8 @@
 use crate::app_state::{
     badge_monitoring_pref, clear_active_webview, clear_badge_monitoring_prefs,
-    remove_badge_monitoring_pref, set_active_resource_usage_monitoring, set_active_webview,
-    set_badge_monitoring_pref, set_stored_right_panel_width,
+    remove_badge_monitoring_pref, service_audio_muted, set_active_resource_usage_monitoring,
+    set_active_webview, set_badge_monitoring_pref, set_service_audio_muted,
+    set_stored_right_panel_width,
 };
 use crate::download_dialog::handle_service_webview_download;
 use crate::file_drop::register_file_drop_handler;
@@ -43,6 +44,12 @@ pub(crate) struct RightPanelWidthPayload {
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct AudioMutedPayload {
+    pub(crate) muted: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ServiceWebviewCommandPayload {
     pub(crate) id: String,
     pub(crate) url: String,
@@ -57,6 +64,13 @@ fn set_badge_monitoring(webview: &tauri::Webview, enabled: bool) {
     let enabled_literal = if enabled { "true" } else { "false" };
     let _ = webview.eval(format!(
         "window.__ferxSetBadgeMonitoring?.({enabled_literal});"
+    ));
+}
+
+fn set_audio_muted(webview: &tauri::Webview, muted: bool) {
+    let muted_literal = if muted { "true" } else { "false" };
+    let _ = webview.eval(format!(
+        "window.__ferxSetAudioMuted?.({muted_literal});"
     ));
 }
 
@@ -116,6 +130,18 @@ pub async fn hide_all_webviews(app: AppHandle) {
                     size: tauri::Size::Physical(offscreen_size),
                 });
             }
+        }
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn set_all_service_webviews_audio_muted(app: AppHandle, payload: AudioMutedPayload) {
+    set_service_audio_muted(&app, payload.muted);
+
+    for (name, webview) in app.webviews() {
+        if name != "main" {
+            set_audio_muted(&webview, payload.muted);
         }
     }
 }
@@ -312,6 +338,7 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
             if name != "main" {
                 if name == id {
                     set_badge_monitoring(&webview, badge_monitoring_pref(&app, &id));
+                    set_audio_muted(&webview, service_audio_muted(&app));
                     let _ = webview.eval(resource_usage_monitor_eval_script(
                         resource_usage_monitoring_enabled,
                     ));
@@ -324,6 +351,7 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
                     already_exists = true;
                 } else {
                     set_badge_monitoring(&webview, badge_monitoring_pref(&app, &name));
+                    set_audio_muted(&webview, service_audio_muted(&app));
                     let _ = webview.eval(resource_usage_monitor_eval_script(false));
                     let _ = webview.set_bounds(tauri::Rect {
                         position: tauri::Position::Physical(offscreen_pos),
@@ -376,6 +404,7 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
             Ok(webview) => {
                 register_file_drop_handler(&webview);
                 set_badge_monitoring(&webview, badge_monitoring_pref(&app, &id));
+                set_audio_muted(&webview, service_audio_muted(&app));
             }
             Err(error) => {
                 eprintln!("open_service: webview creation failed for {id}: {error}");
@@ -470,6 +499,7 @@ pub async fn load_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
             Ok(webview) => {
                 register_file_drop_handler(&webview);
                 set_badge_monitoring(&webview, badge_monitoring_enabled);
+                set_audio_muted(&webview, service_audio_muted(&app));
             }
             Err(error) => {
                 eprintln!("load_service: webview creation failed for {id}: {error}");

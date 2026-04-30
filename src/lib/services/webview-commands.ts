@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
   createRightPanelWidthPayload,
+  createAudioMutedPayload,
   createServiceWebviewPayload,
   createWebviewIdPayload,
   type DeleteWebviewPayload,
@@ -144,5 +145,14 @@ export function deleteServiceWebview(
 export function setRightPanelWidth(width: number, invokeCommand: InvokeCommand = invoke) {
   return invokeCommand("set_right_panel_width", {
     payload: createRightPanelWidthPayload(width),
+  });
+}
+
+export function setAllServiceWebviewsAudioMuted(
+  muted: boolean,
+  invokeCommand: InvokeCommand = invoke,
+) {
+  return invokeCommand("set_all_service_webviews_audio_muted", {
+    payload: createAudioMutedPayload(muted),
   });
 }

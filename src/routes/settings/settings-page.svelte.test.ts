@@ -31,6 +31,7 @@ vi.mock("@tauri-apps/plugin-updater", () => ({
 }));
 
 import packageJson from "../../../package.json";
+import { clearDndState } from "$lib/services/dnd-state.svelte";
 import {
   clearRuntimeBadges,
   setRuntimeBadge,
@@ -44,6 +45,7 @@ describe("settings page", () => {
     invoke.mockClear();
     goto.mockClear();
     listen.mockClear();
+    clearDndState();
     clearRuntimeBadges();
     Object.defineProperty(URL, "createObjectURL", {
       configurable: true,
@@ -387,6 +389,24 @@ describe("settings page", () => {
     flushSync();
 
     expect(goto).toHaveBeenCalledWith("/?open=mail");
+
+    unmount(component);
+  });
+
+  it("mutes service webviews when Do Not Disturb is toggled from settings", () => {
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+    invoke.mockClear();
+
+    document.querySelector<HTMLButtonElement>('[title="Turn On Do Not Disturb"]')?.click();
+    flushSync();
+
+    expect(invoke).toHaveBeenCalledWith("set_all_service_webviews_audio_muted", {
+      payload: { muted: true },
+    });
 
     unmount(component);
   });

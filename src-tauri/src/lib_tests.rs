@@ -12,11 +12,12 @@ use crate::service_webview_badge_scripts::{
 };
 use crate::service_webview_resource_usage::resource_usage_monitor_script;
 use crate::service_webview_runtime_scripts::{
-    common_webview_script, google_auth_compat_script, notification_script, spellcheck_script,
+    audio_mute_controller_script, common_webview_script, google_auth_compat_script,
+    notification_script, spellcheck_script,
 };
 use crate::webview_commands::{
     close_all_service_webviews, report_outlook_badge, report_resource_usage, report_teams_badge,
-    safe_export_file_name, save_workspace_config_export, DeleteWebviewPayload,
+    safe_export_file_name, save_workspace_config_export, AudioMutedPayload, DeleteWebviewPayload,
     RightPanelWidthPayload, ServiceWebviewCommandPayload, WebviewIdPayload,
 };
 use crate::window_layout::effective_service_content_size;
@@ -60,6 +61,20 @@ fn report_outlook_badge_uses_child_webview_context_type() {
 #[test]
 fn report_teams_badge_uses_child_webview_context_type() {
     let _: fn(tauri::AppHandle, tauri::Webview, String) = report_teams_badge;
+}
+
+#[test]
+fn audio_mute_controller_tracks_media_and_web_audio() {
+    let script = audio_mute_controller_script();
+
+    assert!(script.contains("window.__ferxSetAudioMuted"));
+    assert!(script.contains("HTMLMediaElement.prototype.play"));
+    assert!(script.contains("querySelectorAll('audio, video')"));
+    assert!(script.contains("patchAudioContextConstructor('AudioContext')"));
+    assert!(script.contains("patchAudioContextConstructor('webkitAudioContext')"));
+    assert!(script.contains("context.suspend"));
+    assert!(script.contains("context.resume"));
+    assert!(script.contains("new MutationObserver"));
 }
 
 #[test]
@@ -220,11 +235,16 @@ fn auxiliary_webview_command_payloads_deserialize_from_camel_case() {
         "width": 360.0
     }))
     .expect("expected right panel width payload");
+    let audio_payload: AudioMutedPayload = serde_json::from_value(json!({
+        "muted": true
+    }))
+    .expect("expected audio muted payload");
 
     assert_eq!(delete_payload.id, "chat");
     assert_eq!(delete_payload.storage_key, "storage-chat");
     assert_eq!(close_payload.id, "chat");
     assert_eq!(width_payload.width, 360.0);
+    assert!(audio_payload.muted);
 }
 
 #[test]

@@ -8,6 +8,7 @@ import {
   openServiceWebview,
   preloadBackgroundServices,
   reloadServiceWebview,
+  setAllServiceWebviewsAudioMuted,
   setRightPanelWidth,
   showServiceContextMenu,
 } from "./webview-commands";
@@ -37,6 +38,7 @@ describe("webview command wrappers", () => {
     await closeServiceWebview("chat", invokeCommand);
     await deleteServiceWebview({ id: "chat", storageKey: "storage-chat" }, invokeCommand);
     await setRightPanelWidth(360, invokeCommand);
+    await setAllServiceWebviewsAudioMuted(true, invokeCommand);
     await showServiceContextMenu("chat", true, invokeCommand);
 
     expect(invokeCommand).toHaveBeenNthCalledWith(1, "hide_all_webviews");
@@ -70,7 +72,10 @@ describe("webview command wrappers", () => {
     expect(invokeCommand).toHaveBeenNthCalledWith(6, "set_right_panel_width", {
       payload: { width: 360 },
     });
-    expect(invokeCommand).toHaveBeenNthCalledWith(7, "show_context_menu", {
+    expect(invokeCommand).toHaveBeenNthCalledWith(7, "set_all_service_webviews_audio_muted", {
+      payload: { muted: true },
+    });
+    expect(invokeCommand).toHaveBeenNthCalledWith(8, "show_context_menu", {
       id: "chat",
       disabled: true,
     });

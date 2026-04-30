@@ -12,6 +12,9 @@ async openService(payload: ServiceWebviewCommandPayload) : Promise<void> {
 async hideAllWebviews() : Promise<void> {
     await TAURI_INVOKE("hide_all_webviews");
 },
+async setAllServiceWebviewsAudioMuted(payload: AudioMutedPayload) : Promise<void> {
+    await TAURI_INVOKE("set_all_service_webviews_audio_muted", { payload });
+},
 async closeAllServiceWebviews() : Promise<void> {
     await TAURI_INVOKE("close_all_service_webviews");
 },
@@ -73,6 +76,7 @@ async updateTrayIcon(hasUnread: boolean) : Promise<void> {
 
 /** user-defined types **/
 
+export type AudioMutedPayload = { muted: boolean }
 export type DeleteWebviewPayload = { id: string; storageKey: string }
 export type RightPanelWidthPayload = { width: number }
 export type ServiceWebviewCommandPayload = { id: string; url: string; storageKey: string; allowNotifications: boolean; badgeMonitoringEnabled: boolean; spellCheckEnabled: boolean; resourceUsageMonitoringEnabled: boolean }

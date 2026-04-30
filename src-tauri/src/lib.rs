@@ -43,6 +43,7 @@ pub(crate) fn build_specta() -> SpectaBuilder<tauri::Wry> {
     SpectaBuilder::<tauri::Wry>::new().commands(collect_commands![
         webview_commands::open_service,
         webview_commands::hide_all_webviews,
+        webview_commands::set_all_service_webviews_audio_muted,
         webview_commands::close_all_service_webviews,
         webview_commands::set_right_panel_width,
         webview_commands::save_workspace_config_export,
@@ -88,6 +89,7 @@ pub fn run() {
             std::collections::HashMap::new(),
         )))
         .manage(app_state::RightPanelWidth(std::sync::Mutex::new(0.0)))
+        .manage(app_state::ServiceAudioMuted(std::sync::Mutex::new(false)))
         .manage(app_state::MainWindowResizeGen(AtomicU64::new(0)));
 
     #[cfg(feature = "devtools")]

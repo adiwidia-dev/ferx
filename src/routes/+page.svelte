@@ -20,6 +20,7 @@
     preloadBackgroundServices,
     preloadServiceWebview,
     reloadServiceWebview,
+    setAllServiceWebviewsAudioMuted,
     setRightPanelWidth,
     showServiceContextMenu,
   } from "$lib/services/webview-commands";
@@ -76,6 +77,7 @@
   } from "$lib/services/workspace-groups";
   import { serializeTodoNotes } from "$lib/services/todos";
   import type { WorkspaceIconKey } from "$lib/services/workspace-icons";
+  import { dndState, toggleDndEnabled } from "$lib/services/dnd-state.svelte";
   import { createDragDropState } from "$lib/services/drag-drop.svelte";
   import { createTodoPanelStore, TODOS_PANEL_WIDTH } from "$lib/services/todo-panel.svelte";
   import { createServiceEditorStore } from "$lib/services/service-editor.svelte";
@@ -94,7 +96,6 @@
     DEFAULT_APP_SETTINGS.resourceUsageMonitoringEnabled,
   );
   let isWorkspaceSwitcherOpen = $state(false);
-  let isDnd = $state(false);
 
   const webviewCommands = createWebviewCommandQueue();
 
@@ -147,9 +148,10 @@
     activeId ? resourceUsageSnapshots[activeId] : undefined,
   );
   let hasUnreadNotifications = $derived(
-    !isDnd && countTrayRelevantUnreadServices(displayServices) > 0,
+    !dndState.enabled && countTrayRelevantUnreadServices(displayServices) > 0,
   );
   let lastTrayUnreadState: boolean | null = null;
+  let lastAppliedDndAudioState: boolean | null = null;
 
   // ---------------------------------------------------------------------------
   // Effects
@@ -159,6 +161,19 @@
     if (isInitialized && hasUnreadNotifications !== lastTrayUnreadState) {
       lastTrayUnreadState = hasUnreadNotifications;
       void invoke("update_tray_icon", { hasUnread: hasUnreadNotifications });
+    }
+  });
+
+  $effect(() => {
+    if (isInitialized) {
+      const muted = dndState.enabled;
+      if (lastAppliedDndAudioState === muted) return;
+      if (lastAppliedDndAudioState === null && !muted) {
+        lastAppliedDndAudioState = muted;
+        return;
+      }
+      lastAppliedDndAudioState = muted;
+      webviewCommands.run(() => setAllServiceWebviewsAudioMuted(muted));
     }
   });
 
@@ -513,7 +528,7 @@
     bind:isWorkspaceSwitcherOpen
     draggedId={dnd.draggedId}
     dragOverId={dnd.dragOverId}
-    {isDnd}
+    isDnd={dndState.enabled}
     isTodosPanelOpen={todos.isPanelOpen}
     onPointerDown={(e, id) => dnd.handlePointerDown(e, id)}
     onSelectService={switchService}
@@ -525,7 +540,7 @@
     onDeleteWorkspace={deleteWorkspace}
     onWorkspaceSwitcherOpenChange={setWorkspaceSwitcherOpen}
     onOpenServiceContextMenu={(input) => void openServiceContextMenu(input)}
-    onToggleDnd={() => (isDnd = !isDnd)}
+    onToggleDnd={toggleDndEnabled}
     onOpenAddModal={openAddModal}
     onToggleTodosPanel={() => todos.setOpen(!todos.isPanelOpen)}
   />
