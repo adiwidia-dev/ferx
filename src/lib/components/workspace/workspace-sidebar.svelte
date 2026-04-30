@@ -26,7 +26,7 @@
     onSetWorkspaceDisabled: (input: { workspaceId: string; disabled: boolean }) => void;
     onDeleteWorkspace: (workspaceId: string) => void;
     onWorkspaceSwitcherOpenChange: (open: boolean) => void;
-    onOpenServiceContextMenu: (input: { id: string; disabled: boolean }) => void;
+    onOpenServiceContextMenu: (input: { id: string; disabled: boolean; showBadge: boolean; affectTray: boolean; muteAudio: boolean }) => void;
     onToggleDnd: () => void;
     onOpenAddModal: () => void;
     onToggleTodosPanel: () => void;
@@ -113,6 +113,9 @@
               onOpenServiceContextMenu({
                 id: service.id,
                 disabled: !!service.disabled,
+                showBadge: service.notificationPrefs.showBadge,
+                affectTray: service.notificationPrefs.affectTray,
+                muteAudio: service.notificationPrefs.muteAudio,
               });
             }}
           >
@@ -179,10 +182,13 @@
           stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"
-          ><path
-            d="M10.7 2.8A8 8 0 0 0 2 12c0 4.4 3.6 8 8 8a8 8 0 0 0 9.2-7.3A8 8 0 0 1 10.7 2.8z"
-          /><line x1="2" y1="2" x2="22" y2="22" /></svg
         >
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          <path d="M18.63 13A17.89 17.89 0 0 1 18 8" />
+          <path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14" />
+          <path d="M18 8a6 6 0 0 0-9.33-5" />
+          <line x1="2" y1="2" x2="22" y2="22" />
+        </svg>
       {:else}
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -194,10 +200,10 @@
           stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"
-          ><path
-            d="M10.7 2.8A8 8 0 0 0 2 12c0 4.4 3.6 8 8 8a8 8 0 0 0 9.2-7.3A8 8 0 0 1 10.7 2.8z"
-          /></svg
         >
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+        </svg>
       {/if}
     </Button>
 
