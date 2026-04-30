@@ -38,6 +38,8 @@ tauri-plugin-mcp-bridge = { version = "0.11", optional = true }
 tokio = { version = "1", features = ["time"] }
 url = "2"
 rfd = "0.15"
+specta = { version = "=2.0.0-rc.22", features = ["derive"] }
+tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
 
 [profile.release]
 panic = "abort"

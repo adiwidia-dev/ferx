@@ -1,5 +1,6 @@
 use crate::service_runtime::{
-    extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
+    badge_strategy_for_url, extract_hostname, hostname_matches, microsoft_service_kind,
+    MicrosoftServiceKind,
 };
 use crate::service_webview_badge_scripts::{
     badge_engine_script, outlook_badge_engine_script, teams_badge_engine_script,
@@ -71,7 +72,7 @@ fn injected_js_for_url(
     spell_check_enabled: bool,
     resource_usage_monitoring_enabled: bool,
 ) -> String {
-    let strategy_name = crate::webview_commands::badge_strategy_for_url(url);
+    let strategy_name = badge_strategy_for_url(url);
     let microsoft_service = microsoft_service_kind(url);
     let google_compat = if is_google_service(url) {
         google_auth_compat_script()

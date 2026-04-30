@@ -7,9 +7,7 @@ use crate::download_dialog::handle_service_webview_download;
 use crate::file_drop::register_file_drop_handler;
 use crate::navigation_bridge::emit_badge_update;
 use crate::navigation_bridge::handle_special_navigation;
-use crate::service_runtime::{
-    extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
-};
+use crate::service_runtime::badge_strategy_for_url;
 use crate::service_storage::{
     data_store_identifier_for_storage_key, session_dir_for_storage_key,
 };
@@ -25,26 +23,26 @@ use serde::Deserialize;
 use tauri::webview::Color;
 use tauri::{AppHandle, Emitter, Manager};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct WebviewIdPayload {
     pub(crate) id: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DeleteWebviewPayload {
     pub(crate) id: String,
     pub(crate) storage_key: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RightPanelWidthPayload {
     pub(crate) width: f64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ServiceWebviewCommandPayload {
     pub(crate) id: String,
@@ -91,57 +89,46 @@ pub(crate) fn safe_export_file_name(default_filename: &str) -> String {
     }
 }
 
-pub(crate) fn badge_strategy_for_url(url: &str) -> &'static str {
-    if matches!(
-        microsoft_service_kind(url),
-        Some(MicrosoftServiceKind::Outlook)
-    ) {
-        "outlook-folder-dom"
-    } else if matches!(
-        microsoft_service_kind(url),
-        Some(MicrosoftServiceKind::Teams)
-    ) {
-        "teams-dom"
-    } else if hostname_matches(
-        &extract_hostname(url)
-            .unwrap_or_default()
-            .to_ascii_lowercase(),
-        "web.whatsapp.com",
-    ) {
-        "whatsapp-title"
-    } else {
-        "unsupported"
-    }
-}
 
 #[tauri::command]
+#[specta::specta]
 pub async fn hide_all_webviews(app: AppHandle) {
-    use tauri::{PhysicalPosition, PhysicalSize};
+    use tauri::PhysicalPosition;
 
     clear_active_webview(&app);
     set_active_resource_usage_monitoring(&app, false);
 
-    for (name, webview) in app.webviews() {
-        if name != "main" {
-            set_badge_monitoring(&webview, false);
-            let _ = webview.set_bounds(tauri::Rect {
-                position: tauri::Position::Physical(PhysicalPosition::new(-10000, -10000)),
-                size: tauri::Size::Physical(PhysicalSize::new(1, 1)),
-            });
-            let _ = webview.hide();
-            let _ = webview.close();
+    if let Some(window) = app.get_window("main") {
+        let scale_factor = window.scale_factor().unwrap_or(1.0);
+        let physical_size = window.inner_size().unwrap_or_default();
+        let sidebar_width = sidebar_physical_width(scale_factor);
+        let right_panel_width = right_panel_physical_width(
+            scale_factor,
+            crate::app_state::right_panel_width(&app),
+        );
+        let offscreen_size =
+            effective_service_content_size(physical_size, sidebar_width, 0, right_panel_width);
+
+        for (name, webview) in app.webviews() {
+            if name != "main" {
+                set_badge_monitoring(&webview, false);
+                let _ = webview.set_bounds(tauri::Rect {
+                    position: tauri::Position::Physical(PhysicalPosition::new(-10000, -10000)),
+                    size: tauri::Size::Physical(offscreen_size),
+                });
+            }
         }
     }
-
-    tokio::time::sleep(std::time::Duration::from_millis(180)).await;
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn close_all_service_webviews(app: AppHandle) {
     close_service_webviews(&app);
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn set_right_panel_width(app: AppHandle, payload: RightPanelWidthPayload) {
     set_stored_right_panel_width(&app, payload.width);
 
@@ -152,6 +139,7 @@ pub async fn set_right_panel_width(app: AppHandle, payload: RightPanelWidthPaylo
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn save_workspace_config_export(
     contents: String,
     default_filename: String,
@@ -170,6 +158,7 @@ pub async fn save_workspace_config_export(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn restart_app(app: AppHandle) -> Result<(), String> {
     if tauri::is_dev() {
         close_service_webviews(&app);
@@ -186,6 +175,7 @@ pub async fn restart_app(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn reload_webview(app: AppHandle, payload: WebviewIdPayload) {
     let WebviewIdPayload { id } = payload;
 
@@ -195,16 +185,19 @@ pub async fn reload_webview(app: AppHandle, payload: WebviewIdPayload) {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn report_outlook_badge(app: AppHandle, webview: tauri::Webview, payload: String) {
     emit_badge_update(&app, webview.label(), &payload);
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn report_teams_badge(app: AppHandle, webview: tauri::Webview, payload: String) {
     emit_badge_update(&app, webview.label(), &payload);
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn report_resource_usage(app: AppHandle, webview: tauri::Webview, payload: String) {
     let _ = app.emit(
         "resource-usage-update",
@@ -213,6 +206,7 @@ pub fn report_resource_usage(app: AppHandle, webview: tauri::Webview, payload: S
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn close_webview(app: AppHandle, payload: WebviewIdPayload) {
     let WebviewIdPayload { id } = payload;
 
@@ -231,6 +225,7 @@ pub async fn close_webview(app: AppHandle, payload: WebviewIdPayload) {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn delete_webview(app: AppHandle, payload: DeleteWebviewPayload) {
     let DeleteWebviewPayload { id, storage_key } = payload;
 
@@ -263,6 +258,7 @@ pub async fn delete_webview(app: AppHandle, payload: DeleteWebviewPayload) {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandPayload) {
     use tauri::PhysicalPosition;
 
@@ -382,12 +378,16 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
                 register_file_drop_handler(&webview);
                 set_badge_monitoring(&webview, badge_monitoring_pref(&app, &id));
             }
-            Err(error) => println!("Webview failed: {}", error),
+            Err(error) => {
+                eprintln!("open_service: webview creation failed for {id}: {error}");
+                let _ = app.emit("show-toast", format!("Failed to open service: {error}"));
+            }
         }
     }
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn load_service(app: tauri::AppHandle, payload: ServiceWebviewCommandPayload) {
     use tauri::PhysicalPosition;
 
@@ -463,13 +463,19 @@ pub async fn load_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
             crate::app_state::right_panel_width(&app),
         );
 
-        if let Ok(webview) = window.add_child(
+        match window.add_child(
             builder,
             PhysicalPosition::new(-10000, -10000),
             effective_service_content_size(physical_size, sidebar_width, 0, right_panel_width),
         ) {
-            register_file_drop_handler(&webview);
-            set_badge_monitoring(&webview, badge_monitoring_enabled);
+            Ok(webview) => {
+                register_file_drop_handler(&webview);
+                set_badge_monitoring(&webview, badge_monitoring_enabled);
+            }
+            Err(error) => {
+                eprintln!("load_service: webview creation failed for {id}: {error}");
+                let _ = app.emit("show-toast", format!("Failed to preload service: {error}"));
+            }
         }
     }
 }

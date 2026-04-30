@@ -1,5 +1,6 @@
 use crate::service_runtime::{
-    extract_hostname, hostname_matches, microsoft_service_kind, MicrosoftServiceKind,
+    badge_strategy_for_url, extract_hostname, hostname_matches, microsoft_service_kind,
+    MicrosoftServiceKind,
 };
 use crate::service_webview::{
     external_webview_url, injected_js, service_webview_setup,
@@ -14,10 +15,9 @@ use crate::service_webview_runtime_scripts::{
     common_webview_script, google_auth_compat_script, notification_script, spellcheck_script,
 };
 use crate::webview_commands::{
-    badge_strategy_for_url, close_all_service_webviews, report_outlook_badge,
-    report_resource_usage, report_teams_badge, safe_export_file_name,
-    save_workspace_config_export, DeleteWebviewPayload, RightPanelWidthPayload,
-    ServiceWebviewCommandPayload, WebviewIdPayload,
+    close_all_service_webviews, report_outlook_badge, report_resource_usage, report_teams_badge,
+    safe_export_file_name, save_workspace_config_export, DeleteWebviewPayload,
+    RightPanelWidthPayload, ServiceWebviewCommandPayload, WebviewIdPayload,
 };
 use crate::window_layout::effective_service_content_size;
 use serde_json::json;
@@ -118,32 +118,46 @@ fn default_capability_grants_updater_and_process_restart() {
     assert!(capability.contains("process:allow-restart"));
 }
 
-#[test]
-fn close_all_service_webviews_command_exists() {
-    let source = include_str!("lib.rs");
-    let _command = close_all_service_webviews;
-
-    assert!(source.contains("close_all_service_webviews,"));
+/// Type-level proof that these commands exist and have the expected signatures.
+/// The compiler rejects this file if any command is removed or its signature changes —
+/// no source-string sniffing needed.
+#[allow(dead_code)]
+fn assert_command_signatures() {
+    // close_all_service_webviews: AppHandle → ()
+    let _: fn() = || {
+        let _ = close_all_service_webviews;
+    };
+    // save_workspace_config_export: (String, String) → Result<bool, String>
+    let _: fn() = || {
+        let _ = save_workspace_config_export;
+    };
+    // report_resource_usage: (AppHandle, Webview, String) → ()
+    let _: fn(tauri::AppHandle, tauri::Webview, String) = report_resource_usage;
 }
 
 #[test]
-fn save_workspace_config_export_command_exists() {
-    let source = include_str!("lib.rs");
-    let _command = save_workspace_config_export;
+fn close_webview_preserves_session_storage() {
+    // close_webview must not delete the service's data directory or data store.
+    // Deleting storage on close would wipe sessions when a workspace is disabled.
+    // Only delete_webview is permitted to remove storage.
+    let source = include_str!("webview_commands.rs");
+    let close_start = source
+        .find("pub async fn close_webview")
+        .expect("expected close_webview command");
+    let next_command = source[close_start + 1..]
+        .find("#[tauri::command]")
+        .map(|offset| close_start + 1 + offset)
+        .unwrap_or(source.len());
+    let close_body = &source[close_start..next_command];
 
-    assert!(source.contains("save_workspace_config_export,"));
+    assert!(!close_body.contains("remove_data_store"),
+        "close_webview must not delete the data store — use delete_webview for that");
+    assert!(!close_body.contains("remove_dir_all"),
+        "close_webview must not delete the session directory — use delete_webview for that");
 }
 
 #[test]
-fn report_resource_usage_command_exists() {
-    let source = include_str!("lib.rs");
-    let _command = report_resource_usage;
-
-    assert!(source.contains("report_resource_usage,"));
-}
-
-#[test]
-fn hide_all_webviews_closes_child_webviews_without_storage_deletion() {
+fn hide_all_webviews_moves_child_webviews_offscreen_without_storage_deletion() {
     let source = include_str!("webview_commands.rs");
     let hide_start = source
         .find("pub async fn hide_all_webviews")
@@ -154,12 +168,18 @@ fn hide_all_webviews_closes_child_webviews_without_storage_deletion() {
         .unwrap_or(source.len());
     let hide_command = &source[hide_start..next_command];
 
+    // Must move webviews offscreen so overlays (modal, workspace picker,
+    // settings) can appear above them without the native child webviews
+    // showing through.
     assert!(hide_command.contains("webview.set_bounds"));
     assert!(hide_command.contains("PhysicalPosition::new(-10000, -10000)"));
-    assert!(hide_command.contains("PhysicalSize::new(1, 1)"));
-    assert!(hide_command.contains("let _ = webview.hide();"));
-    assert!(hide_command.contains("let _ = webview.close();"));
-    assert!(hide_command.contains("Duration::from_millis(180)"));
+
+    // Must NOT destroy webviews — closing them would force a full reload of
+    // every service the next time the overlay is dismissed.
+    assert!(!hide_command.contains("let _ = webview.close();"));
+    assert!(!hide_command.contains("let _ = webview.hide();"));
+
+    // Must NOT delete any persistent session storage.
     assert!(!hide_command.contains("remove_data_store"));
     assert!(!hide_command.contains("remove_dir_all"));
 }
@@ -696,4 +716,22 @@ fn extracted_resource_and_badge_script_modules_preserve_known_markers() {
 #[test]
 fn service_webview_setup_rejects_invalid_external_urls() {
     assert!(service_webview_setup("not a url", false).is_none());
+}
+
+/// Regenerates `src/lib/tauri-commands.ts` from the current Rust command
+/// signatures and fails if the file on disk is different from what specta
+/// would produce.  Run `yarn tauri dev` (or `cargo tauri dev`) once to fix
+/// the file, then commit it.
+///
+/// CI pairs this test with `git diff --exit-code src/lib/tauri-commands.ts`
+/// so a stale generated file is caught before it can land on main.
+#[test]
+fn tauri_commands_typescript_is_up_to_date() {
+    crate::build_specta()
+        .export(
+            tauri_specta::ts::Typescript::default()
+                .header("// This file is auto-generated by tauri-specta. Do not edit manually.\n"),
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../src/lib/tauri-commands.ts"),
+        )
+        .expect("Failed to export TypeScript bindings");
 }

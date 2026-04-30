@@ -36,67 +36,6 @@ pub(crate) fn badge_engine_script(strategy_name: &str) -> String {
             return 'count:' + count;
         }};
 
-        const parseFolderCount = (text, label) => {{
-            const collapsed = (text || '').replace(/\s+/g, ' ').trim();
-            const escapedLabel = label.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
-            const match = collapsed.match(new RegExp('(?:^|\\b)' + escapedLabel + '\\s*(\\d+)(?:\\b|$)', 'i'));
-            if (!match) return null;
-
-            const count = parseInt(match[1], 10);
-            return Number.isFinite(count) && count > 0 ? count : 0;
-        }};
-
-        const parseLooseFolderCount = (text, label) => {{
-            const collapsed = (text || '').replace(/\s+/g, ' ').trim();
-            const escapedLabel = label.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
-            const match = collapsed.match(new RegExp(escapedLabel + '.*?(\\d+)', 'i'))
-                || collapsed.match(new RegExp('(\\d+).*?' + escapedLabel, 'i'));
-            if (!match) return null;
-
-            const count = parseInt(match[1], 10);
-            return Number.isFinite(count) && count > 0 ? count : 0;
-        }};
-
-        const parseUnreadCount = (text, label) => {{
-            const collapsed = (text || '').replace(/\s+/g, ' ').trim();
-            const escapedLabel = label.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
-            const match = collapsed.match(new RegExp(escapedLabel + '.*?\\((\\d+)\\s*unread\\)', 'i'))
-                || collapsed.match(new RegExp(escapedLabel + '.*?(\\d+)\\s*unread', 'i'))
-                || collapsed.match(new RegExp('(\\d+)\\s*unread.*?' + escapedLabel, 'i'));
-            if (!match) return null;
-
-            const count = parseInt(match[1], 10);
-            return Number.isFinite(count) && count > 0 ? count : 0;
-        }};
-
-        const isVisibleNode = (node) => {{
-            if (!node || typeof node.getBoundingClientRect !== 'function') return false;
-            const rect = node.getBoundingClientRect();
-            return rect.width > 0 && rect.height > 0;
-        }};
-
-        const outlookFolderState = () => {{
-            const rows = Array.from(document.querySelectorAll('[role="treeitem"], [role="option"]'));
-            let bestCount = null;
-            for (const row of rows) {{
-                if (!isVisibleNode(row)) continue;
-
-                const text = (row.innerText || row.textContent || '').trim();
-                if (!text) continue;
-
-                const lower = text.toLowerCase();
-                if (!lower.includes('inbox') && !lower.includes('kotak masuk')) continue;
-
-                const count = parseFolderCount(text, 'Inbox') ?? parseFolderCount(text, 'Kotak Masuk');
-                if (count === null) continue;
-
-                bestCount = Math.max(bestCount || 0, count);
-            }}
-
-            if (bestCount === null) return null;
-            return bestCount > 0 ? 'count:' + bestCount : 'clear';
-        }};
-
         const strategies = {{
             'unsupported': {{
                 needsDomObservation: false,
@@ -109,10 +48,6 @@ pub(crate) fn badge_engine_script(strategy_name: &str) -> String {
             'whatsapp-title': {{
                 needsDomObservation: false,
                 readState: () => titleCountState(document.title)
-            }},
-            'outlook-folder-dom': {{
-                needsDomObservation: true,
-                readState: () => outlookFolderState() || titleCountState(document.title)
             }}
         }};
 
