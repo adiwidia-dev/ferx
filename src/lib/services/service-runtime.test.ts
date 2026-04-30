@@ -15,7 +15,7 @@ function createService(overrides: {
   disabled?: boolean;
   showBadge?: boolean;
   affectTray?: boolean;
-  allowNotifications?: boolean;
+  muteAudio?: boolean;
 } = {}) {
   return {
     id: overrides.id ?? "service-1",
@@ -25,7 +25,7 @@ function createService(overrides: {
     notificationPrefs: {
       showBadge: overrides.showBadge ?? true,
       affectTray: overrides.affectTray ?? true,
-      allowNotifications: overrides.allowNotifications ?? true,
+      muteAudio: overrides.muteAudio ?? false,
     },
   };
 }
@@ -38,7 +38,7 @@ describe("createServiceWebviewPayload", () => {
           id: "docs",
           url: "https://docs.example.com/",
           storageKey: "storage-docs",
-          allowNotifications: false,
+          muteAudio: true,
         }),
         true,
       ),
@@ -46,7 +46,7 @@ describe("createServiceWebviewPayload", () => {
       id: "docs",
       url: "https://docs.example.com/",
       storageKey: "storage-docs",
-      allowNotifications: false,
+      allowNotifications: true,
       badgeMonitoringEnabled: true,
       spellCheckEnabled: true,
       resourceUsageMonitoringEnabled: false,

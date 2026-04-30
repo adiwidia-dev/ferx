@@ -17,7 +17,7 @@ const services: PageService[] = [
     notificationPrefs: {
       showBadge: true,
       affectTray: false,
-      allowNotifications: true,
+      muteAudio: false,
     },
   },
   {
@@ -30,7 +30,7 @@ const services: PageService[] = [
     notificationPrefs: {
       showBadge: false,
       affectTray: true,
-      allowNotifications: false,
+      muteAudio: true,
     },
   },
 ];

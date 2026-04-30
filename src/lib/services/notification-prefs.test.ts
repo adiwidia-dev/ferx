@@ -11,7 +11,7 @@ describe("DEFAULT_NOTIFICATION_PREFS", () => {
     expect(DEFAULT_NOTIFICATION_PREFS).toEqual({
       showBadge: true,
       affectTray: true,
-      allowNotifications: true,
+      muteAudio: false,
     });
   });
 });
@@ -48,7 +48,7 @@ describe("ensureServiceNotificationPrefs", () => {
     expect(result.services[0].notificationPrefs).toEqual({
       showBadge: false,
       affectTray: true,
-      allowNotifications: true,
+      muteAudio: false,
     });
   });
 
@@ -85,7 +85,7 @@ describe("ensureServiceNotificationPrefs", () => {
         notificationPrefs: {
           showBadge: false,
           affectTray: true,
-          allowNotifications: false,
+          muteAudio: true,
         },
       },
     ]);
@@ -94,7 +94,7 @@ describe("ensureServiceNotificationPrefs", () => {
     expect(result.services[0].notificationPrefs).toEqual({
       showBadge: false,
       affectTray: true,
-      allowNotifications: false,
+      muteAudio: true,
     });
   });
 });
@@ -111,7 +111,7 @@ describe("countTrayRelevantUnreadServices", () => {
         notificationPrefs: {
           showBadge: true,
           affectTray: true,
-          allowNotifications: true,
+          muteAudio: false,
         },
       },
       {
@@ -123,7 +123,7 @@ describe("countTrayRelevantUnreadServices", () => {
         notificationPrefs: {
           showBadge: true,
           affectTray: false,
-          allowNotifications: true,
+          muteAudio: false,
         },
       },
     ]);
@@ -143,7 +143,7 @@ describe("countTrayRelevantUnreadServices", () => {
         notificationPrefs: {
           showBadge: true,
           affectTray: true,
-          allowNotifications: true,
+          muteAudio: false,
         },
       },
     ]);

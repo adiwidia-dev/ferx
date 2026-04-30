@@ -9,6 +9,7 @@ import {
   preloadBackgroundServices,
   reloadServiceWebview,
   setAllServiceWebviewsAudioMuted,
+  setServiceWebviewAudioMuted,
   setRightPanelWidth,
   showServiceContextMenu,
 } from "./webview-commands";
@@ -21,7 +22,7 @@ function createService(overrides: Partial<Parameters<typeof openServiceWebview>[
     notificationPrefs: {
       showBadge: true,
       affectTray: true,
-      allowNotifications: true,
+      muteAudio: false,
     },
     ...overrides,
   };
@@ -39,7 +40,13 @@ describe("webview command wrappers", () => {
     await deleteServiceWebview({ id: "chat", storageKey: "storage-chat" }, invokeCommand);
     await setRightPanelWidth(360, invokeCommand);
     await setAllServiceWebviewsAudioMuted(true, invokeCommand);
-    await showServiceContextMenu("chat", true, invokeCommand);
+    await showServiceContextMenu(
+      "chat",
+      true,
+      { showBadge: true, affectTray: true, muteAudio: false },
+      invokeCommand,
+    );
+    await setServiceWebviewAudioMuted("chat", true, invokeCommand);
 
     expect(invokeCommand).toHaveBeenNthCalledWith(1, "hide_all_webviews");
     expect(invokeCommand).toHaveBeenNthCalledWith(
@@ -78,6 +85,12 @@ describe("webview command wrappers", () => {
     expect(invokeCommand).toHaveBeenNthCalledWith(8, "show_context_menu", {
       id: "chat",
       disabled: true,
+      showBadge: true,
+      affectTray: true,
+      muteAudio: false,
+    });
+    expect(invokeCommand).toHaveBeenNthCalledWith(9, "set_service_webview_audio_muted", {
+      payload: { id: "chat", muted: true },
     });
   });
 });

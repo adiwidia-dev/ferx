@@ -123,10 +123,10 @@ describe("workspace actions", () => {
 
     const nextState = updateServiceNotificationPrefs(state, "shared", (prefs) => ({
       ...prefs,
-      allowNotifications: false,
+      muteAudio: true,
     }));
 
-    expect(nextState.servicesById.shared.notificationPrefs.allowNotifications).toBe(false);
+    expect(nextState.servicesById.shared.notificationPrefs.muteAudio).toBe(true);
     expect(nextState.servicesById.youtube.notificationPrefs).toEqual(
       state.servicesById.youtube.notificationPrefs,
     );

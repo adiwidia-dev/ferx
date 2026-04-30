@@ -228,7 +228,7 @@ describe("readStoredServices", () => {
         notificationPrefs: {
           showBadge: false,
           affectTray: true,
-          allowNotifications: false,
+          muteAudio: true,
         },
       },
     ]);
@@ -245,7 +245,7 @@ describe("readStoredServices", () => {
           notificationPrefs: {
             showBadge: false,
             affectTray: true,
-            allowNotifications: false,
+            muteAudio: true,
           },
         },
       ],

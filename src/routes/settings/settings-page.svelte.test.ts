@@ -291,7 +291,7 @@ describe("settings page", () => {
           notificationPrefs: {
             showBadge: true,
             affectTray: true,
-            allowNotifications: true,
+            muteAudio: false,
           },
         },
       ]),
@@ -340,7 +340,7 @@ describe("settings page", () => {
           notificationPrefs: {
             showBadge: true,
             affectTray: true,
-            allowNotifications: true,
+            muteAudio: false,
           },
         },
       ]),
@@ -373,7 +373,7 @@ describe("settings page", () => {
           notificationPrefs: {
             showBadge: true,
             affectTray: true,
-            allowNotifications: true,
+            muteAudio: false,
           },
         },
       ]),
@@ -425,7 +425,7 @@ describe("settings page", () => {
           notificationPrefs: {
             showBadge: true,
             affectTray: true,
-            allowNotifications: true,
+            muteAudio: false,
           },
         },
       ]),
@@ -483,7 +483,7 @@ describe("settings page", () => {
           notificationPrefs: {
             showBadge: true,
             affectTray: true,
-            allowNotifications: true,
+            muteAudio: false,
           },
         },
       ]),
