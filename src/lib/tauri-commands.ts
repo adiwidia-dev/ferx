@@ -15,6 +15,9 @@ async hideAllWebviews() : Promise<void> {
 async setAllServiceWebviewsAudioMuted(payload: AudioMutedPayload) : Promise<void> {
     await TAURI_INVOKE("set_all_service_webviews_audio_muted", { payload });
 },
+async setServiceWebviewAudioMuted(payload: SingleAudioMutedPayload) : Promise<void> {
+    await TAURI_INVOKE("set_service_webview_audio_muted", { payload });
+},
 async closeAllServiceWebviews() : Promise<void> {
     await TAURI_INVOKE("close_all_service_webviews");
 },
@@ -58,8 +61,8 @@ async deleteWebview(payload: DeleteWebviewPayload) : Promise<void> {
 async loadService(payload: ServiceWebviewCommandPayload) : Promise<void> {
     await TAURI_INVOKE("load_service", { payload });
 },
-async showContextMenu(id: string, disabled: boolean) : Promise<void> {
-    await TAURI_INVOKE("show_context_menu", { id, disabled });
+async showContextMenu(id: string, disabled: boolean, showBadge: boolean, affectTray: boolean, muteAudio: boolean) : Promise<void> {
+    await TAURI_INVOKE("show_context_menu", { id, disabled, showBadge, affectTray, muteAudio });
 },
 async updateTrayIcon(hasUnread: boolean) : Promise<void> {
     await TAURI_INVOKE("update_tray_icon", { hasUnread });
@@ -80,6 +83,7 @@ export type AudioMutedPayload = { muted: boolean }
 export type DeleteWebviewPayload = { id: string; storageKey: string }
 export type RightPanelWidthPayload = { width: number }
 export type ServiceWebviewCommandPayload = { id: string; url: string; storageKey: string; allowNotifications: boolean; badgeMonitoringEnabled: boolean; spellCheckEnabled: boolean; resourceUsageMonitoringEnabled: boolean }
+export type SingleAudioMutedPayload = { id: string; muted: boolean }
 export type WebviewIdPayload = { id: string }
 
 /** tauri-specta globals **/
