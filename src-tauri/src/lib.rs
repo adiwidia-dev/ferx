@@ -23,8 +23,16 @@ mod lib_tests;
 
 #[tauri::command]
 #[specta::specta]
-fn show_context_menu(app: tauri::AppHandle, window: tauri::Window, id: String, disabled: bool) {
-    desktop_ui::show_context_menu(app, window, id, disabled);
+fn show_context_menu(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+    id: String,
+    disabled: bool,
+    show_badge: bool,
+    affect_tray: bool,
+    mute_audio: bool,
+) {
+    desktop_ui::show_context_menu(app, window, id, disabled, show_badge, affect_tray, mute_audio);
 }
 
 #[tauri::command]

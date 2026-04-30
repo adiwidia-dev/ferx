@@ -6,6 +6,9 @@ pub(crate) fn show_context_menu(
     window: tauri::Window,
     id: String,
     disabled: bool,
+    show_badge: bool,
+    affect_tray: bool,
+    mute_audio: bool,
 ) {
     use tauri::menu::{Menu, MenuItem};
 
@@ -27,39 +30,39 @@ pub(crate) fn show_context_menu(
     let toggle_badge = match MenuItem::with_id(
         &app,
         format!("toggle-badge:{}", id),
-        "Toggle unread badge",
+        if show_badge { "Disable Unread Badge" } else { "Enable Unread Badge" },
         true,
         None::<&str>,
     ) {
         Ok(item) => item,
         Err(error) => {
-            eprintln!("Failed to build Toggle unread badge menu item: {error}");
+            eprintln!("Failed to build Disable/Enable Unread Badge menu item: {error}");
             return;
         }
     };
     let toggle_tray = match MenuItem::with_id(
         &app,
         format!("toggle-tray:{}", id),
-        "Toggle tray unread",
+        if affect_tray { "Disable Unread Tray" } else { "Enable Unread Tray" },
         true,
         None::<&str>,
     ) {
         Ok(item) => item,
         Err(error) => {
-            eprintln!("Failed to build Toggle tray unread menu item: {error}");
+            eprintln!("Failed to build Disable/Enable Unread Tray menu item: {error}");
             return;
         }
     };
     let toggle_notifications = match MenuItem::with_id(
         &app,
         format!("toggle-notifications:{}", id),
-        "Toggle notifications",
+        if mute_audio { "Enable Notification Sound" } else { "Disable Notification Sound" },
         true,
         None::<&str>,
     ) {
         Ok(item) => item,
         Err(error) => {
-            eprintln!("Failed to build Toggle notifications menu item: {error}");
+            eprintln!("Failed to build Disable/Enable Notification Sound menu item: {error}");
             return;
         }
     };
