@@ -44,6 +44,7 @@ pub(crate) fn build_specta() -> SpectaBuilder<tauri::Wry> {
         webview_commands::open_service,
         webview_commands::hide_all_webviews,
         webview_commands::set_all_service_webviews_audio_muted,
+        webview_commands::set_service_webview_audio_muted,
         webview_commands::close_all_service_webviews,
         webview_commands::set_right_panel_width,
         webview_commands::save_workspace_config_export,

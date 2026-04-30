@@ -50,6 +50,13 @@ pub(crate) struct AudioMutedPayload {
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct SingleAudioMutedPayload {
+    pub(crate) id: String,
+    pub(crate) muted: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ServiceWebviewCommandPayload {
     pub(crate) id: String,
     pub(crate) url: String,
@@ -142,6 +149,17 @@ pub async fn set_all_service_webviews_audio_muted(app: AppHandle, payload: Audio
     for (name, webview) in app.webviews() {
         if name != "main" {
             set_audio_muted(&webview, payload.muted);
+        }
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn set_service_webview_audio_muted(app: AppHandle, payload: SingleAudioMutedPayload) {
+    for (name, webview) in app.webviews() {
+        if name == payload.id {
+            set_audio_muted(&webview, payload.muted);
+            break;
         }
     }
 }
