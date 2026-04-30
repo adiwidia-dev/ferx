@@ -1,3 +1,22 @@
+/**
+ * workspace-actions.ts — side-effect descriptors for workspace mutations
+ *
+ * Bridges pure workspace state (workspace-groups.ts) with the webview
+ * lifecycle. Functions here compute BOTH the next state AND the set of
+ * webview operations that must follow, returning them as plain data so
+ * the caller (page component) can execute them in the right order.
+ *
+ * RULES for this module:
+ *  - Functions return { state, closeWebviewIds, shouldHideWebviews, … } shapes.
+ *  - They do NOT call `invoke` or import from webview-commands — they only
+ *    describe what the caller must do.
+ *  - If a mutation only touches state with no webview consequence, it belongs
+ *    in workspace-groups.ts (pure) or workspace-state.ts (service-level pure).
+ *
+ * BOUNDARY vs workspace-groups.ts:
+ *  - workspace-groups.ts  = pure transforms, no side-effect info.
+ *  - workspace-actions.ts = same transforms + "here's what webviews to close/hide".
+ */
 import type { NotificationPrefs } from "$lib/services/notification-prefs";
 import {
   deleteWorkspaceGroup,
@@ -140,7 +159,7 @@ export function setWorkspaceDisabledWithEffects(
   return {
     state: nextState,
     closeWebviewIds: workspaceServices.map((service) => service.id),
-    shouldHideWebviews: input.workspaceId === nextState.currentWorkspaceId,
+    shouldHideWebviews: input.workspaceId === state.currentWorkspaceId,
   };
 }
 

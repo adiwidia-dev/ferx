@@ -93,6 +93,8 @@ export function readWorkspacePageStartupState({
   };
 }
 
+export type DebouncedStorageWriter<T> = ReturnType<typeof createDebouncedStorageWriter<T>>;
+
 export function createDebouncedStorageWriter<T>({
   storageKey,
   delayMs,

@@ -1,3 +1,25 @@
+/**
+ * workspace-state.ts — service-level state and the add/edit/delete flow
+ *
+ * Owns the `PageService` runtime type and all functions that operate at the
+ * individual-service level: startup migration, add/edit/delete orchestration,
+ * page listener cleanup.
+ *
+ * RULES for this module:
+ *  - `PageService` is the single source of truth for the runtime service shape.
+ *  - `saveServiceState` / `applySaveServiceResult` encapsulate the full
+ *    add/edit/delete lifecycle — do not duplicate this logic in components.
+ *  - Startup migration (legacy key reading) lives here, not in the page.
+ *
+ * BOUNDARY vs workspace-groups.ts:
+ *  - workspace-state.ts  = service-level concerns: the PageService shape,
+ *                          adding/editing/deleting a single service, startup migration.
+ *  - workspace-groups.ts = workspace-level concerns: the multi-workspace tree,
+ *                          which services belong to which workspace, active service ID.
+ *
+ * Import direction: workspace-groups.ts imports PageService from here.
+ * workspace-state.ts must NOT import from workspace-groups.ts (would create a cycle).
+ */
 import {
   DEFAULT_NOTIFICATION_PREFS,
   type NotificationPrefs,
