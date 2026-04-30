@@ -44,3 +44,8 @@ jobs:
 
       - name: Run Rust library tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
+      - name: Verify tauri-commands.ts is up to date
+        run: |
+          cargo test --manifest-path src-tauri/Cargo.toml --lib tauri_commands_typescript_is_up_to_date
+          git diff --exit-code src/lib/tauri-commands.ts || (echo "::error::tauri-commands.ts is stale — run 'yarn tauri dev' to regenerate and commit the result." && exit 1)
