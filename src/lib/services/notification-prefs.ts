@@ -10,6 +10,10 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   muteAudio: false,
 };
 
+type LegacyNotificationPrefs = Partial<NotificationPrefs> & {
+  allowNotifications?: boolean;
+};
+
 type ServiceWithOptionalNotificationPrefs = {
   id: string;
   name: string;
@@ -17,45 +21,67 @@ type ServiceWithOptionalNotificationPrefs = {
   storageKey: string;
   disabled?: boolean;
   badge?: number;
-  notificationPrefs?: Partial<NotificationPrefs>;
+  notificationPrefs?: LegacyNotificationPrefs;
 };
 
 type ServiceWithNotificationPrefs = ServiceWithOptionalNotificationPrefs & {
   notificationPrefs: NotificationPrefs;
 };
 
-export function ensureServiceNotificationPrefs(
-  services: ServiceWithOptionalNotificationPrefs[],
+function hasOwn(value: object, key: string) {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function normalizeNotificationPrefs(notificationPrefs?: LegacyNotificationPrefs): {
+  notificationPrefs: NotificationPrefs;
+  changed: boolean;
+} {
+  const legacyHasAllowNotifications =
+    !!notificationPrefs && hasOwn(notificationPrefs, "allowNotifications");
+  const hasMuteAudio = !!notificationPrefs && hasOwn(notificationPrefs, "muteAudio");
+  const migratedMuteAudio =
+    hasMuteAudio
+      ? notificationPrefs.muteAudio
+      : legacyHasAllowNotifications
+        ? !notificationPrefs.allowNotifications
+        : DEFAULT_NOTIFICATION_PREFS.muteAudio;
+
+  return {
+    notificationPrefs: {
+      showBadge: notificationPrefs?.showBadge ?? DEFAULT_NOTIFICATION_PREFS.showBadge,
+      affectTray: notificationPrefs?.affectTray ?? DEFAULT_NOTIFICATION_PREFS.affectTray,
+      muteAudio: migratedMuteAudio ?? DEFAULT_NOTIFICATION_PREFS.muteAudio,
+    },
+    changed:
+      !notificationPrefs ||
+      notificationPrefs.showBadge === undefined ||
+      notificationPrefs.affectTray === undefined ||
+      !hasMuteAudio ||
+      legacyHasAllowNotifications,
+  };
+}
+
+export function ensureServiceNotificationPrefs<T extends ServiceWithOptionalNotificationPrefs>(
+  services: T[],
 ): {
-  services: ServiceWithNotificationPrefs[];
+  services: Array<T & ServiceWithNotificationPrefs>;
   changed: boolean;
 } {
   let changed = false;
 
   return {
     services: services.map((service) => {
-      const notificationPrefs = {
-        ...DEFAULT_NOTIFICATION_PREFS,
-        ...service.notificationPrefs,
-      };
+      const normalized = normalizeNotificationPrefs(service.notificationPrefs);
 
-      if (
-        service.notificationPrefs &&
-        service.notificationPrefs.showBadge !== undefined &&
-        service.notificationPrefs.affectTray !== undefined &&
-        service.notificationPrefs.muteAudio !== undefined
-      ) {
-        return {
-          ...service,
-          notificationPrefs,
-        } as ServiceWithNotificationPrefs;
+      if (!normalized.changed) {
+        return service as T & ServiceWithNotificationPrefs;
       }
 
       changed = true;
       return {
         ...service,
-        notificationPrefs,
-      };
+        notificationPrefs: normalized.notificationPrefs,
+      } as T & ServiceWithNotificationPrefs;
     }),
     changed,
   };

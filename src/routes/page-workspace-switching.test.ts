@@ -231,6 +231,37 @@ describe("workspace switching webview commands", () => {
     unmount(component);
   });
 
+  it("shows the native service context menu for saved services with legacy notification prefs", async () => {
+    const state = createWorkspaceState();
+    state.servicesById.youtube.notificationPrefs = {
+      showBadge: true,
+      affectTray: true,
+      allowNotifications: false,
+    } as unknown as typeof state.servicesById.youtube.notificationPrefs;
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(state));
+    invoke.mockResolvedValue(undefined);
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+    invoke.mockClear();
+
+    document.querySelector<HTMLButtonElement>('button[title="YouTube Music (Cmd+1)"]')
+      ?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    await settle();
+
+    expect(invoke).toHaveBeenCalledWith("show_context_menu", {
+      id: "youtube",
+      disabled: false,
+      showBadge: true,
+      affectTray: true,
+      muteAudio: true,
+    });
+
+    unmount(component);
+  });
+
   it("closes disabled workspace services without deleting their session storage", async () => {
     localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
 

@@ -345,6 +345,39 @@ describe("normalizeWorkspaceGroupsState", () => {
       },
     });
   });
+
+  it("migrates legacy notification prefs in saved workspace services", () => {
+    const service = createService({
+      id: "mail",
+      notificationPrefs: {
+        showBadge: true,
+        affectTray: false,
+        allowNotifications: false,
+      } as unknown as PageService["notificationPrefs"],
+    });
+
+    const normalized = normalizeWorkspaceGroupsState({
+      version: WORKSPACES_STATE_VERSION,
+      currentWorkspaceId: DEFAULT_WORKSPACE_ID,
+      workspaces: [
+        {
+          id: DEFAULT_WORKSPACE_ID,
+          name: "Default",
+          serviceIds: ["mail"],
+          activeServiceId: "mail",
+        },
+      ],
+      servicesById: {
+        mail: service,
+      },
+    });
+
+    expect(normalized.servicesById.mail.notificationPrefs).toEqual({
+      showBadge: true,
+      affectTray: false,
+      muteAudio: true,
+    });
+  });
 });
 
 describe("serializeWorkspaceGroupsState", () => {

@@ -362,8 +362,18 @@
     commitWorkspaceState(deleteWorkspaceGroup(workspaceState, workspaceId));
   }
 
-  function openServiceContextMenu(input: { id: string; disabled: boolean }) {
-    void showServiceContextMenu(input.id, input.disabled);
+  function openServiceContextMenu(input: {
+    id: string;
+    disabled: boolean;
+    showBadge: boolean;
+    affectTray: boolean;
+    muteAudio: boolean;
+  }) {
+    void showServiceContextMenu(input.id, input.disabled, {
+      showBadge: input.showBadge,
+      affectTray: input.affectTray,
+      muteAudio: input.muteAudio,
+    });
   }
 
   function toggleDnd() {

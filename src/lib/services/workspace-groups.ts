@@ -18,6 +18,7 @@
  */
 import type { PageService } from "./workspace-state";
 import { readStoredServices } from "./service-config";
+import { ensureServiceNotificationPrefs } from "./notification-prefs";
 import {
   DEFAULT_WORKSPACE_ICON,
   normalizeWorkspaceIcon,
@@ -91,8 +92,9 @@ export function stripRuntimeServiceState(service: PageService): PageService {
 
 function createServicesById(services: PageService[]): Record<string, PageService> {
   const servicesById: Record<string, PageService> = {};
+  const { services: normalizedServices } = ensureServiceNotificationPrefs(services);
 
-  for (const service of services) {
+  for (const service of normalizedServices) {
     if (!service.id || service.id in servicesById) {
       continue;
     }

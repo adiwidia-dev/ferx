@@ -97,6 +97,29 @@ describe("ensureServiceNotificationPrefs", () => {
       muteAudio: true,
     });
   });
+
+  it("migrates legacy allowNotifications to inverted muteAudio", () => {
+    const result = ensureServiceNotificationPrefs([
+      {
+        id: "one",
+        name: "Slack",
+        url: "https://slack.com",
+        storageKey: "storage-one",
+        notificationPrefs: {
+          showBadge: true,
+          affectTray: true,
+          allowNotifications: false,
+        },
+      },
+    ]);
+
+    expect(result.changed).toBe(true);
+    expect(result.services[0].notificationPrefs).toEqual({
+      showBadge: true,
+      affectTray: true,
+      muteAudio: true,
+    });
+  });
 });
 
 describe("countTrayRelevantUnreadServices", () => {
