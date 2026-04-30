@@ -8,6 +8,7 @@ import {
 } from "$lib/services/app-settings";
 import { WORKSPACE_ACTIVE_ID_KEY } from "$lib/services/workspace-state";
 import {
+  pickWorkspaceColor,
   WORKSPACES_STATE_KEY,
   WORKSPACES_STATE_VERSION,
   type WorkspaceGroupsState,
@@ -18,7 +19,6 @@ import {
   formatBytes,
   formatServiceCount,
   formatWorkspaceCount,
-  pickWorkspaceColor,
   readSettingsPageStartupState,
   resolveSettingsServiceRoute,
   scheduleSettingsWorkspaceReload,

@@ -1,8 +1,27 @@
+/**
+ * workspace-groups.ts — pure workspace state transforms
+ *
+ * Owns the `WorkspaceGroupsState` shape (the full multi-workspace tree) and
+ * all pure functions that read or update it.
+ *
+ * RULES for this module:
+ *  - Every exported function is a pure state transform: (state, …args) → newState.
+ *  - No `invoke`, no webview side-effects, no localStorage reads/writes.
+ *  - Side-effectful wrappers (e.g. "disable and close webviews") live in
+ *    workspace-actions.ts, not here.
+ *
+ * BOUNDARY vs workspace-state.ts:
+ *  - workspace-groups.ts  = workspace-level concerns (multi-workspace tree, service IDs,
+ *                           active workspace, workspace metadata).
+ *  - workspace-state.ts   = service-level concerns (PageService shape, single-service
+ *                           add/edit/delete flow, startup migration).
+ */
 import type { PageService } from "./workspace-state";
 import { readStoredServices } from "./service-config";
 import {
   DEFAULT_WORKSPACE_ICON,
   normalizeWorkspaceIcon,
+  type WorkspaceIconKey,
 } from "./workspace-icons";
 
 export { DEFAULT_WORKSPACE_ICON } from "./workspace-icons";
@@ -12,6 +31,30 @@ export const WORKSPACES_STATE_KEY = "ferx-workspaces-state";
 export const DEFAULT_WORKSPACE_ID = "default";
 export const DEFAULT_WORKSPACE_NAME = "Default";
 export const DEFAULT_WORKSPACE_COLOR = "#3B82F6";
+
+const WORKSPACE_COLORS = ["#3B82F6", "#22C55E", "#F59E0B", "#A855F7", "#EF4444", "#14B8A6"];
+
+export function pickWorkspaceColor(index: number): string {
+  return WORKSPACE_COLORS[index % WORKSPACE_COLORS.length];
+}
+
+export function createNewWorkspace(
+  state: WorkspaceGroupsState,
+  input: { name: string; icon: WorkspaceIconKey },
+): WorkspaceGroupsState {
+  const id = `workspace-${crypto.randomUUID().slice(0, 8)}`;
+  return setCurrentWorkspaceId(
+    createWorkspaceGroup(state, {
+      id,
+      name: input.name,
+      serviceIds: [],
+      activeServiceId: "",
+      color: pickWorkspaceColor(state.workspaces.length),
+      icon: input.icon,
+    }),
+    id,
+  );
+}
 
 export interface WorkspaceGroup {
   id: string;

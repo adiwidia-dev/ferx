@@ -8,10 +8,12 @@ import {
   WORKSPACES_STATE_VERSION,
   addServiceToWorkspace,
   createDefaultWorkspaceGroupsState,
+  createNewWorkspace,
   createWorkspaceGroup,
   deleteWorkspaceGroup,
   getWorkspaceServices,
   normalizeWorkspaceGroupsState,
+  pickWorkspaceColor,
   readWorkspaceGroupsStartupState,
   removeServiceFromWorkspace,
   renameWorkspaceGroup,
@@ -413,5 +415,53 @@ describe("readWorkspaceGroupsStartupState", () => {
       },
       toastMessage: "Saved workspaces were reset.",
     });
+  });
+});
+
+describe("pickWorkspaceColor", () => {
+  it("returns a hex color string", () => {
+    expect(pickWorkspaceColor(0)).toMatch(/^#[0-9A-Fa-f]{6}$/);
+  });
+
+  it("cycles through colors by index", () => {
+    const c0 = pickWorkspaceColor(0);
+    const c6 = pickWorkspaceColor(6);
+    expect(c0).toBe(c6); // palette has 6 entries, index 6 wraps to 0
+  });
+
+  it("returns a different color for consecutive indices", () => {
+    expect(pickWorkspaceColor(0)).not.toBe(pickWorkspaceColor(1));
+  });
+});
+
+describe("createNewWorkspace", () => {
+  it("appends a new workspace and switches to it", () => {
+    const base = createDefaultWorkspaceGroupsState();
+    const next = createNewWorkspace(base, { name: "Work", icon: "briefcase" });
+    expect(next.workspaces).toHaveLength(2);
+    const added = next.workspaces.find((w) => w.name === "Work");
+    expect(added).toBeDefined();
+    expect(next.currentWorkspaceId).toBe(added!.id);
+  });
+
+  it("generates a unique id prefixed with 'workspace-'", () => {
+    const base = createDefaultWorkspaceGroupsState();
+    const next = createNewWorkspace(base, { name: "Home", icon: "house" });
+    const added = next.workspaces.find((w) => w.name === "Home")!;
+    expect(added.id).toMatch(/^workspace-/);
+  });
+
+  it("assigns a color from the palette", () => {
+    const base = createDefaultWorkspaceGroupsState();
+    const next = createNewWorkspace(base, { name: "Home", icon: "house" });
+    const added = next.workspaces.find((w) => w.name === "Home")!;
+    expect(added.color).toMatch(/^#[0-9A-Fa-f]{6}$/);
+  });
+
+  it("normalizes the icon", () => {
+    const base = createDefaultWorkspaceGroupsState();
+    const next = createNewWorkspace(base, { name: "Home", icon: "house" });
+    const added = next.workspaces.find((w) => w.name === "Home")!;
+    expect(added.icon).toBe("house");
   });
 });

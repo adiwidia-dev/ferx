@@ -35,7 +35,9 @@
   } from "$lib/services/updater";
   import {
     createDefaultWorkspaceGroupsState,
+    createNewWorkspace,
     deleteWorkspaceGroup,
+    getWorkspaceServices,
     renameWorkspaceGroup,
     setCurrentWorkspaceId,
     setWorkspaceDisabled as setWorkspaceGroupDisabled,
@@ -44,9 +46,7 @@
   } from "$lib/services/workspace-groups";
   import {
     commitSettingsWorkspaceState,
-    createSettingsWorkspace,
     getSettingsActiveServiceId,
-    getSettingsServices,
     readSettingsPageStartupState,
     resolveSettingsServiceRoute,
     scheduleSettingsWorkspaceReload,
@@ -63,7 +63,7 @@
   ];
 
   let workspaceState = $state<WorkspaceGroupsState>(createDefaultWorkspaceGroupsState());
-  let services = $derived(getSettingsServices(workspaceState));
+  let services = $derived(getWorkspaceServices(workspaceState));
   let activeId = $derived(getSettingsActiveServiceId(workspaceState));
   let isDnd = $state(false);
   let isTodosPanelOpen = $state(false);
@@ -317,7 +317,7 @@
   function handleSidebarPointerDown(_event: PointerEvent, _id: string) {}
 
   function createWorkspace(input: { name: string; icon: WorkspaceIconKey }) {
-    commitWorkspaceState(createSettingsWorkspace(workspaceState, input));
+    commitWorkspaceState(createNewWorkspace(workspaceState, input));
   }
 
   function updateWorkspaceIcon(input: { workspaceId: string; icon: WorkspaceIconKey }) {
