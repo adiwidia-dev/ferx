@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
-  createDeleteWebviewPayload,
   createRightPanelWidthPayload,
   createServiceWebviewPayload,
   createWebviewIdPayload,
@@ -13,13 +12,19 @@ type InvokeCommand = (command: string, args?: Record<string, unknown>) => Promis
 type Sleep = (ms: number) => Promise<unknown>;
 
 export function createWebviewCommandQueue() {
-  let queue: Promise<unknown> = Promise.resolve();
+  let queue: Promise<void> = Promise.resolve();
 
   return {
-    run(run: () => Promise<unknown>) {
-      queue = queue.then(run, run);
-      void queue;
-      return queue;
+    run(fn: () => Promise<unknown>) {
+      const result = queue.then(fn);
+      // Keep the queue moving even if this command fails, but don't silently
+      // swallow the error — log it so it shows up in Tauri's dev console.
+      queue = result.catch((error: unknown) => {
+        console.error("[ferx] webview command failed:", error);
+      });
+      // Return the un-caught promise so callers that need to sequence on
+      // success/failure (e.g. hideActiveWebviewsForOverlay) still can.
+      return result;
     },
     idle() {
       return queue;
@@ -115,7 +120,7 @@ export function deleteServiceWebview(
   service: DeleteWebviewPayload,
   invokeCommand: InvokeCommand = invoke,
 ) {
-  return invokeCommand("delete_webview", { payload: createDeleteWebviewPayload(service) });
+  return invokeCommand("delete_webview", { payload: service });
 }
 
 export function setRightPanelWidth(width: number, invokeCommand: InvokeCommand = invoke) {
