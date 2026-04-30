@@ -397,13 +397,15 @@
   }
 
   function reloadService(id: string) {
-    void reloadServiceWebview(id);
+    void webviewCommands.run(() => reloadServiceWebview(id));
   }
 
   function toggleDisable(id: string) {
     const nextState = toggleWorkspaceServiceDisabled(workspaceState, id);
     workspaceState = nextState.state;
-    if (nextState.deleteWebview) void deleteServiceWebview(nextState.deleteWebview);
+    if (nextState.deleteWebview) {
+      void webviewCommands.run(() => deleteServiceWebview(nextState.deleteWebview!));
+    }
   }
 
   function updateServiceNotificationPrefs(
@@ -417,7 +419,9 @@
     const nextState = deleteServiceFromWorkspaceState(workspaceState, badges, id);
     workspaceState = nextState.state;
     badges = nextState.badges;
-    if (nextState.deletedService) void deleteServiceWebview(nextState.deletedService);
+    if (nextState.deletedService) {
+      void webviewCommands.run(() => deleteServiceWebview(nextState.deletedService!));
+    }
   }
 
   async function openServiceContextMenu(input: { id: string; disabled: boolean }) {
@@ -439,14 +443,18 @@
   function setWorkspaceDisabled(input: { workspaceId: string; disabled: boolean }) {
     const nextState = setWorkspaceDisabledWithEffects(workspaceState, input);
     workspaceState = nextState.state;
-    for (const serviceId of nextState.closeWebviewIds) void closeServiceWebview(serviceId);
-    if (nextState.shouldHideWebviews) void hideAllWebviews();
+    for (const serviceId of nextState.closeWebviewIds) {
+      void webviewCommands.run(() => closeServiceWebview(serviceId));
+    }
+    if (nextState.shouldHideWebviews) void webviewCommands.run(hideAllWebviews);
   }
 
   function deleteWorkspace(workspaceId: string) {
     const nextState = deleteWorkspaceWithEffects(workspaceState, workspaceId);
     workspaceState = nextState.state;
-    for (const serviceId of nextState.closeWebviewIds) void closeServiceWebview(serviceId);
+    for (const serviceId of nextState.closeWebviewIds) {
+      void webviewCommands.run(() => closeServiceWebview(serviceId));
+    }
   }
 
   // ---------------------------------------------------------------------------

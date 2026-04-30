@@ -1,6 +1,20 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// jsdom does not define elementFromPoint. Define a configurable stub on the
+// document instance so vi.spyOn and direct calls work across all tests.
+beforeEach(() => {
+  Object.defineProperty(document, "elementFromPoint", {
+    configurable: true,
+    writable: true,
+    value: () => null,
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 import { createDragDropState } from "./drag-drop.svelte";
 
 // ---------------------------------------------------------------------------

@@ -14,6 +14,7 @@ function makeStorage() {
   return {
     schedule: vi.fn(),
     flush: vi.fn(),
+    clear: vi.fn(),
   };
 }
 

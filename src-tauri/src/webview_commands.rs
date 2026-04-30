@@ -7,7 +7,6 @@ use crate::download_dialog::handle_service_webview_download;
 use crate::file_drop::register_file_drop_handler;
 use crate::navigation_bridge::emit_badge_update;
 use crate::navigation_bridge::handle_special_navigation;
-use crate::service_runtime::badge_strategy_for_url;
 use crate::service_storage::{
     data_store_identifier_for_storage_key, session_dir_for_storage_key,
 };

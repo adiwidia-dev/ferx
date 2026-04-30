@@ -1,11 +1,13 @@
 // Payload types are generated from Rust via tauri-specta. Import them from
 // there so this file never drifts from the actual Tauri command signatures.
-export type {
+import type {
   ServiceWebviewCommandPayload,
   DeleteWebviewPayload,
   WebviewIdPayload,
   RightPanelWidthPayload,
 } from "$lib/tauri-commands";
+
+export type { ServiceWebviewCommandPayload, DeleteWebviewPayload, WebviewIdPayload, RightPanelWidthPayload };
 
 export type ServiceWebviewService = {
   id: string;

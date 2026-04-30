@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type MockInstance } from "vitest";
 
 import { createServiceEditorStore, type SaveServiceContext } from "./service-editor.svelte";
+import type { PageService } from "./workspace-state";
 
 function makePageService(overrides = {}) {
   return {
@@ -82,16 +83,23 @@ describe("createServiceEditorStore", () => {
   });
 });
 
-function makeCtx(overrides: Partial<SaveServiceContext> = {}): SaveServiceContext {
+type CtxMocks = {
+  showToast: MockInstance;
+  onWorkspaceUpdate: MockInstance;
+  deleteWebview: MockInstance;
+  loadService: MockInstance;
+};
+
+function makeCtx(overrides: Partial<SaveServiceContext> = {}): SaveServiceContext & CtxMocks {
   return {
-    services: [],
+    services: [] as PageService[],
     activeId: "",
     showToast: vi.fn(),
     onWorkspaceUpdate: vi.fn(),
     deleteWebview: vi.fn(() => Promise.resolve()),
     loadService: vi.fn(() => Promise.resolve()),
     ...overrides,
-  };
+  } as unknown as SaveServiceContext & CtxMocks;
 }
 
 describe("createServiceEditorStore — save()", () => {

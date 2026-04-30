@@ -12,7 +12,7 @@ type InvokeCommand = (command: string, args?: Record<string, unknown>) => Promis
 type Sleep = (ms: number) => Promise<unknown>;
 
 export function createWebviewCommandQueue() {
-  let queue: Promise<void> = Promise.resolve();
+  let queue: Promise<unknown> = Promise.resolve();
 
   return {
     run(fn: () => Promise<unknown>) {
