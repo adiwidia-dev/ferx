@@ -2,6 +2,12 @@
 import { flushSync, mount, unmount } from "svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DEFAULT_NOTIFICATION_PREFS } from "$lib/services/notification-prefs";
+import {
+  WORKSPACES_STATE_KEY,
+  WORKSPACES_STATE_VERSION,
+  type WorkspaceGroupsState,
+} from "$lib/services/workspace-groups";
 import WorkspacePage from "./+page.svelte";
 
 const invoke = vi.hoisted(() => vi.fn());
@@ -47,6 +53,31 @@ function mockElementFromPoint(target: Element) {
     }
 
     Reflect.deleteProperty(document, "elementFromPoint");
+  };
+}
+
+function createWorkspaceState(): WorkspaceGroupsState {
+  return {
+    version: WORKSPACES_STATE_VERSION,
+    currentWorkspaceId: "default",
+    workspaces: [
+      {
+        id: "default",
+        name: "Default",
+        serviceIds: ["chat"],
+        activeServiceId: "chat",
+        icon: "briefcase",
+      },
+    ],
+    servicesById: {
+      chat: {
+        id: "chat",
+        name: "Chat",
+        url: "https://chat.example.com/",
+        storageKey: "storage-chat",
+        notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+      },
+    },
   };
 }
 
@@ -103,11 +134,50 @@ describe("workspace todos panel", () => {
     ) as HTMLButtonElement | null;
     closeButton?.click();
     flushSync();
-    await Promise.resolve();
+    await waitForTodoFocus();
 
     expect(document.querySelector('[data-testid="todos-panel"]')).toBeFalsy();
     expect(invoke).toHaveBeenCalledWith("set_right_panel_width", {
       payload: { width: 0 },
+    });
+
+    unmount(component);
+  });
+
+  it("queues todo panel width updates behind pending webview commands", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+    let resolveOpenService: () => void = () => {};
+    invoke.mockImplementation((command) => {
+      if (command === "open_service") {
+        return new Promise((resolve) => {
+          resolveOpenService = () => resolve(undefined);
+        });
+      }
+
+      return Promise.resolve();
+    });
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+
+    flushSync();
+    await Promise.resolve();
+    invoke.mockClear();
+
+    document.querySelector<HTMLButtonElement>('button[title="Todos"]')?.click();
+    flushSync();
+    await Promise.resolve();
+
+    expect(invoke).not.toHaveBeenCalledWith("set_right_panel_width", {
+      payload: { width: 360 },
+    });
+
+    resolveOpenService();
+    await waitForTodoFocus();
+
+    expect(invoke).toHaveBeenCalledWith("set_right_panel_width", {
+      payload: { width: 360 },
     });
 
     unmount(component);

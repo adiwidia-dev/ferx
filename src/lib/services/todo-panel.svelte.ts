@@ -1,11 +1,10 @@
 /**
  * Reactive state and operations for the todos panel.
  *
- * Call createTodoPanelStore() once at page level; pass the result to
- * TodosPanel and setRightPanelWidth via the component.
+ * Call createTodoPanelStore() once at page level; inject a panel-width
+ * callback there so native webview resizing stays in the page command queue.
  */
 
-import { setRightPanelWidth } from "$lib/services/webview-commands";
 import {
   addTodoItem,
   createTodoItem,
@@ -26,7 +25,12 @@ import type { DebouncedStorageWriter } from "$lib/services/workspace-page-lifecy
 
 export const TODOS_PANEL_WIDTH = 360;
 
-export function createTodoPanelStore(storage: DebouncedStorageWriter<TodoNote[]>) {
+type SetPanelWidth = (width: number) => void | Promise<unknown>;
+
+export function createTodoPanelStore(
+  storage: DebouncedStorageWriter<TodoNote[]>,
+  setPanelWidth: SetPanelWidth = () => undefined,
+) {
   let notes = $state<TodoNote[]>([]);
   let isPanelOpen = $state(false);
 
@@ -55,7 +59,7 @@ export function createTodoPanelStore(storage: DebouncedStorageWriter<TodoNote[]>
 
     setOpen(open: boolean) {
       isPanelOpen = open;
-      void setRightPanelWidth(open ? TODOS_PANEL_WIDTH : 0);
+      void setPanelWidth(open ? TODOS_PANEL_WIDTH : 0);
     },
 
     addNote() {

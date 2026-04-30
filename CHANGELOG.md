@@ -19,6 +19,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 - Restored the Add Service dialog, Edit Service dialog, workspace picker, and service context menu so they appear correctly above active service webviews
 - Fixed all services reloading from scratch every time an overlay (modal, workspace switcher, settings) was dismissed — `hide_all_webviews` was accidentally closing webviews instead of moving them offscreen
 - Fixed a race condition where dismissing an overlay could flash service content briefly behind it before the overlay finished closing
+- Fixed remaining webview command sequencing gaps for todo panel resizing, service add/edit saves, and page cleanup
 
 ---
 

@@ -2,14 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createTodoPanelStore, TODOS_PANEL_WIDTH } from "./todo-panel.svelte";
 
-// setRightPanelWidth calls invoke — replace it with a no-op for unit tests.
-vi.mock("$lib/services/webview-commands", () => ({
-  setRightPanelWidth: vi.fn(() => Promise.resolve()),
-}));
-
-import { setRightPanelWidth } from "$lib/services/webview-commands";
-const mockSetWidth = vi.mocked(setRightPanelWidth);
-
 function makeStorage() {
   return {
     schedule: vi.fn(),
@@ -26,19 +18,21 @@ describe("createTodoPanelStore — panel state", () => {
   });
 
   it("setOpen(true) opens panel and calls setRightPanelWidth with panel width", () => {
-    const todos = createTodoPanelStore(makeStorage());
+    const setPanelWidth = vi.fn();
+    const todos = createTodoPanelStore(makeStorage(), setPanelWidth);
     todos.setOpen(true);
     expect(todos.isPanelOpen).toBe(true);
-    expect(mockSetWidth).toHaveBeenCalledWith(TODOS_PANEL_WIDTH);
+    expect(setPanelWidth).toHaveBeenCalledWith(TODOS_PANEL_WIDTH);
   });
 
   it("setOpen(false) closes panel and calls setRightPanelWidth(0)", () => {
-    const todos = createTodoPanelStore(makeStorage());
+    const setPanelWidth = vi.fn();
+    const todos = createTodoPanelStore(makeStorage(), setPanelWidth);
     todos.setOpen(true);
-    mockSetWidth.mockClear();
+    setPanelWidth.mockClear();
     todos.setOpen(false);
     expect(todos.isPanelOpen).toBe(false);
-    expect(mockSetWidth).toHaveBeenCalledWith(0);
+    expect(setPanelWidth).toHaveBeenCalledWith(0);
   });
 });
 

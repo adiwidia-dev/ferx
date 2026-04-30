@@ -113,8 +113,10 @@
   // ---------------------------------------------------------------------------
 
   const dnd = createDragDropState();
-  const todos = createTodoPanelStore(todoStorage);
   const serviceEditor = createServiceEditorStore();
+  const todos = createTodoPanelStore(todoStorage, (width) =>
+    webviewCommands.run(() => setRightPanelWidth(width)),
+  );
 
   // ---------------------------------------------------------------------------
   // Derived state
@@ -311,7 +313,7 @@
       cleanupFlushOnExit();
       workspaceStorage.flush(workspaceState);
       todos.flush();
-      void setRightPanelWidth(0);
+      void webviewCommands.run(() => setRightPanelWidth(0));
       cleanupPageListeners({
         unlistenToastPromise,
         unlistenMenuPromise: unlistenPromise,
@@ -479,8 +481,9 @@
       onWorkspaceUpdate: (next) => {
         workspaceState = applyCurrentWorkspaceServices(workspaceState, next.services, next.activeId);
       },
-      deleteWebview: deleteServiceWebview,
-      loadService: (service) => preloadServiceWebview(service, spellCheckEnabled),
+      deleteWebview: (payload) => webviewCommands.run(() => deleteServiceWebview(payload)),
+      loadService: (service) =>
+        webviewCommands.run(() => preloadServiceWebview(service, spellCheckEnabled)),
     });
   }
 </script>
