@@ -80,7 +80,6 @@
   // Core page state
   // ---------------------------------------------------------------------------
 
-  type Service = PageService;
   let toastMessage = $state("");
   let toastTimeout = $state<ReturnType<typeof setTimeout> | null>(null);
   let workspaceState = $state<WorkspaceGroupsState>(createDefaultWorkspaceGroupsState());
@@ -153,7 +152,7 @@
   $effect(() => {
     if (isInitialized && hasUnreadNotifications !== lastTrayUnreadState) {
       lastTrayUnreadState = hasUnreadNotifications;
-      invoke("update_tray_icon", { hasUnread: hasUnreadNotifications });
+      void invoke("update_tray_icon", { hasUnread: hasUnreadNotifications });
     }
   });
 
@@ -459,7 +458,7 @@
     serviceEditor.open(null);
   }
 
-  async function openEditModal(service: Service) {
+  async function openEditModal(service: PageService) {
     await hideActiveWebviewsForOverlay();
     serviceEditor.openForEdit(service);
   }
