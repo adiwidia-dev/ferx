@@ -24,7 +24,7 @@ export type ServiceWebviewService = {
   notificationPrefs: {
     showBadge?: boolean;
     affectTray?: boolean;
-    allowNotifications: boolean;
+    muteAudio: boolean;
   };
 };
 
@@ -41,7 +41,7 @@ export function createServiceWebviewPayload(
     id: service.id,
     url: service.url,
     storageKey: service.storageKey,
-    allowNotifications: service.notificationPrefs.allowNotifications,
+    allowNotifications: true,
     badgeMonitoringEnabled,
     spellCheckEnabled,
     resourceUsageMonitoringEnabled,

@@ -1,13 +1,13 @@
 export interface NotificationPrefs {
   showBadge: boolean;
   affectTray: boolean;
-  allowNotifications: boolean;
+  muteAudio: boolean;
 }
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   showBadge: true,
   affectTray: true,
-  allowNotifications: true,
+  muteAudio: false,
 };
 
 type ServiceWithOptionalNotificationPrefs = {
@@ -43,7 +43,7 @@ export function ensureServiceNotificationPrefs(
         service.notificationPrefs &&
         service.notificationPrefs.showBadge !== undefined &&
         service.notificationPrefs.affectTray !== undefined &&
-        service.notificationPrefs.allowNotifications !== undefined
+        service.notificationPrefs.muteAudio !== undefined
       ) {
         return {
           ...service,

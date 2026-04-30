@@ -70,7 +70,7 @@ function parseNotificationPrefs(value: unknown): Partial<NotificationPrefs> | un
   }
 
   const prefs: Partial<NotificationPrefs> = {};
-  for (const key of ["showBadge", "affectTray", "allowNotifications"] as const) {
+  for (const key of ["showBadge", "affectTray", "muteAudio"] as const) {
     const candidate = value[key];
     if (candidate !== undefined && typeof candidate !== "boolean") {
       return null;
