@@ -833,10 +833,10 @@ bidi-js@^1.0.3:
   dependencies:
     require-from-string "^2.0.2"
 
-bits-ui@^2.17.3:
-  version "2.17.3"
-  resolved "https://registry.npmjs.org/bits-ui/-/bits-ui-2.17.3.tgz"
-  integrity sha512-Bef41uY9U2jaBJHPhcPvmBNkGec5Wx2z6eioDsTmsaR2vH4QoaOcPi75gzCG3+/2TNr6v/qBwzgWNPYCxNtrEA==
+bits-ui@^2.18.1:
+  version "2.18.1"
+  resolved "https://registry.yarnpkg.com/bits-ui/-/bits-ui-2.18.1.tgz#180c80f92d5c04789afe4b150360ddafe13c502c"
+  integrity sha512-KkemzKFH4T3gt3H+P86JcnAWExjByv/6vlwjm/BoCwTPHu03yiCdxbghdJLvFReQTe0acCAiRcKfmixxD6XvlA==
   dependencies:
     "@floating-ui/core" "^1.7.1"
     "@floating-ui/dom" "^1.7.1"
