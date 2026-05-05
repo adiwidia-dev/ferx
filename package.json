@@ -48,7 +48,7 @@
     "@tauri-apps/cli": "^2.10.1",
     "bits-ui": "^2.17.3",
     "clsx": "^2.1.1",
-    "jsdom": "^28.1.0",
+    "jsdom": "^29.1.1",
     "shadcn-svelte": "^1.2.7",
     "svelte": "^5.55.4",
     "svelte-check": "^4.0.0",
