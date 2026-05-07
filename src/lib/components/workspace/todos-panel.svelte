@@ -6,6 +6,11 @@
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import XIcon from "@lucide/svelte/icons/x";
   import { Button } from "$lib/components/ui/button";
+  import {
+    preventMacosNavigationPrivateUseInput,
+    preventMacosNavigationPrivateUseKeypress,
+    sanitizeTextInputValue,
+  } from "$lib/services/keyboard-input-guard";
   import type { TodoNote } from "$lib/services/todos";
 
   interface Props {
@@ -211,7 +216,7 @@
   }
 
   function focusWhenPending(
-    input: HTMLInputElement,
+    input: HTMLTextAreaElement,
     params: { itemId: string; pendingFocusItemId: string | null },
   ) {
     function focusIfPending(next: typeof params) {
@@ -227,6 +232,24 @@
 
     return {
       update: focusIfPending,
+    };
+  }
+
+  function autoResizeTextarea(textarea: HTMLTextAreaElement, value: string) {
+    function resize() {
+      textarea.style.height = "auto";
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+
+    queueMicrotask(resize);
+
+    return {
+      update(nextValue: string) {
+        if (nextValue !== value) {
+          value = nextValue;
+        }
+        queueMicrotask(resize);
+      },
     };
   }
 
@@ -259,6 +282,14 @@
     onUpdateItemText(noteId, itemId, items[0]);
     const insertedIds = onAddItemsAfter(noteId, itemId, items.slice(1));
     pendingFocusItemId = insertedIds.at(-1) ?? itemId;
+  }
+
+  function handleTodoInput(event: Event, onValue: (value: string) => void) {
+    onValue(
+      sanitizeTextInputValue(
+        event.currentTarget as HTMLInputElement | HTMLTextAreaElement,
+      ),
+    );
   }
 </script>
 
@@ -336,8 +367,10 @@
               aria-label="Todo note title"
               spellcheck={spellCheckEnabled}
               value={note.title}
+              onbeforeinput={(event) => preventMacosNavigationPrivateUseInput(event)}
               oninput={(event) =>
-                onUpdateNoteTitle(note.id, (event.currentTarget as HTMLInputElement).value)}
+                handleTodoInput(event, (value) => onUpdateNoteTitle(note.id, value))}
+              onkeypress={(event) => preventMacosNavigationPrivateUseKeypress(event)}
               onkeydown={(event) => {
                 if (event.key === "Enter") {
                   (event.currentTarget as HTMLInputElement).blur();
@@ -387,23 +420,27 @@
                       (event.currentTarget as HTMLInputElement).checked,
                     )}
                 />
-                <input
-                  class="min-w-0 flex-1 border-0 bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground"
+                <textarea
+                  class="min-h-7 w-full min-w-0 flex-1 resize-none overflow-hidden break-words whitespace-pre-wrap border-0 bg-transparent py-1 text-sm leading-5 outline-none placeholder:text-muted-foreground"
                   aria-label="Todo item text"
                   data-todo-item-input={item.id}
+                  rows="1"
                   spellcheck={spellCheckEnabled}
                   use:focusWhenPending={{ itemId: item.id, pendingFocusItemId }}
+                  use:autoResizeTextarea={item.text}
                   value={item.text}
                   placeholder="List item"
+                  onbeforeinput={(event) => preventMacosNavigationPrivateUseInput(event)}
                   oninput={(event) =>
-                    onUpdateItemText(note.id, item.id, (event.currentTarget as HTMLInputElement).value)}
+                    handleTodoInput(event, (value) => onUpdateItemText(note.id, item.id, value))}
+                  onkeypress={(event) => preventMacosNavigationPrivateUseKeypress(event)}
                   onkeydown={(event) => {
                     if (event.key === "Enter") {
                       handleItemEnter(note.id, item.id, event);
                     }
                   }}
                   onpaste={(event) => handleItemPaste(note.id, item.id, event)}
-                />
+                ></textarea>
                 <Button
                   aria-label="Delete todo item"
                   variant="ghost"
@@ -474,22 +511,26 @@
                             (event.currentTarget as HTMLInputElement).checked,
                           )}
                       />
-                      <input
-                        class="min-w-0 flex-1 border-0 bg-transparent py-1 text-sm line-through outline-none placeholder:text-muted-foreground"
+                      <textarea
+                        class="min-h-7 w-full min-w-0 flex-1 resize-none overflow-hidden break-words whitespace-pre-wrap border-0 bg-transparent py-1 text-sm leading-5 line-through outline-none placeholder:text-muted-foreground"
                         aria-label="Completed todo item text"
                         data-todo-item-input={item.id}
+                        rows="1"
                         spellcheck={spellCheckEnabled}
                         use:focusWhenPending={{ itemId: item.id, pendingFocusItemId }}
+                        use:autoResizeTextarea={item.text}
                         value={item.text}
+                        onbeforeinput={(event) => preventMacosNavigationPrivateUseInput(event)}
                         oninput={(event) =>
-                          onUpdateItemText(note.id, item.id, (event.currentTarget as HTMLInputElement).value)}
+                          handleTodoInput(event, (value) => onUpdateItemText(note.id, item.id, value))}
+                        onkeypress={(event) => preventMacosNavigationPrivateUseKeypress(event)}
                         onkeydown={(event) => {
                           if (event.key === "Enter") {
                             handleItemEnter(note.id, item.id, event);
                           }
                         }}
                         onpaste={(event) => handleItemPaste(note.id, item.id, event)}
-                      />
+                      ></textarea>
                       <Button
                         aria-label="Delete completed todo item"
                         variant="ghost"

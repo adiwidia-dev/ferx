@@ -24,6 +24,9 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 - Fixed Add Service and workspace switcher overlays so one click opens them after active service webviews are moved offscreen
 - Fixed service notification badges disappearing from the sidebar after opening Settings
 - Do Not Disturb now mutes service webview audio in addition to suppressing unread tray state
+- Fixed macOS arrow/navigation key private-use characters appearing as boxes in service chat fields and todo inputs
+- Fixed long todo item text being clipped by wrapping item text across multiple lines
+- Fixed long-pressing letter keys on macOS inserting only one character instead of repeating
 
 ---
 

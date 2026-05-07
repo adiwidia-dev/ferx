@@ -3,6 +3,8 @@ mod app_state;
 mod desktop_ui;
 mod download_dialog;
 mod file_drop;
+#[cfg(target_os = "macos")]
+mod macos_defaults;
 mod navigation_bridge;
 mod service_webview_badge_scripts;
 mod service_webview_resource_usage;
@@ -71,6 +73,9 @@ pub(crate) fn build_specta() -> SpectaBuilder<tauri::Wry> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "macos")]
+    macos_defaults::disable_press_and_hold_key_popup();
+
     let specta_builder = build_specta();
 
     // In debug builds, regenerate src/lib/tauri-commands.ts so the TypeScript

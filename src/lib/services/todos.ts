@@ -1,3 +1,5 @@
+import { stripMacosNavigationPrivateUseChars } from "$lib/services/keyboard-input-guard";
+
 export const TODO_NOTES_STORAGE_KEY = "ferx-todo-notes";
 
 export interface TodoItem {
@@ -33,7 +35,7 @@ function parseTodoItem(value: unknown): TodoItem | null {
 
   return {
     id: value.id,
-    text: value.text,
+    text: stripMacosNavigationPrivateUseChars(value.text),
     completed: value.completed,
   };
 }
@@ -55,7 +57,7 @@ function parseTodoNote(value: unknown): TodoNote | null {
 
   return {
     id: value.id,
-    title: value.title,
+    title: stripMacosNavigationPrivateUseChars(value.title),
     collapsed: value.collapsed ?? false,
     completedCollapsed: value.completedCollapsed,
     items: value.items.flatMap((item) => {
@@ -127,7 +129,7 @@ export function serializeTodoNotes(notes: TodoNote[]): string {
 export function createTodoNote(createId: () => string, title = "Title"): TodoNote {
   return {
     id: createId(),
-    title,
+    title: stripMacosNavigationPrivateUseChars(title),
     collapsed: false,
     items: [],
     completedCollapsed: false,
@@ -137,7 +139,7 @@ export function createTodoNote(createId: () => string, title = "Title"): TodoNot
 export function createTodoItem(createId: () => string, text = ""): TodoItem {
   return {
     id: createId(),
-    text,
+    text: stripMacosNavigationPrivateUseChars(text),
     completed: false,
   };
 }
@@ -147,7 +149,10 @@ export function updateTodoNoteTitle(
   noteId: string,
   title: string,
 ): TodoNote[] {
-  return notes.map((note) => (note.id === noteId ? { ...note, title } : note));
+  const sanitizedTitle = stripMacosNavigationPrivateUseChars(title);
+  return notes.map((note) =>
+    note.id === noteId ? { ...note, title: sanitizedTitle } : note,
+  );
 }
 
 export function deleteTodoNote(notes: TodoNote[], noteId: string): TodoNote[] {
@@ -211,12 +216,13 @@ export function updateTodoItemText(
   itemId: string,
   text: string,
 ): TodoNote[] {
+  const sanitizedText = stripMacosNavigationPrivateUseChars(text);
   return notes.map((note) =>
     note.id === noteId
       ? {
           ...note,
           items: note.items.map((item) =>
-            item.id === itemId ? { ...item, text } : item,
+            item.id === itemId ? { ...item, text: sanitizedText } : item,
           ),
         }
       : note,

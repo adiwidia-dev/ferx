@@ -56,6 +56,16 @@ function mockElementFromPoint(target: Element) {
   };
 }
 
+function todoItemEditors() {
+  return Array.from(
+    document.querySelectorAll<HTMLTextAreaElement>('textarea[aria-label="Todo item text"]'),
+  );
+}
+
+function todoItemEditor() {
+  return document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Todo item text"]');
+}
+
 function createWorkspaceState(): WorkspaceGroupsState {
   return {
     version: WORKSPACES_STATE_VERSION,
@@ -205,9 +215,7 @@ describe("workspace todos panel", () => {
     document.querySelector<HTMLButtonElement>('button[title="Todos"]')?.click();
     flushSync();
 
-    const itemInput = document.querySelector<HTMLInputElement>(
-      'input[aria-label="Todo item text"]',
-    );
+    const itemInput = todoItemEditor();
     itemInput?.focus();
     itemInput?.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
@@ -215,9 +223,7 @@ describe("workspace todos panel", () => {
     flushSync();
     await waitForTodoFocus();
 
-    const itemInputs = Array.from(
-      document.querySelectorAll<HTMLInputElement>('input[aria-label="Todo item text"]'),
-    );
+    const itemInputs = todoItemEditors();
     expect(itemInputs).toHaveLength(2);
     expect(document.activeElement).toBe(itemInputs[1]);
 
@@ -246,9 +252,7 @@ describe("workspace todos panel", () => {
     document.querySelector<HTMLButtonElement>('button[title="Todos"]')?.click();
     flushSync();
 
-    const itemInput = document.querySelector<HTMLInputElement>(
-      'input[aria-label="Todo item text"]',
-    );
+    const itemInput = todoItemEditor();
     const pasteEvent = new Event("paste", {
       bubbles: true,
       cancelable: true,
@@ -261,15 +265,118 @@ describe("workspace todos panel", () => {
     itemInput?.dispatchEvent(pasteEvent);
     await waitForTodoFocus();
 
-    const itemInputs = Array.from(
-      document.querySelectorAll<HTMLInputElement>('input[aria-label="Todo item text"]'),
-    );
+    const itemInputs = todoItemEditors();
     expect(itemInputs.map((input) => input.value)).toEqual([
       "Sawi hijau",
       "Sawi",
       "Sawi besar",
     ]);
     expect(document.activeElement).toBe(itemInputs[2]);
+
+    unmount(component);
+  });
+
+  it("blocks macOS private-use arrow characters before they enter todo inputs", () => {
+    localStorage.setItem(
+      "ferx-todo-notes",
+      JSON.stringify([
+        {
+          id: "note-1",
+          title: "Groceries",
+          completedCollapsed: false,
+          items: [{ id: "item-1", text: "test", completed: false }],
+        },
+      ]),
+    );
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    document.querySelector<HTMLButtonElement>('button[title="Todos"]')?.click();
+    flushSync();
+
+    const itemInput = todoItemEditor();
+    const beforeInput = new InputEvent("beforeinput", {
+      data: "\u{F703}",
+      inputType: "insertText",
+      bubbles: true,
+      cancelable: true,
+    });
+
+    itemInput?.dispatchEvent(beforeInput);
+
+    expect(beforeInput.defaultPrevented).toBe(true);
+
+    unmount(component);
+  });
+
+  it("blocks legacy keypress arrow characters before they enter todo inputs", () => {
+    localStorage.setItem(
+      "ferx-todo-notes",
+      JSON.stringify([
+        {
+          id: "note-1",
+          title: "Groceries",
+          completedCollapsed: false,
+          items: [{ id: "item-1", text: "test", completed: false }],
+        },
+      ]),
+    );
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    document.querySelector<HTMLButtonElement>('button[title="Todos"]')?.click();
+    flushSync();
+
+    const itemInput = todoItemEditor();
+    const keypress = new KeyboardEvent("keypress", {
+      key: "\u001D",
+      bubbles: true,
+      cancelable: true,
+    });
+
+    itemInput?.dispatchEvent(keypress);
+
+    expect(keypress.defaultPrevented).toBe(true);
+
+    unmount(component);
+  });
+
+  it("removes macOS private-use arrow characters if they reach a todo input value", () => {
+    localStorage.setItem(
+      "ferx-todo-notes",
+      JSON.stringify([
+        {
+          id: "note-1",
+          title: "Groceries",
+          completedCollapsed: false,
+          items: [{ id: "item-1", text: "test", completed: false }],
+        },
+      ]),
+    );
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    document.querySelector<HTMLButtonElement>('button[title="Todos"]')?.click();
+    flushSync();
+
+    const itemInput = todoItemEditor();
+    itemInput!.value = "test\u{F703}";
+    itemInput?.dispatchEvent(new Event("input", { bubbles: true }));
+    flushSync();
+
+    expect(itemInput?.value).toBe("test");
 
     unmount(component);
   });
@@ -297,7 +404,7 @@ describe("workspace todos panel", () => {
     flushSync();
 
     expect(
-      document.querySelector<HTMLInputElement>('input[aria-label="Todo item text"]')?.value,
+      todoItemEditor()?.value,
     ).toBe("Sawi");
     document.querySelector<HTMLButtonElement>('button[aria-label="Collapse todo note"]')?.click();
     flushSync();
@@ -305,12 +412,12 @@ describe("workspace todos panel", () => {
     expect(
       document.querySelector<HTMLInputElement>('input[aria-label="Todo note title"]')?.value,
     ).toBe("Groceries");
-    expect(document.querySelector('input[aria-label="Todo item text"]')).toBeFalsy();
+    expect(todoItemEditor()).toBeFalsy();
 
     document.querySelector<HTMLButtonElement>('button[aria-label="Expand todo note"]')?.click();
     flushSync();
     expect(
-      document.querySelector<HTMLInputElement>('input[aria-label="Todo item text"]')?.value,
+      todoItemEditor()?.value,
     ).toBe("Sawi");
 
     unmount(component);
@@ -416,9 +523,7 @@ describe("workspace todos panel", () => {
     flushSync();
     restoreElementFromPoint();
 
-    const itemInputs = Array.from(
-      document.querySelectorAll<HTMLInputElement>('input[aria-label="Todo item text"]'),
-    );
+    const itemInputs = todoItemEditors();
     expect(itemInputs.map((input) => input.value)).toEqual(["Second", "Third", "First"]);
 
     unmount(component);
@@ -456,10 +561,41 @@ describe("workspace todos panel", () => {
         ?.getAttribute("spellcheck"),
     ).toBe("false");
     expect(
-      document
-        .querySelector<HTMLInputElement>('input[aria-label="Todo item text"]')
-        ?.getAttribute("spellcheck"),
+      todoItemEditor()?.getAttribute("spellcheck"),
     ).toBe("false");
+
+    unmount(component);
+  });
+
+  it("uses wrapping textareas for todo item text", () => {
+    localStorage.setItem(
+      "ferx-todo-notes",
+      JSON.stringify([
+        {
+          id: "note-1",
+          title: "Groceries",
+          collapsed: false,
+          completedCollapsed: false,
+          items: [{ id: "item-1", text: "supercalifragilisticexpialidocious".repeat(4), completed: false }],
+        },
+      ]),
+    );
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+
+    flushSync();
+    document.querySelector<HTMLButtonElement>('button[title="Todos"]')?.click();
+    flushSync();
+
+    const editor = todoItemEditor();
+
+    expect(editor).toBeTruthy();
+    expect(document.querySelector('input[aria-label="Todo item text"]')).toBeFalsy();
+    expect(editor?.className).toContain("break-words");
+    expect(editor?.className).toContain("whitespace-pre-wrap");
+    expect(editor?.getAttribute("rows")).toBe("1");
 
     unmount(component);
   });

@@ -125,6 +125,22 @@ fn tauri_conf_enables_updater_with_github_endpoint() {
 }
 
 #[test]
+fn macos_info_plist_disables_press_and_hold_for_key_repeat() {
+    let info_plist = include_str!("../Info.plist");
+
+    assert!(info_plist.contains("<key>ApplePressAndHoldEnabled</key>"));
+    assert!(info_plist.contains("<false/>"));
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn macos_runtime_defaults_disable_press_and_hold_for_key_repeat() {
+    crate::macos_defaults::disable_press_and_hold_key_popup();
+
+    assert!(!crate::macos_defaults::press_and_hold_key_popup_enabled());
+}
+
+#[test]
 fn default_capability_grants_updater_and_process_restart() {
     let capability = include_str!("../capabilities/default.json");
 

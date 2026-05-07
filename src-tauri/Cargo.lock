@@ -1051,6 +1051,7 @@ name = "ferx"
 version = "0.3.1"
 dependencies = [
  "base64 0.22.1",
+ "objc2-foundation 0.3.2",
  "rfd",
  "serde",
  "serde_json",

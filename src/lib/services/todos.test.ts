@@ -64,6 +64,24 @@ describe("readTodoNotes", () => {
       },
     ]);
   });
+
+  it("removes arrow/navigation control characters from stored note and item text", () => {
+    const saved = JSON.stringify([
+      note({
+        id: "valid",
+        title: "Title\u{F703}\u001D",
+        items: [{ id: "item-1", text: "test\u{F702}\u001C", completed: false }],
+      }),
+    ]);
+
+    expect(readTodoNotes(saved)).toEqual([
+      note({
+        id: "valid",
+        title: "Title",
+        items: [{ id: "item-1", text: "test", completed: false }],
+      }),
+    ]);
+  });
 });
 
 describe("todo note helpers", () => {
@@ -113,6 +131,23 @@ describe("todo note helpers", () => {
       { id: "item-1", text: "New item", completed: false },
     ]);
     expect(deleteTodoNote(edited, "note-2")).toHaveLength(1);
+  });
+
+  it("removes arrow/navigation control characters from edited todo text", () => {
+    const notes = [
+      note({
+        id: "note-1",
+        items: [{ id: "item-1", text: "Old", completed: false }],
+      }),
+    ];
+
+    expect(updateTodoNoteTitle(notes, "note-1", "Title\u{F703}\u001D")[0].title).toBe(
+      "Title",
+    );
+    expect(
+      updateTodoItemText(notes, "note-1", "item-1", "test\u{F702}\u001C")[0].items[0]
+        .text,
+    ).toBe("test");
   });
 
   it("toggles note collapsed state", () => {
