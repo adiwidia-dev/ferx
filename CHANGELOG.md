@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 ### Added
 
 - CI now verifies that `src/lib/tauri-commands.ts` matches the current Rust command signatures; a stale generated file fails the build with a clear error message
+- Release CI now builds unsigned Windows NSIS installers alongside the macOS DMG and includes Windows entries in the in-app updater manifest
 
 ### Changed
 

@@ -8,7 +8,21 @@ on:
 
 jobs:
   publish:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      # tauri-action merges each platform into the same latest.json asset.
+      # Running release builds one at a time avoids concurrent manifest writes.
+      max-parallel: 1
+      matrix:
+        include:
+          - platform: macos-latest
+            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
+            args: --target universal-apple-darwin
+          - platform: windows-latest
+            rust_targets: ""
+            args: --bundles nsis
+
+    runs-on: ${{ matrix.platform }}
 
     permissions:
       contents: write
@@ -27,21 +41,24 @@ jobs:
         run: corepack prepare yarn@1.22.22 --activate
 
       - name: Set up Rust
+        if: matrix.rust_targets != ''
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: ${{ matrix.rust_targets }}
+
+      - name: Set up Rust
+        if: matrix.rust_targets == ''
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install JavaScript dependencies
         run: yarn install --frozen-lockfile
 
-      # tauri-action builds the app, applies ad-hoc bundle signing from
-      # `tauri.conf.json` (`bundle.macOS.signingIdentity = "-"`) before
-      # packaging, signs updater artifacts with our minisign key (not
-      # Apple's Developer ID), uploads the DMG + tarball + signature to a
-      # draft GitHub Release, and emits `latest.json` next to them.
-      # The updater endpoint in tauri.conf.json points at
-      # `/releases/latest/download/latest.json`, so promoting the draft
-      # release to "latest" is what rolls the update out to users.
+      # tauri-action builds each platform, signs updater artifacts with our
+      # minisign key, uploads the install bundle + update signature to one
+      # draft GitHub Release, and merges platform entries into latest.json.
+      # macOS still uses ad-hoc bundle signing from `tauri.conf.json`
+      # (`bundle.macOS.signingIdentity = "-"`). Windows is intentionally not
+      # Authenticode-signed, matching the current GitHub-only release model.
       - name: Build and publish
         uses: tauri-apps/tauri-action@v0
         env:
@@ -53,4 +70,5 @@ jobs:
           releaseName: "Ferx ${{ github.ref_name }}"
           releaseDraft: true
           prerelease: false
-          args: --target universal-apple-darwin
+          updaterJsonPreferNsis: true
+          args: ${{ matrix.args }}

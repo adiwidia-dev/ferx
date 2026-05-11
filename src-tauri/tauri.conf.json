@@ -63,6 +63,12 @@
       "app",
       "dmg"
     ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false
+      }
+    },
     "macOS": {
       "signingIdentity": "-"
     },
@@ -80,7 +86,10 @@
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE2QUNCNTc4MzdFNzk4QjkKUldTNW1PYzNlTFdzRnF4YUlTelFuaStzQzljNWNzT1MyYW0vT0N0bHczcTI3dVFjeHk3bG9TT20K",
       "endpoints": [
         "https://github.com/adiwidia-dev/ferx/releases/latest/download/latest.json"
-      ]
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

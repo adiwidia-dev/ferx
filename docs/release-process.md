@@ -128,8 +128,10 @@ On success, the workflow has:
 1. Built a universal (aarch64 + x86_64) `Ferx.app`.
 2. Applied ad-hoc signing during bundling via `src-tauri/tauri.conf.json` (`bundle.macOS.signingIdentity = "-"`), so the shipped DMG and updater tarball contain the same signed app identity.
 3. Produced `Ferx.app.tar.gz` + `Ferx.app.tar.gz.sig` (signed with the minisign key).
-4. Generated `latest.json` with the tarball URL and signature contents.
-5. Created a **draft** GitHub Release and attached the DMG, tarball, `.sig`, and `latest.json`.
+4. Built an unsigned Windows NSIS setup `.exe`.
+5. Produced the Windows setup `.exe.sig` updater signature with the same minisign key.
+6. Generated `latest.json` with macOS and Windows platform entries.
+7. Created a **draft** GitHub Release and attached the DMG, macOS updater tarball, Windows setup `.exe`, `.sig` files, and `latest.json`.
 
 ### Step 8 — Fill in release notes and publish
 
@@ -152,11 +154,28 @@ On a Mac with a previous version of Ferx installed:
 4. Click **Relaunch Now**.
 5. After relaunch, Settings should show the new version number and `You're up to date`.
 
+On a Windows VM with a previous version of Ferx installed:
+
+1. Open Ferx → Settings → **Check for Updates**.
+2. You should see `Version X.Y.Z is available` with the release notes you wrote.
+3. Click **Download and Install**. The updater downloads the NSIS setup `.exe`, verifies its minisign `.sig`, and installs it passively.
+4. Relaunch when prompted.
+5. After relaunch, Settings should show the new version number and `You're up to date`.
+
+The Windows installer itself is intentionally unsigned. You can confirm that with:
+
+```powershell
+Get-AuthenticodeSignature .\Ferx*.exe
+```
+
+The expected status is `NotSigned`. This does not disable Tauri updater verification; the updater still requires the `.sig` generated from `TAURI_SIGNING_PRIVATE_KEY`.
+
 If it doesn't work, debug in this order:
 
 1. `curl -L https://github.com/adiwidia-dev/ferx/releases/latest/download/latest.json` → must return the JSON you just published.
-2. Verify `plugins.updater.pubkey` in `tauri.conf.json` matches the public half of `TAURI_SIGNING_PRIVATE_KEY` in Actions secrets.
-3. Re-check the running install's version against `tauri.conf.json` on that release — the updater compares semver, not file hashes.
+2. Verify `latest.json` contains the current platform key: `darwin-aarch64`/`darwin-x86_64` for macOS or `windows-x86_64` for Windows.
+3. Verify `plugins.updater.pubkey` in `tauri.conf.json` matches the public half of `TAURI_SIGNING_PRIVATE_KEY` in Actions secrets.
+4. Re-check the running install's version against `tauri.conf.json` on that release — the updater compares semver, not file hashes.
 
 ## Special cases
 
@@ -181,6 +200,12 @@ If users see a repeated keychain password prompt after every in-app update, chec
 3. App identifier and install path are stable (`com.ferx.dev` at `/Applications/Ferx.app`).
 
 Without Apple Developer ID + notarization, occasional prompts may still happen on some systems. Stable ad-hoc signing reduces frequency but is not equivalent to notarized trust.
+
+### Windows SmartScreen warning
+
+Windows GitHub release builds are currently not Authenticode-signed. This keeps the release flow similar to Ferdium's current GitHub-only Windows releases and avoids paid certificate setup, but Microsoft Defender SmartScreen may warn that Ferx is unrecognized.
+
+This is separate from in-app updater verification. Do not remove `TAURI_SIGNING_PRIVATE_KEY` or `.sig` artifacts; those are still required for secure updates.
 
 ### Pulling a bad release back
 

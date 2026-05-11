@@ -35,7 +35,7 @@ Configuration exports contain workspace service names, URLs, and app settings on
 
 ## Installation
 
-Download the latest release from the [GitHub Releases page](https://github.com/adiwidia-dev/ferx/releases). Choose the `.dmg` file for macOS.
+Download the latest release from the [GitHub Releases page](https://github.com/adiwidia-dev/ferx/releases). Choose the `.dmg` file for macOS or the Windows setup `.exe` for Windows.
 
 ### macOS
 
@@ -45,15 +45,21 @@ Download the latest release from the [GitHub Releases page](https://github.com/a
 4. Open **System Settings → Privacy & Security**, scroll down to the security prompt, and click **Open Anyway**.
 5. Subsequent launches and in-app updates do not re-prompt.
 
+### Windows
+
+1. Download the Windows setup `.exe` from the GitHub Releases page.
+2. Run the installer.
+3. Microsoft Defender SmartScreen may warn that the app is unrecognized because Ferx Windows builds are not code signed yet. Only install Ferx from the official GitHub Releases page.
+
 ### In-app updates
 
 Once installed, Ferx checks GitHub Releases for new versions automatically. When an update is available you will be notified inside the app. The updater verifies the download with a minisign signature before applying it. The update is applied on the next relaunch.
 
 ## Platform Support
 
-Current development and support are macOS-focused. Other platforms may build with additional work, but they are not yet treated as first-class supported targets.
+Current development and support are focused on macOS and Windows GitHub releases. Windows builds are unsigned and may show Microsoft Defender SmartScreen warnings on first install.
 
-The current desktop implementation also relies on Tauri multiwebview support and macOS private APIs for the intended UX. App Store distribution is not a target for the current build.
+The current desktop implementation relies on Tauri multiwebview support. The macOS build also uses private APIs for the intended UX. App Store and Microsoft Store distribution are not targets for the current build.
 
 ## Prerequisites
 
