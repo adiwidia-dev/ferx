@@ -17,6 +17,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ### Fixed
 
+- Reduced Outlook and Teams badge monitoring work while preserving unread badge detection.
 - Fixed service right-click context menus failing to open for users with saved notification preferences from before the per-service audio muting rename
 - Restored the Add Service dialog, Edit Service dialog, workspace picker, and service context menu so they appear correctly above active service webviews
 - Fixed all services reloading from scratch every time an overlay (modal, workspace switcher, settings) was dismissed — `hide_all_webviews` was accidentally closing webviews instead of moving them offscreen

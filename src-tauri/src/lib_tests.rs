@@ -474,6 +474,32 @@ fn outlook_badge_script_uses_screen_reader_and_folder_fallbacks() {
 }
 
 #[test]
+fn outlook_badge_script_keeps_badge_reporting_fallback_and_safety_poll() {
+    let script = outlook_badge_engine_script("outlook-folder-dom");
+
+    assert!(script.contains("report_outlook_badge"));
+    assert!(script.contains("MutationObserver"));
+    assert!(script.contains("__ferxSetBadgeMonitoring"));
+    assert!(script.contains("BADGE_SAFETY_POLL_MS"));
+    assert!(script.contains("resolveObservationTargets"));
+    assert!(script.contains("scheduleBadgeEvaluation"));
+    assert!(script.contains("evaluationInFlight"));
+}
+
+#[test]
+fn teams_badge_script_keeps_badge_reporting_fallback_and_safety_poll() {
+    let script = teams_badge_engine_script();
+
+    assert!(script.contains("report_teams_badge"));
+    assert!(script.contains("MutationObserver"));
+    assert!(script.contains("__ferxSetBadgeMonitoring"));
+    assert!(script.contains("BADGE_SAFETY_POLL_MS"));
+    assert!(script.contains("resolveObservationTargets"));
+    assert!(script.contains("scheduleBadgeEvaluation"));
+    assert!(script.contains("evaluationInFlight"));
+}
+
+#[test]
 fn service_webview_setup_skips_notification_shim_for_microsoft_apps() {
     let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
     else {

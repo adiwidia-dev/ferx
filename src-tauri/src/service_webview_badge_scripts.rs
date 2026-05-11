@@ -189,6 +189,54 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
         window.__ferx_last_badge_state = '__ferx:init__';
         window.__ferx_badge_dom_timer = window.__ferx_badge_dom_timer || null;
         window.__ferx_badge_monitoring_enabled = window.__ferx_badge_monitoring_enabled ?? true;
+        let observer = null;
+        let evaluationTimer = null;
+        let evaluationInFlight = false;
+        let evaluationQueued = false;
+        let safetyPollTimer = null;
+        const BADGE_EVALUATION_DELAY_MS = 300;
+        const BADGE_SAFETY_POLL_MS = 15000;
+
+        const observeOptions = {{
+            childList: true,
+            subtree: true,
+            characterData: true,
+            attributes: true,
+            attributeFilter: ['aria-label', 'title', 'data-testid', 'class']
+        }};
+
+        const observationSelectors = [
+            '[role="tree"]',
+            '[role="navigation"]',
+            'nav',
+            '[aria-label*="Folder"]',
+            '[aria-label*="Folders"]',
+            '[aria-label*="Mail"]',
+            '[data-app-section="Mail"]'
+        ];
+
+        const uniqueElements = (elements) => {{
+            const seen = new Set();
+            return elements.filter((element) => {{
+                if (!element || seen.has(element)) {{
+                    return false;
+                }}
+                seen.add(element);
+                return true;
+            }});
+        }};
+
+        const resolveObservationTargets = () => {{
+            const roots = uniqueElements(
+                observationSelectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)))
+            );
+
+            if (roots.length > 0) {{
+                return roots;
+            }}
+
+            return [document.body || document.documentElement].filter(Boolean);
+        }};
 
         const normalizeTitle = (title) => (title || '').replace(/[\u200E\u200F\u200B-\u200D]/g, '').trim();
         const titleCountState = (title) => {{
@@ -298,13 +346,58 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
             await emitBadgeState(nextState);
         }};
 
-        const scheduleDomEvaluation = () => {{
+        const runBadgeEvaluation = async () => {{
             if (!window.__ferx_badge_monitoring_enabled) return;
-            if (window.__ferx_badge_dom_timer) clearTimeout(window.__ferx_badge_dom_timer);
-            window.__ferx_badge_dom_timer = window.setTimeout(() => {{
+
+            if (evaluationInFlight) {{
+                evaluationQueued = true;
+                return;
+            }}
+
+            evaluationInFlight = true;
+
+            try {{
+                await evaluateBadgeState();
+            }} finally {{
+                evaluationInFlight = false;
+
+                if (evaluationQueued) {{
+                    evaluationQueued = false;
+                    scheduleBadgeEvaluation();
+                }}
+            }}
+        }};
+
+        const scheduleBadgeEvaluation = () => {{
+            if (!window.__ferx_badge_monitoring_enabled) return;
+
+            if (evaluationTimer !== null) {{
+                clearTimeout(evaluationTimer);
+            }}
+
+            evaluationTimer = setTimeout(() => {{
+                evaluationTimer = null;
                 window.__ferx_badge_dom_timer = null;
-                void evaluateBadgeState();
-            }}, 250);
+                void runBadgeEvaluation();
+            }}, BADGE_EVALUATION_DELAY_MS);
+            window.__ferx_badge_dom_timer = evaluationTimer;
+        }};
+
+        const startSafetyPoll = () => {{
+            if (safetyPollTimer !== null) {{
+                clearInterval(safetyPollTimer);
+            }}
+
+            safetyPollTimer = setInterval(() => {{
+                void runBadgeEvaluation();
+            }}, BADGE_SAFETY_POLL_MS);
+        }};
+
+        const stopSafetyPoll = () => {{
+            if (safetyPollTimer !== null) {{
+                clearInterval(safetyPollTimer);
+                safetyPollTimer = null;
+            }}
         }};
 
         const observeTitle = () => {{
@@ -315,7 +408,7 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
                 titleEl.__ferx_title_observer_bound = true;
                 new MutationObserver(() => {{
                     if (!window.__ferx_badge_monitoring_enabled) return;
-                    void evaluateBadgeState();
+                    void runBadgeEvaluation();
                 }}).observe(titleEl, {{
                     childList: true,
                     subtree: true,
@@ -333,41 +426,55 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
                 const didBind = bindTitleObserver();
                 if (!didBind) return;
                 if (!window.__ferx_badge_monitoring_enabled) return;
-                void evaluateBadgeState();
+                void runBadgeEvaluation();
             }}).observe(head, {{
                 childList: true
             }});
         }};
 
         const observeDom = () => {{
-            const target = document.body || document.documentElement;
-            if (!target) return;
+            if (observer) {{
+                observer.disconnect();
+            }}
 
-            new MutationObserver(() => {{
-                if (!window.__ferx_badge_monitoring_enabled) return;
-                scheduleDomEvaluation();
-            }}).observe(target, {{
-                childList: true,
-                subtree: true,
-                characterData: true
+            observer = new MutationObserver(() => {{
+                scheduleBadgeEvaluation();
             }});
+
+            for (const target of resolveObservationTargets()) {{
+                observer.observe(target, observeOptions);
+            }}
         }};
 
         window.__ferxSetBadgeMonitoring = (enabled) => {{
             window.__ferx_badge_monitoring_enabled = enabled;
-            if (window.__ferx_badge_dom_timer) {{
-                clearTimeout(window.__ferx_badge_dom_timer);
-                window.__ferx_badge_dom_timer = null;
+            if (!enabled) {{
+                if (observer) {{
+                    observer.disconnect();
+                    observer = null;
+                }}
+
+                if (evaluationTimer !== null) {{
+                    clearTimeout(evaluationTimer);
+                    evaluationTimer = null;
+                    window.__ferx_badge_dom_timer = null;
+                }}
+
+                evaluationQueued = false;
+                stopSafetyPoll();
+                return;
             }}
 
-            if (!enabled) return;
-            void evaluateBadgeState();
+            observeDom();
+            startSafetyPoll();
+            void runBadgeEvaluation();
         }};
 
         const start = () => {{
             observeTitle();
             observeDom();
-            void evaluateBadgeState();
+            startSafetyPoll();
+            void runBadgeEvaluation();
         }};
 
         if (document.readyState === 'loading') {{
@@ -378,15 +485,15 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
 
         window.addEventListener('focus', () => {{
             if (!window.__ferx_badge_monitoring_enabled) return;
-            void evaluateBadgeState();
+            void runBadgeEvaluation();
         }});
         window.addEventListener('hashchange', () => {{
             if (!window.__ferx_badge_monitoring_enabled) return;
-            void evaluateBadgeState();
+            void runBadgeEvaluation();
         }});
         window.addEventListener('popstate', () => {{
             if (!window.__ferx_badge_monitoring_enabled) return;
-            void evaluateBadgeState();
+            void runBadgeEvaluation();
         }});
     }})();
 "#
@@ -405,6 +512,55 @@ pub(crate) fn teams_badge_engine_script() -> String {
         window.__ferx_last_badge_state = '__ferx:init__';
         window.__ferx_badge_dom_timer = null;
         window.__ferx_badge_monitoring_enabled = window.__ferx_badge_monitoring_enabled ?? true;
+        let observer = null;
+        let evaluationTimer = null;
+        let evaluationInFlight = false;
+        let evaluationQueued = false;
+        let safetyPollTimer = null;
+        const BADGE_EVALUATION_DELAY_MS = 300;
+        const BADGE_SAFETY_POLL_MS = 15000;
+
+        const observeOptions = {
+            childList: true,
+            subtree: true,
+            characterData: true,
+            attributes: true,
+            attributeFilter: ['aria-label', 'title', 'data-testid', 'class']
+        };
+
+        const observationSelectors = [
+            '[data-tid="app-layout-area--sidebar"]',
+            '[data-tid*="rail"]',
+            '[role="navigation"]',
+            'nav',
+            '[class*="app-bar"]',
+            '[class*="AppBar"]',
+            '[class*="activity"]',
+            '[class*="Activity"]'
+        ];
+
+        const uniqueElements = (elements) => {
+            const seen = new Set();
+            return elements.filter((element) => {
+                if (!element || seen.has(element)) {
+                    return false;
+                }
+                seen.add(element);
+                return true;
+            });
+        };
+
+        const resolveObservationTargets = () => {
+            const roots = uniqueElements(
+                observationSelectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)))
+            );
+
+            if (roots.length > 0) {
+                return roots;
+            }
+
+            return [document.body || document.documentElement].filter(Boolean);
+        };
 
         const safeParseInt = (text) => {
             const n = parseInt((text || '').trim(), 10);
@@ -478,13 +634,58 @@ pub(crate) fn teams_badge_engine_script() -> String {
             }
         };
 
-        const scheduleDomEvaluation = () => {
+        const runBadgeEvaluation = async () => {
             if (!window.__ferx_badge_monitoring_enabled) return;
-            if (window.__ferx_badge_dom_timer) clearTimeout(window.__ferx_badge_dom_timer);
-            window.__ferx_badge_dom_timer = setTimeout(() => {
+
+            if (evaluationInFlight) {
+                evaluationQueued = true;
+                return;
+            }
+
+            evaluationInFlight = true;
+
+            try {
+                await evaluateBadgeState();
+            } finally {
+                evaluationInFlight = false;
+
+                if (evaluationQueued) {
+                    evaluationQueued = false;
+                    scheduleBadgeEvaluation();
+                }
+            }
+        };
+
+        const scheduleBadgeEvaluation = () => {
+            if (!window.__ferx_badge_monitoring_enabled) return;
+
+            if (evaluationTimer !== null) {
+                clearTimeout(evaluationTimer);
+            }
+
+            evaluationTimer = setTimeout(() => {
+                evaluationTimer = null;
                 window.__ferx_badge_dom_timer = null;
-                void evaluateBadgeState();
-            }, 250);
+                void runBadgeEvaluation();
+            }, BADGE_EVALUATION_DELAY_MS);
+            window.__ferx_badge_dom_timer = evaluationTimer;
+        };
+
+        const startSafetyPoll = () => {
+            if (safetyPollTimer !== null) {
+                clearInterval(safetyPollTimer);
+            }
+
+            safetyPollTimer = setInterval(() => {
+                void runBadgeEvaluation();
+            }, BADGE_SAFETY_POLL_MS);
+        };
+
+        const stopSafetyPoll = () => {
+            if (safetyPollTimer !== null) {
+                clearInterval(safetyPollTimer);
+                safetyPollTimer = null;
+            }
         };
 
         const observeTitle = () => {
@@ -495,7 +696,7 @@ pub(crate) fn teams_badge_engine_script() -> String {
                 titleEl.__ferx_title_observer_bound = true;
                 new MutationObserver(() => {
                     if (!window.__ferx_badge_monitoring_enabled) return;
-                    void evaluateBadgeState();
+                    void runBadgeEvaluation();
                 }).observe(titleEl, {
                     childList: true,
                     subtree: true,
@@ -513,41 +714,55 @@ pub(crate) fn teams_badge_engine_script() -> String {
                 const didBind = bindTitleObserver();
                 if (!didBind) return;
                 if (!window.__ferx_badge_monitoring_enabled) return;
-                void evaluateBadgeState();
+                void runBadgeEvaluation();
             }).observe(head, {
                 childList: true
             });
         };
 
         const observeDom = () => {
-            const target = document.body || document.documentElement;
-            if (!target) return;
+            if (observer) {
+                observer.disconnect();
+            }
 
-            new MutationObserver(() => {
-                if (!window.__ferx_badge_monitoring_enabled) return;
-                scheduleDomEvaluation();
-            }).observe(target, {
-                childList: true,
-                subtree: true,
-                characterData: true
+            observer = new MutationObserver(() => {
+                scheduleBadgeEvaluation();
             });
+
+            for (const target of resolveObservationTargets()) {
+                observer.observe(target, observeOptions);
+            }
         };
 
         window.__ferxSetBadgeMonitoring = (enabled) => {
             window.__ferx_badge_monitoring_enabled = enabled;
-            if (window.__ferx_badge_dom_timer) {
-                clearTimeout(window.__ferx_badge_dom_timer);
-                window.__ferx_badge_dom_timer = null;
+            if (!enabled) {
+                if (observer) {
+                    observer.disconnect();
+                    observer = null;
+                }
+
+                if (evaluationTimer !== null) {
+                    clearTimeout(evaluationTimer);
+                    evaluationTimer = null;
+                    window.__ferx_badge_dom_timer = null;
+                }
+
+                evaluationQueued = false;
+                stopSafetyPoll();
+                return;
             }
 
-            if (!enabled) return;
-            void evaluateBadgeState();
+            observeDom();
+            startSafetyPoll();
+            void runBadgeEvaluation();
         };
 
         const start = () => {
             observeTitle();
             observeDom();
-            void evaluateBadgeState();
+            startSafetyPoll();
+            void runBadgeEvaluation();
         };
 
         if (document.readyState === 'loading') {
@@ -558,15 +773,15 @@ pub(crate) fn teams_badge_engine_script() -> String {
 
         window.addEventListener('focus', () => {
             if (!window.__ferx_badge_monitoring_enabled) return;
-            void evaluateBadgeState();
+            void runBadgeEvaluation();
         });
         window.addEventListener('hashchange', () => {
             if (!window.__ferx_badge_monitoring_enabled) return;
-            void evaluateBadgeState();
+            void runBadgeEvaluation();
         });
         window.addEventListener('popstate', () => {
             if (!window.__ferx_badge_monitoring_enabled) return;
-            void evaluateBadgeState();
+            void runBadgeEvaluation();
         });
     })();
 "#.to_string()
