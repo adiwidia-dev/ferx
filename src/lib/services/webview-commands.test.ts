@@ -160,6 +160,40 @@ describe("createWebviewCommandQueue", () => {
 });
 
 describe("preloadBackgroundServices", () => {
+  it("runs background preloads through the supplied scheduler", async () => {
+    const calls: string[] = [];
+    const scheduler = async (operation: () => Promise<void>) => {
+      calls.push("scheduled");
+      await operation();
+    };
+    const invokeCommand = vi.fn(async () => {
+      calls.push("preloaded");
+    });
+
+    await preloadBackgroundServices({
+      services: [createService({ id: "active" }), createService({ id: "background" })],
+      activeId: "active",
+      spellCheckEnabled: true,
+      maxPreloads: 1,
+      gapMs: 0,
+      shouldCancel: () => false,
+      sleep: vi.fn(() => Promise.resolve()),
+      invokeCommand,
+      schedulePreload: scheduler,
+    });
+
+    expect(calls).toEqual(["scheduled", "preloaded"]);
+    expect(invokeCommand).toHaveBeenCalledWith(
+      "load_service",
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          id: "background",
+          spellCheckEnabled: true,
+        }),
+      }),
+    );
+  });
+
   it("preloads enabled non-active services up to the configured cap", async () => {
     const invokeCommand = vi.fn(() => Promise.resolve());
     const sleep = vi.fn(() => Promise.resolve());

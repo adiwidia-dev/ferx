@@ -11,6 +11,7 @@ import {
 
 type InvokeCommand = (command: string, args?: Record<string, unknown>) => Promise<unknown>;
 type Sleep = (ms: number) => Promise<unknown>;
+type SchedulePreload = (operation: () => Promise<void>) => Promise<void>;
 type QueueOptions = {
   interruptible?: boolean;
 };
@@ -117,6 +118,7 @@ export async function preloadBackgroundServices({
   shouldCancel,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   invokeCommand = invoke,
+  schedulePreload,
 }: {
   services: ServiceWebviewService[];
   activeId: string;
@@ -126,8 +128,17 @@ export async function preloadBackgroundServices({
   shouldCancel: () => boolean;
   sleep?: Sleep;
   invokeCommand?: InvokeCommand;
+  schedulePreload?: SchedulePreload;
 }) {
   let preloaded = 0;
+  const runPreload = async (operation: () => Promise<void>) => {
+    if (schedulePreload) {
+      await schedulePreload(operation);
+      return;
+    }
+
+    await operation();
+  };
 
   for (const service of services) {
     if (shouldCancel()) {
@@ -137,7 +148,9 @@ export async function preloadBackgroundServices({
       break;
     }
     if (shouldPreloadService(service, activeId)) {
-      await preloadServiceWebview(service, spellCheckEnabled, invokeCommand);
+      await runPreload(async () => {
+        await preloadServiceWebview(service, spellCheckEnabled, invokeCommand);
+      });
       preloaded++;
       await sleep(gapMs);
     }

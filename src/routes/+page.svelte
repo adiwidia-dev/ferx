@@ -265,6 +265,9 @@
             maxPreloads: MAX_BACKGROUND_PRELOADS,
             gapMs: PRELOAD_GAP_MS,
             shouldCancel: isCancelled,
+            schedulePreload: async (operation) => {
+              await webviewCommands.run(operation);
+            },
           }),
       });
     }
