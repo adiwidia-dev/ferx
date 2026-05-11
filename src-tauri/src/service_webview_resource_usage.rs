@@ -19,6 +19,7 @@ pub(crate) fn resource_usage_monitor_script() -> &'static str {
         window.__ferx_resource_usage_long_task_ms = 0;
         window.__ferx_resource_usage_last_tick = performance.now();
         window.__ferx_resource_usage_cpu_estimate = null;
+        let lastResourceEntryIndex = 0;
 
         const safeNumber = (value) => Number.isFinite(value) ? value : null;
         const textEncoder = new TextEncoder();
@@ -58,18 +59,27 @@ pub(crate) fn resource_usage_monitor_script() -> &'static str {
             return memory.usedJSHeapSize;
         };
 
-        const totalNetworkBytes = () => {
-            let total = 0;
+        const collectNetworkBytes = () => {
             try {
                 const entries = performance.getEntriesByType('resource');
-                for (const entry of entries) {
-                    const bytes = entry.transferSize || entry.encodedBodySize || entry.decodedBodySize || 0;
-                    if (Number.isFinite(bytes) && bytes > 0) total += bytes;
+
+                if (entries.length < lastResourceEntryIndex) {
+                    lastResourceEntryIndex = 0;
                 }
+
+                let transferBytes = 0;
+
+                for (let index = lastResourceEntryIndex; index < entries.length; index += 1) {
+                    const entry = entries[index];
+                    const bytes = entry.transferSize || entry.encodedBodySize || entry.decodedBodySize || 0;
+                    if (Number.isFinite(bytes) && bytes > 0) transferBytes += bytes;
+                }
+
+                lastResourceEntryIndex = entries.length;
+                return transferBytes;
             } catch (_error) {
                 return 0;
             }
-            return total;
         };
 
         const installNetworkUploadHooks = () => {
@@ -152,8 +162,7 @@ pub(crate) fn resource_usage_monitor_script() -> &'static str {
 
             const now = performance.now();
             const elapsedMs = Math.max(1, now - window.__ferx_resource_usage_last_sample);
-            const networkBytes = totalNetworkBytes();
-            const networkDelta = Math.max(0, networkBytes - window.__ferx_resource_usage_last_network_bytes);
+            const networkDelta = collectNetworkBytes();
             const networkInMbps = (networkDelta * 8) / (elapsedMs / 1000) / 1000000;
             const uploadBytes = window.__ferx_resource_usage_upload_bytes;
             const networkOutMbps = (uploadBytes * 8) / (elapsedMs / 1000) / 1000000;
@@ -165,7 +174,7 @@ pub(crate) fn resource_usage_monitor_script() -> &'static str {
 
             window.__ferx_resource_usage_last_tick = now;
             window.__ferx_resource_usage_last_sample = now;
-            window.__ferx_resource_usage_last_network_bytes = networkBytes;
+            window.__ferx_resource_usage_last_network_bytes += networkDelta;
             window.__ferx_resource_usage_upload_bytes = 0;
             window.__ferx_resource_usage_long_task_ms = 0;
             window.__ferx_resource_usage_cpu_estimate = cpuEstimatePercent;
@@ -198,7 +207,8 @@ pub(crate) fn resource_usage_monitor_script() -> &'static str {
             installNetworkUploadHooks();
             installLongTaskObserver();
             window.__ferx_resource_usage_last_sample = performance.now();
-            window.__ferx_resource_usage_last_network_bytes = totalNetworkBytes();
+            lastResourceEntryIndex = performance.getEntriesByType('resource').length;
+            window.__ferx_resource_usage_last_network_bytes = 0;
             window.__ferx_resource_usage_timer = setInterval(() => void sample(), 1000);
             void sample();
         };

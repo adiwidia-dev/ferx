@@ -652,6 +652,17 @@ fn resource_usage_monitor_restores_page_hooks_when_disabled() {
 }
 
 #[test]
+fn resource_usage_script_processes_resource_entries_incrementally() {
+    let script = resource_usage_monitor_script();
+
+    assert!(script.contains("lastResourceEntryIndex"));
+    assert!(script.contains("entries.length < lastResourceEntryIndex"));
+    assert!(script.contains(
+        "for (let index = lastResourceEntryIndex; index < entries.length; index += 1)"
+    ));
+}
+
+#[test]
 fn service_webview_setup_skips_resource_usage_monitor_when_disabled() {
     let Some((_, script)) = service_webview_setup_with_resource_monitoring(
         "https://discord.com/channels/@me",
