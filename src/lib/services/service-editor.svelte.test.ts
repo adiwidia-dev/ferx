@@ -151,15 +151,13 @@ describe("createServiceEditorStore — save()", () => {
     expect(activeId).toBe(services[0].id);
   });
 
-  it("calls loadService after successful add", async () => {
+  it("does not preload a newly added active service", async () => {
     const editor = createServiceEditorStore();
     const ctx = makeCtx();
     editor.open(null);
     editor.save({ name: "Notion", url: "https://notion.so", iconBgColor: undefined }, ctx);
-    await Promise.resolve(); // loadService is the first await in applySaveServiceResult for add
-    expect(ctx.loadService).toHaveBeenCalledOnce();
-    const calledWith = ctx.loadService.mock.calls[0][0] as { name: string };
-    expect(calledWith.name).toBe("Notion");
+    await Promise.resolve();
+    expect(ctx.loadService).not.toHaveBeenCalled();
   });
 
   it("closes dialog on successful edit with unchanged url — no webview operations", () => {

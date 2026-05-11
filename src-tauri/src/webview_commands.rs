@@ -428,6 +428,8 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
                 register_file_drop_handler(&webview);
                 set_badge_monitoring(&webview, badge_monitoring_pref(&app, &id));
                 set_audio_muted(&webview, service_audio_muted(&app));
+                let _ = webview.show();
+                let _ = webview.set_focus();
                 if let Some(previous_id) = previous_active_to_hide {
                     if let Some(previous_webview) = app.get_webview(&previous_id) {
                         let _ = previous_webview.eval(resource_usage_monitor_eval_script(false));

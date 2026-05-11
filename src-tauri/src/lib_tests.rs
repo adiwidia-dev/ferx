@@ -49,6 +49,31 @@ fn previous_active_webview_to_hide_skips_empty_and_same_service() {
 }
 
 #[test]
+fn open_service_explicitly_activates_new_child_webviews_on_creation() {
+    let source = include_str!("webview_commands.rs");
+    let add_child_match = source
+        .find("match window.add_child(builder, active_pos, active_size)")
+        .expect("expected open_service to add an active child webview");
+    let open_service_tail = &source[add_child_match..];
+    let ok_branch = open_service_tail
+        .find("Ok(webview) =>")
+        .expect("expected open_service child-webview creation success branch");
+    let err_branch = open_service_tail
+        .find("Err(error) =>")
+        .expect("expected open_service child-webview creation error branch");
+    let creation_success_branch = &open_service_tail[ok_branch..err_branch];
+
+    assert!(
+        creation_success_branch.contains("webview.show()"),
+        "newly-created service webviews must be shown explicitly on Windows"
+    );
+    assert!(
+        creation_success_branch.contains("webview.set_focus()"),
+        "newly-created service webviews must be focused explicitly on Windows"
+    );
+}
+
+#[test]
 fn outlook_badge_script_uses_command_bridge_payloads() {
     let Some((_, script)) = service_webview_setup("https://outlook.office.com/mail", false) else {
         panic!("expected valid outlook setup");

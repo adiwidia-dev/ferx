@@ -235,7 +235,7 @@ export async function applySaveServiceResult({
     }
   }
 
-  if (nextState.loadService) {
+  if (nextState.loadService && nextState.loadService.id !== nextState.activeId) {
     await loadService(nextState.loadService);
   }
 }
