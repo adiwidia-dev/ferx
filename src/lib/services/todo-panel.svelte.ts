@@ -27,6 +27,24 @@ export const TODOS_PANEL_WIDTH = 360;
 
 type SetPanelWidth = (width: number) => void | Promise<unknown>;
 
+export function splitTodoItems<T extends { completed: boolean }>(items: T[]): {
+  activeItems: T[];
+  completedItems: T[];
+} {
+  const activeItems: T[] = [];
+  const completedItems: T[] = [];
+
+  for (const item of items) {
+    if (item.completed) {
+      completedItems.push(item);
+    } else {
+      activeItems.push(item);
+    }
+  }
+
+  return { activeItems, completedItems };
+}
+
 export function createTodoPanelStore(
   storage: DebouncedStorageWriter<TodoNote[]>,
   setPanelWidth: SetPanelWidth = () => undefined,

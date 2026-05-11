@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createTodoPanelStore, TODOS_PANEL_WIDTH } from "./todo-panel.svelte";
+import { createTodoPanelStore, splitTodoItems, TODOS_PANEL_WIDTH } from "./todo-panel.svelte";
 
 function makeStorage() {
   return {
@@ -92,6 +92,26 @@ describe("createTodoPanelStore — note operations", () => {
 });
 
 describe("createTodoPanelStore — item operations", () => {
+  it("keeps active and completed todo ordering when rendering grouped items", () => {
+    const note = {
+      id: "note-1",
+      title: "Today",
+      items: [
+        { id: "a", text: "Active A", completed: false },
+        { id: "b", text: "Done B", completed: true },
+        { id: "c", text: "Active C", completed: false },
+      ],
+    };
+
+    expect(splitTodoItems(note.items)).toEqual({
+      activeItems: [
+        { id: "a", text: "Active A", completed: false },
+        { id: "c", text: "Active C", completed: false },
+      ],
+      completedItems: [{ id: "b", text: "Done B", completed: true }],
+    });
+  });
+
   it("addItem returns a new item id and appends to the note", () => {
     const todos = createTodoPanelStore(makeStorage());
     todos.addNote();

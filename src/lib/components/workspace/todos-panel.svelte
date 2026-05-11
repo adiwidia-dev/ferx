@@ -11,6 +11,7 @@
     preventMacosNavigationPrivateUseKeypress,
     sanitizeTextInputValue,
   } from "$lib/services/keyboard-input-guard";
+  import { splitTodoItems } from "$lib/services/todo-panel.svelte";
   import type { TodoNote } from "$lib/services/todos";
 
   interface Props {
@@ -64,14 +65,6 @@
   let isPointerDragging = $state(false);
   let dragRafPending = false;
   let pendingFocusItemId = $state<string | null>(null);
-
-  function activeItems(note: TodoNote) {
-    return note.items.filter((item) => !item.completed);
-  }
-
-  function completedItems(note: TodoNote) {
-    return note.items.filter((item) => item.completed);
-  }
 
   function resetPointerDrag() {
     pointerDrag = null;
@@ -236,19 +229,34 @@
   }
 
   function autoResizeTextarea(textarea: HTMLTextAreaElement, value: string) {
+    let currentValue = value;
+    let resizeScheduled = false;
+
     function resize() {
+      resizeScheduled = false;
       textarea.style.height = "auto";
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
 
-    queueMicrotask(resize);
+    function scheduleResize() {
+      if (resizeScheduled) {
+        return;
+      }
+
+      resizeScheduled = true;
+      queueMicrotask(resize);
+    }
+
+    scheduleResize();
 
     return {
       update(nextValue: string) {
-        if (nextValue !== value) {
-          value = nextValue;
+        if (nextValue === currentValue) {
+          return;
         }
-        queueMicrotask(resize);
+
+        currentValue = nextValue;
+        scheduleResize();
       },
     };
   }
@@ -330,8 +338,9 @@
 
     <div class="min-h-0 flex-1 overflow-y-auto px-3 py-4">
       {#each notes as note (note.id)}
-        {@const active = activeItems(note)}
-        {@const completed = completedItems(note)}
+        {@const groupedItems = splitTodoItems(note.items)}
+        {@const activeItems = groupedItems.activeItems}
+        {@const completedItems = groupedItems.completedItems}
         <section
           data-testid="todo-note-card"
           data-todo-note-drop-target={note.id}
@@ -390,7 +399,7 @@
 
           {#if !note.collapsed}
           <div class="px-3 pb-2">
-            {#each active as item (item.id)}
+            {#each activeItems as item (item.id)}
               <div
                 data-testid="todo-item-row"
                 data-todo-item-drop-target={item.id}
@@ -465,7 +474,7 @@
               <span>List item</span>
             </button>
 
-            {#if completed.length > 0}
+            {#if completedItems.length > 0}
               <div class="mt-2 border-t pt-2">
                 <button
                   type="button"
@@ -477,11 +486,11 @@
                   {:else}
                     <ChevronDownIcon class="size-4" />
                   {/if}
-                  <span>{completed.length} Completed {completed.length === 1 ? "item" : "items"}</span>
+                  <span>{completedItems.length} Completed {completedItems.length === 1 ? "item" : "items"}</span>
                 </button>
 
                 {#if !note.completedCollapsed}
-                  {#each completed as item (item.id)}
+                  {#each completedItems as item (item.id)}
                     <div
                       data-testid="todo-item-row"
                       data-todo-item-drop-target={item.id}
