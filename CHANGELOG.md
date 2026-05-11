@@ -17,6 +17,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ### Fixed
 
+- Removed the duplicate Check updates button from the Settings page header.
 - Reduced todo panel render and textarea resize work for larger todo lists.
 - Reduced resource usage monitor sampling cost during long service sessions.
 - Reduced native webview work during service switching so large workspaces remain more responsive.

@@ -241,6 +241,7 @@ describe("settings page", () => {
     expect(document.body.textContent).toContain(packageJson.version);
     expect(document.body.textContent).toContain("Automatic updates");
     expect(document.body.textContent).not.toContain("Manual updates");
+    expect(document.querySelector("header")?.textContent).not.toContain("Check updates");
 
     const checkUpdateButton = Array.from(document.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("Check for Updates"),

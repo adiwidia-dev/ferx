@@ -4,7 +4,6 @@
   import { goto } from "$app/navigation";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import AppWindowIcon from "@lucide/svelte/icons/app-window";
-  import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
   import { onMount } from "svelte";
   import { Button } from "$lib/components/ui/button";
   import SettingsConfigurationDialogs from "$lib/components/settings/settings-configuration-dialogs.svelte";
@@ -488,15 +487,6 @@
                 Manage workspace preferences, configuration backups, and verified app updates.
               </p>
             </div>
-            <Button
-              variant="outline"
-              class="h-9 w-fit rounded-lg px-3 text-xs"
-              onclick={handleCheckForUpdates}
-              disabled={updater.status === "checking" || updater.status === "downloading"}
-            >
-              <RefreshCwIcon class="size-3.5" />
-              {updater.status === "checking" ? "Checking" : "Check updates"}
-            </Button>
           </header>
 
           <div class="space-y-5">
