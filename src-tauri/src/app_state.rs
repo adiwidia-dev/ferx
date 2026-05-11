@@ -87,6 +87,11 @@ pub fn clear_active_webview(app: &AppHandle) {
     };
 }
 
+pub fn get_active_webview(app: &AppHandle) -> String {
+    let state = app.state::<ActiveWebview>();
+    state.0.lock().map(|active| active.clone()).unwrap_or_default()
+}
+
 pub fn set_active_webview(app: &AppHandle, service_id: String) {
     let state = app.state::<ActiveWebview>();
     if let Ok(mut active) = state.0.lock() {

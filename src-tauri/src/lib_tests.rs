@@ -16,9 +16,10 @@ use crate::service_webview_runtime_scripts::{
     notification_script, spellcheck_script,
 };
 use crate::webview_commands::{
-    close_all_service_webviews, report_outlook_badge, report_resource_usage, report_teams_badge,
-    safe_export_file_name, save_workspace_config_export, AudioMutedPayload, DeleteWebviewPayload,
-    RightPanelWidthPayload, ServiceWebviewCommandPayload, WebviewIdPayload,
+    close_all_service_webviews, previous_active_webview_to_hide, report_outlook_badge,
+    report_resource_usage, report_teams_badge, safe_export_file_name, save_workspace_config_export,
+    AudioMutedPayload, DeleteWebviewPayload, RightPanelWidthPayload, ServiceWebviewCommandPayload,
+    WebviewIdPayload,
 };
 use crate::window_layout::effective_service_content_size;
 use serde_json::json;
@@ -35,6 +36,16 @@ fn extract_hostname_returns_hostname_without_port() {
 fn hostname_matches_allows_subdomains_only() {
     assert!(hostname_matches("teams.microsoft.com", "microsoft.com"));
     assert!(!hostname_matches("notmicrosoft.com", "microsoft.com"));
+}
+
+#[test]
+fn previous_active_webview_to_hide_skips_empty_and_same_service() {
+    assert_eq!(previous_active_webview_to_hide("", "outlook"), None);
+    assert_eq!(previous_active_webview_to_hide("outlook", "outlook"), None);
+    assert_eq!(
+        previous_active_webview_to_hide("teams", "outlook"),
+        Some("teams".to_string())
+    );
 }
 
 #[test]

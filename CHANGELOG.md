@@ -17,6 +17,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ### Fixed
 
+- Reduced native webview work during service switching so large workspaces remain more responsive.
 - Serialized startup service preloading through the webview command queue to avoid races with service switching and overlays.
 - Reduced Outlook and Teams badge monitoring work while preserving unread badge detection.
 - Fixed service right-click context menus failing to open for users with saved notification preferences from before the per-service audio muting rename
