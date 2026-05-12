@@ -8,23 +8,51 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ## [Unreleased]
 
-### Added
-
-- CI now verifies that `src/lib/tauri-commands.ts` matches the current Rust command signatures; a stale generated file fails the build with a clear error message
-- Release CI now builds unsigned Windows NSIS installers alongside the macOS DMG and includes Windows entries in the in-app updater manifest
-
-### Changed
-
 ### Fixed
 
 - Updated Tauri to 2.11.1 or later to fix local-origin IPC checks for remote webview pages on Windows and Android.
+
+---
+
+## [0.4.2] — 2026-05-11
+
+### Fixed
+
 - Fixed Windows service webviews staying blank until manual reload after startup or adding a service.
+
+---
+
+## [0.4.1] — 2026-05-11
+
+### Added
+
+- Release CI now builds unsigned Windows NSIS installers alongside the macOS DMG and includes Windows entries in the in-app updater manifest.
+
+### Fixed
+
 - Removed the duplicate Check updates button from the Settings page header.
 - Reduced todo panel render and textarea resize work for larger todo lists.
 - Reduced resource usage monitor sampling cost during long service sessions.
 - Reduced native webview work during service switching so large workspaces remain more responsive.
 - Serialized startup service preloading through the webview command queue to avoid races with service switching and overlays.
 - Reduced Outlook and Teams badge monitoring work while preserving unread badge detection.
+
+---
+
+## [0.4.0] — 2026-05-07
+
+### Added
+
+- **Do Not Disturb.** The workspace can suppress unread tray state and mute service webview audio while DND is enabled.
+- **Per-service audio muting.** Service context menus now include per-service audio controls and dynamic Enable/Disable labels.
+- CI now verifies that `src/lib/tauri-commands.ts` matches the current Rust command signatures; a stale generated file fails the build with a clear error message.
+
+### Changed
+
+- Updated the tray unread indicator icon design.
+
+### Fixed
+
 - Fixed service right-click context menus failing to open for users with saved notification preferences from before the per-service audio muting rename
 - Restored the Add Service dialog, Edit Service dialog, workspace picker, and service context menu so they appear correctly above active service webviews
 - Fixed all services reloading from scratch every time an overlay (modal, workspace switcher, settings) was dismissed — `hide_all_webviews` was accidentally closing webviews instead of moving them offscreen
@@ -32,7 +60,6 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 - Fixed remaining webview command sequencing gaps for todo panel resizing, service add/edit saves, and page cleanup
 - Fixed Add Service and workspace switcher overlays so one click opens them after active service webviews are moved offscreen
 - Fixed service notification badges disappearing from the sidebar after opening Settings
-- Do Not Disturb now mutes service webview audio in addition to suppressing unread tray state
 - Fixed macOS arrow/navigation key private-use characters appearing as boxes in service chat fields and todo inputs
 - Fixed long todo item text being clipped by wrapping item text across multiple lines
 - Fixed long-pressing letter keys on macOS inserting only one character instead of repeating
@@ -140,6 +167,9 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 - Service config validation and safety guardrails: invalid URLs, malformed payloads, and unsupported schemes are rejected before any state change is applied.
 - CI baseline: pre-push validation runs type-check, unit tests, and Rust tests.
 
+[0.4.2]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.4.2
+[0.4.1]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.4.1
+[0.4.0]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.4.0
 [0.3.1]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.3.1
 [0.3.0]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.3.0
 [0.2.4]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.2.4
