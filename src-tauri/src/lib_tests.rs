@@ -74,16 +74,16 @@ fn open_service_explicitly_activates_new_child_webviews_on_creation() {
 }
 
 #[test]
-fn outlook_badge_script_uses_command_bridge_payloads() {
+fn outlook_badge_script_uses_navigation_bridge_payloads() {
     let Some((_, script)) = service_webview_setup("https://outlook.office.com/mail", false) else {
         panic!("expected valid outlook setup");
     };
 
     assert!(script.contains("payload = 'unknown'"));
     assert!(script.contains("payload = 'clear'"));
-    assert!(script.contains("window.__TAURI_INTERNALS__?.invoke"));
-    assert!(script.contains("await invoke('report_outlook_badge', { payload })"));
-    assert!(!script.contains("ferx://notify/"));
+    assert!(script.contains("window.__TAURI_INTERNALS__"));
+    assert!(script.contains("https://ferx.notify/"));
+    assert!(!script.contains("invoke('report_outlook_badge'"));
     assert!(!script.contains("await emitBadgeState('clear')"));
     assert!(!script.contains("console.info"));
     assert!(!script.contains("console.warn"));
@@ -489,8 +489,8 @@ fn outlook_setup_restores_badge_detection_without_notify_navigation() {
 
     assert!(outlook_script.contains("window.__ferx_badge_strategy = 'outlook-folder-dom'"));
     assert!(outlook_script.contains("new MutationObserver"));
-    assert!(outlook_script.contains("invoke('report_outlook_badge'"));
-    assert!(!outlook_script.contains("ferx://notify/"));
+    assert!(outlook_script.contains("https://ferx.notify/"));
+    assert!(!outlook_script.contains("invoke('report_outlook_badge'"));
 }
 
 #[test]
@@ -501,6 +501,11 @@ fn outlook_badge_script_uses_screen_reader_and_folder_fallbacks() {
 
     assert!(script.contains("span.screenReaderOnly"));
     assert!(script.contains("div[role=tree]"));
+    assert!(script.contains("parseOutlookInboxCount"));
+    assert!(script.contains("outlookVisibleFolderRowState"));
+    assert!(script.contains("div, span, a, button, li, [tabindex]"));
+    assert!(script.contains("[role=\"button\"]"));
+    assert!(script.contains("[data-folder-name]"));
     assert!(script.contains("outlookScreenReaderState"));
     assert!(script.contains("outlookFolderState"));
     assert!(script.contains(
@@ -513,13 +518,12 @@ fn outlook_badge_script_uses_screen_reader_and_folder_fallbacks() {
 fn outlook_badge_script_keeps_badge_reporting_fallback_and_safety_poll() {
     let script = outlook_badge_engine_script("outlook-folder-dom");
 
-    assert!(script.contains("report_outlook_badge"));
+    assert!(script.contains("https://ferx.notify/"));
     assert!(script.contains("MutationObserver"));
     assert!(script.contains("__ferxSetBadgeMonitoring"));
     assert!(script.contains("BADGE_SAFETY_POLL_MS"));
     assert!(script.contains("resolveObservationTargets"));
     assert!(script.contains("scheduleBadgeEvaluation"));
-    assert!(script.contains("evaluationInFlight"));
 }
 
 #[test]
@@ -552,7 +556,7 @@ fn service_webview_setup_skips_notification_shim_for_microsoft_apps() {
 }
 
 #[test]
-fn service_webview_setup_skips_badge_navigation_for_microsoft_apps() {
+fn service_webview_setup_badge_reporting_methods_per_microsoft_app() {
     let Some((_, teams_script)) = service_webview_setup("https://teams.microsoft.com", false)
     else {
         panic!("expected valid teams setup");
@@ -562,10 +566,15 @@ fn service_webview_setup_skips_badge_navigation_for_microsoft_apps() {
         panic!("expected valid outlook setup");
     };
 
+    // Teams still uses the invoke bridge.
     assert!(!teams_script.contains("https://ferx.notify/"));
     assert!(teams_script.contains("new MutationObserver"));
     assert!(teams_script.contains("invoke('report_teams_badge'"));
-    assert!(outlook_script.contains("invoke('report_outlook_badge'"));
+
+    // Outlook uses the navigation bridge (same as other services) for
+    // Tauri 2.11+ compatibility where remote-webview invoke is restricted.
+    assert!(outlook_script.contains("https://ferx.notify/"));
+    assert!(!outlook_script.contains("invoke('report_outlook_badge'"));
     assert!(outlook_script.contains("new MutationObserver"));
 }
 
@@ -815,9 +824,7 @@ fn extracted_runtime_script_modules_preserve_known_markers() {
 fn extracted_resource_and_badge_script_modules_preserve_known_markers() {
     assert!(resource_usage_monitor_script().contains("report_resource_usage"));
     assert!(badge_engine_script("unsupported").contains("https://ferx.notify/"));
-    assert!(
-        outlook_badge_engine_script("outlook-folder-dom").contains("invoke('report_outlook_badge'")
-    );
+    assert!(outlook_badge_engine_script("outlook-folder-dom").contains("https://ferx.notify/"));
     assert!(teams_badge_engine_script().contains("invoke('report_teams_badge'"));
 }
 

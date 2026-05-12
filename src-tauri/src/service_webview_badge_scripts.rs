@@ -179,8 +179,7 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
     format!(
         r#"
     (() => {{
-        const invoke = window.__TAURI_INTERNALS__?.invoke;
-        if (typeof invoke !== 'function') return;
+        if (!window.__TAURI_INTERNALS__) return;
 
         if (window.__ferx_badge_observers_active) return;
         window.__ferx_badge_observers_active = true;
@@ -191,8 +190,6 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
         window.__ferx_badge_monitoring_enabled = window.__ferx_badge_monitoring_enabled ?? true;
         let observer = null;
         let evaluationTimer = null;
-        let evaluationInFlight = false;
-        let evaluationQueued = false;
         let safetyPollTimer = null;
         const BADGE_EVALUATION_DELAY_MS = 300;
         const BADGE_SAFETY_POLL_MS = 15000;
@@ -253,6 +250,38 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
             return Number.isFinite(n) && n > 0 ? n : 0;
         }};
 
+        const parseOutlookInboxCount = (text) => {{
+            const normalized = (text || '').replace(/[\u200E\u200F\u200B-\u200D]/g, ' ').replace(/\s+/g, ' ').trim();
+            if (!normalized) return null;
+            if (!/(?:\bInbox\b|\bKotak Masuk\b)/i.test(normalized)) return null;
+
+            const afterFolder = normalized.match(/(?:\bInbox\b|\bKotak Masuk\b)\D{{0,80}}?(\d{{1,5}})\b/i);
+            const beforeFolder = normalized.match(/\b(\d{{1,5}})\D{{0,80}}?(?:\bInbox\b|\bKotak Masuk\b)/i);
+            const match = afterFolder || beforeFolder;
+            if (!match) return null;
+
+            const count = parseInt(match[1], 10);
+            return Number.isFinite(count) && count > 0 ? count : null;
+        }};
+
+        const isCompactVisibleElement = (element, text) => {{
+            if (!element || !text || text.length > 160) return false;
+            const rect = element.getBoundingClientRect?.();
+            if (rect && (rect.width <= 0 || rect.height <= 0)) return false;
+            const style = window.getComputedStyle?.(element);
+            if (style && (style.display === 'none' || style.visibility === 'hidden')) return false;
+            return true;
+        }};
+
+        const hasSmallerInboxCandidate = (element, text) => {{
+            for (const child of Array.from(element.children || [])) {{
+                const childText = (child.innerText || child.textContent || '').trim();
+                if (!childText || childText.length >= text.length) continue;
+                if (parseOutlookInboxCount(childText) !== null) return true;
+            }}
+            return false;
+        }};
+
         const outlookScreenReaderState = () => {{
             const trees = document.querySelectorAll('div[role=tree]');
             if (trees.length === 0) return null;
@@ -271,13 +300,13 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
                         if (count > 0) return 'count:' + count;
                     }}
 
-                    const match = childText.match(/(?:Inbox|Kotak Masuk)\D*?(\d+)/i);
-                    if (match) {{
-                        const count = parseInt(match[1], 10);
+                    const simpleMatch = childText.match(/(?:Inbox|Kotak Masuk)\D*?(\d+)/i);
+                    if (simpleMatch) {{
+                        const count = parseInt(simpleMatch[1], 10);
                         if (Number.isFinite(count) && count > 0) return 'count:' + count;
                     }}
 
-                    return 'clear';
+                    return null;
                 }}
             }}
 
@@ -285,32 +314,58 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
         }};
 
         const outlookFolderState = () => {{
-            const items = document.querySelectorAll('[role="treeitem"], [role="option"]');
+            const items = document.querySelectorAll([
+                '[role="treeitem"]',
+                '[role="option"]',
+                '[role="button"]',
+                '[role="link"]',
+                '[role="listitem"]',
+                '[data-folder-name]',
+                '[data-testid*="folder"]',
+                '[aria-label*="Inbox"]',
+                '[title*="Inbox"]'
+            ].join(', '));
             let bestCount = null;
             for (const item of items) {{
                 const texts = [
                     item.getAttribute('aria-label'),
                     item.getAttribute('title'),
+                    item.getAttribute('data-folder-name'),
                     (item.innerText || item.textContent || ''),
                 ].filter((v) => typeof v === 'string' && v.trim());
 
                 for (const text of texts) {{
-                    const lower = text.toLowerCase();
-                    if (!lower.includes('inbox') && !lower.includes('kotak masuk')) continue;
-
-                    const match = text.match(/(\d+)/);
-                    if (match) {{
-                        const count = parseInt(match[1], 10);
-                        if (Number.isFinite(count) && count > 0) {{
-                            bestCount = Math.max(bestCount || 0, count);
-                        }}
+                    const count = parseOutlookInboxCount(text);
+                    if (count !== null) {{
+                        bestCount = Math.max(bestCount || 0, count);
                     }}
                 }}
             }}
             return bestCount !== null ? 'count:' + bestCount : null;
         }};
 
-        const emitBadgeState = async (nextState) => {{
+        const outlookVisibleFolderRowState = () => {{
+            const roots = resolveObservationTargets();
+            const candidates = uniqueElements(roots.flatMap((root) =>
+                Array.from(root.querySelectorAll('div, span, a, button, li, [tabindex]'))
+            ));
+            let bestCount = null;
+
+            for (const candidate of candidates) {{
+                const text = (candidate.innerText || candidate.textContent || '').trim();
+                if (!isCompactVisibleElement(candidate, text)) continue;
+                if (hasSmallerInboxCandidate(candidate, text)) continue;
+
+                const count = parseOutlookInboxCount(text);
+                if (count !== null) {{
+                    bestCount = Math.max(bestCount || 0, count);
+                }}
+            }}
+
+            return bestCount !== null ? 'count:' + bestCount : null;
+        }};
+
+        const emitBadgeState = (nextState) => {{
             let payload;
             if (nextState === 'unknown') {{
                 payload = 'unknown';
@@ -321,16 +376,11 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
             }}
 
             if (payload === window.__ferx_last_badge_state) return;
-
-            try {{
-                await invoke('report_outlook_badge', {{ payload }});
-                window.__ferx_last_badge_state = payload;
-            }} catch (_e) {{
-                // Swallow; next MutationObserver tick will retry.
-            }}
+            window.__ferx_last_badge_state = payload;
+            window.location.href = 'https://ferx.notify/' + payload;
         }};
 
-        const evaluateBadgeState = async () => {{
+        const evaluateBadgeState = () => {{
             if (!window.__ferx_badge_monitoring_enabled) return;
             let nextState = 'clear';
             try {{
@@ -338,34 +388,18 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
                 nextState =
                     outlookScreenReaderState()
                     || outlookFolderState()
+                    || outlookVisibleFolderRowState()
                     || titleCountState(document.title);
             }} catch (_error) {{
                 nextState = 'clear';
             }}
 
-            await emitBadgeState(nextState);
+            emitBadgeState(nextState);
         }};
 
-        const runBadgeEvaluation = async () => {{
+        const runBadgeEvaluation = () => {{
             if (!window.__ferx_badge_monitoring_enabled) return;
-
-            if (evaluationInFlight) {{
-                evaluationQueued = true;
-                return;
-            }}
-
-            evaluationInFlight = true;
-
-            try {{
-                await evaluateBadgeState();
-            }} finally {{
-                evaluationInFlight = false;
-
-                if (evaluationQueued) {{
-                    evaluationQueued = false;
-                    scheduleBadgeEvaluation();
-                }}
-            }}
+            evaluateBadgeState();
         }};
 
         const scheduleBadgeEvaluation = () => {{
@@ -378,7 +412,7 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
             evaluationTimer = setTimeout(() => {{
                 evaluationTimer = null;
                 window.__ferx_badge_dom_timer = null;
-                void runBadgeEvaluation();
+                runBadgeEvaluation();
             }}, BADGE_EVALUATION_DELAY_MS);
             window.__ferx_badge_dom_timer = evaluationTimer;
         }};
@@ -389,7 +423,7 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
             }}
 
             safetyPollTimer = setInterval(() => {{
-                void runBadgeEvaluation();
+                runBadgeEvaluation();
             }}, BADGE_SAFETY_POLL_MS);
         }};
 
@@ -408,7 +442,7 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
                 titleEl.__ferx_title_observer_bound = true;
                 new MutationObserver(() => {{
                     if (!window.__ferx_badge_monitoring_enabled) return;
-                    void runBadgeEvaluation();
+                    runBadgeEvaluation();
                 }}).observe(titleEl, {{
                     childList: true,
                     subtree: true,
@@ -426,7 +460,7 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
                 const didBind = bindTitleObserver();
                 if (!didBind) return;
                 if (!window.__ferx_badge_monitoring_enabled) return;
-                void runBadgeEvaluation();
+                runBadgeEvaluation();
             }}).observe(head, {{
                 childList: true
             }});
@@ -460,21 +494,20 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
                     window.__ferx_badge_dom_timer = null;
                 }}
 
-                evaluationQueued = false;
                 stopSafetyPoll();
                 return;
             }}
 
             observeDom();
             startSafetyPoll();
-            void runBadgeEvaluation();
+            runBadgeEvaluation();
         }};
 
         const start = () => {{
             observeTitle();
             observeDom();
             startSafetyPoll();
-            void runBadgeEvaluation();
+            runBadgeEvaluation();
         }};
 
         if (document.readyState === 'loading') {{
@@ -485,15 +518,15 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
 
         window.addEventListener('focus', () => {{
             if (!window.__ferx_badge_monitoring_enabled) return;
-            void runBadgeEvaluation();
+            runBadgeEvaluation();
         }});
         window.addEventListener('hashchange', () => {{
             if (!window.__ferx_badge_monitoring_enabled) return;
-            void runBadgeEvaluation();
+            runBadgeEvaluation();
         }});
         window.addEventListener('popstate', () => {{
             if (!window.__ferx_badge_monitoring_enabled) return;
-            void runBadgeEvaluation();
+            runBadgeEvaluation();
         }});
     }})();
 "#
