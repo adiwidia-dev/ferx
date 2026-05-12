@@ -247,7 +247,7 @@ export function toggleServiceDisabled(
 ): {
   services: PageService[];
   activeId: string;
-  deleteWebview?: { id: string; storageKey: string };
+  closeWebviewId?: string;
 } {
   const targetService = services.find((service) => service.id === id);
 
@@ -275,7 +275,7 @@ export function toggleServiceDisabled(
   return {
     services: nextServices,
     activeId: nextActiveId,
-    deleteWebview: createDeleteWebviewPayload(targetService),
+    closeWebviewId: targetService.id,
   };
 }
 

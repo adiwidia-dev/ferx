@@ -103,7 +103,7 @@ describe("workspace actions", () => {
     expect(nextState.servicesById.shared).toEqual(state.servicesById.shared);
   });
 
-  it("toggles the current workspace service disabled state and returns a delete payload when disabling", () => {
+  it("toggles the current workspace service disabled state and returns a close payload when disabling", () => {
     const state = createWorkspaceState();
 
     const nextState = toggleWorkspaceServiceDisabled(state, "youtube");
@@ -112,10 +112,7 @@ describe("workspace actions", () => {
       activeServiceId: "slack",
     });
     expect(nextState.state.servicesById.youtube.disabled).toBe(true);
-    expect(nextState.deleteWebview).toEqual({
-      id: "youtube",
-      storageKey: "storage-youtube",
-    });
+    expect(nextState.closeWebviewId).toBe("youtube");
   });
 
   it("updates notification preferences for only the targeted service", () => {

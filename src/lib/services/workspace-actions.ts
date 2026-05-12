@@ -57,7 +57,7 @@ export function toggleWorkspaceServiceDisabled(
   serviceId: string,
 ): {
   state: WorkspaceGroupsState;
-  deleteWebview?: { id: string; storageKey: string };
+  closeWebviewId?: string;
 } {
   const services = getWorkspaceServices(state);
   const activeId =
@@ -67,7 +67,7 @@ export function toggleWorkspaceServiceDisabled(
 
   return {
     state: applyCurrentWorkspaceServices(state, nextState.services, nextState.activeId),
-    deleteWebview: nextState.deleteWebview,
+    closeWebviewId: nextState.closeWebviewId,
   };
 }
 

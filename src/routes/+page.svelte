@@ -429,8 +429,8 @@
   function toggleDisable(id: string) {
     const nextState = toggleWorkspaceServiceDisabled(workspaceState, id);
     workspaceState = nextState.state;
-    if (nextState.deleteWebview) {
-      void webviewCommands.run(() => deleteServiceWebview(nextState.deleteWebview!));
+    if (nextState.closeWebviewId) {
+      void webviewCommands.run(() => closeServiceWebview(nextState.closeWebviewId!));
     }
   }
 

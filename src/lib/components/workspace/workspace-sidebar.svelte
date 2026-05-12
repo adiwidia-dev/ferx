@@ -63,6 +63,17 @@
     isWorkspaceSwitcherOpen = false;
     onSelectService(id);
   }
+
+  function openServiceContextMenu(event: MouseEvent, service: PageService) {
+    event.preventDefault();
+    onOpenServiceContextMenu({
+      id: service.id,
+      disabled: !!service.disabled,
+      showBadge: service.notificationPrefs.showBadge,
+      affectTray: service.notificationPrefs.affectTray,
+      muteAudio: service.notificationPrefs.muteAudio,
+    });
+  }
 </script>
 
 <aside
@@ -99,6 +110,7 @@
           tabindex="-1"
           style="-webkit-app-region: no-drag;"
           onpointerdown={(event) => onPointerDown(event, service.id)}
+          oncontextmenu={(event) => openServiceContextMenu(event, service)}
         >
           <Button
             title={`${service.name} (Cmd+${index + 1})`}
@@ -108,16 +120,6 @@
                    {service.disabled ? 'opacity-40 grayscale' : ''}"
             style={service.iconBgColor ? `box-shadow: inset 0 0 0 2.5px ${service.iconBgColor};` : ""}
             onclick={() => selectService(service.id)}
-            oncontextmenu={(event) => {
-              event.preventDefault();
-              onOpenServiceContextMenu({
-                id: service.id,
-                disabled: !!service.disabled,
-                showBadge: service.notificationPrefs.showBadge,
-                affectTray: service.notificationPrefs.affectTray,
-                muteAudio: service.notificationPrefs.muteAudio,
-              });
-            }}
           >
             <div
               aria-hidden="true"

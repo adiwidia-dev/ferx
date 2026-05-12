@@ -142,7 +142,6 @@ pub async fn hide_all_webviews(app: AppHandle) {
 
         for (name, webview) in app.webviews() {
             if name != "main" {
-                set_badge_monitoring(&webview, false);
                 let _ = webview.set_bounds(tauri::Rect {
                     position: tauri::Position::Physical(PhysicalPosition::new(-10000, -10000)),
                     size: tauri::Size::Physical(offscreen_size),
@@ -234,7 +233,7 @@ pub async fn reload_webview(app: AppHandle, payload: WebviewIdPayload) {
     let WebviewIdPayload { id } = payload;
 
     if let Some(webview) = app.get_webview(&id) {
-        let _ = webview.eval("window.location.reload()");
+        let _ = webview.reload();
     }
 }
 

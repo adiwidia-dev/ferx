@@ -262,6 +262,91 @@ describe("workspace switching webview commands", () => {
     unmount(component);
   });
 
+  it("shows the native service context menu for disabled services", async () => {
+    const state = createWorkspaceState();
+    state.workspaces[0].serviceIds.push("mail");
+    state.servicesById.mail = {
+      id: "mail",
+      name: "Mail",
+      url: "https://outlook.office.com/mail/",
+      storageKey: "storage-mail",
+      notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+      disabled: true,
+    };
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(state));
+    invoke.mockResolvedValue(undefined);
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+    invoke.mockClear();
+
+    document.querySelector<HTMLButtonElement>('button[title="Mail (Cmd+2)"]')
+      ?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    await settle();
+
+    expect(invoke).toHaveBeenCalledWith("show_context_menu", {
+      id: "mail",
+      disabled: true,
+      showBadge: true,
+      affectTray: true,
+      muteAudio: false,
+    });
+
+    unmount(component);
+  });
+
+  it("reloads the selected service when the native reload menu action fires", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+    const listeners = new Map<string, (event: { payload: unknown }) => void>();
+    listen.mockImplementation((event, callback) => {
+      listeners.set(event, callback as (event: { payload: unknown }) => void);
+      return Promise.resolve(() => {});
+    });
+    invoke.mockResolvedValue(undefined);
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+    invoke.mockClear();
+
+    listeners.get("menu-action")?.({ payload: "reload:youtube" });
+    await settle();
+
+    expect(invoke).toHaveBeenCalledWith("reload_webview", { payload: { id: "youtube" } });
+
+    unmount(component);
+  });
+
+  it("closes a service webview without deleting storage when the native disable menu action fires", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+    const listeners = new Map<string, (event: { payload: unknown }) => void>();
+    listen.mockImplementation((event, callback) => {
+      listeners.set(event, callback as (event: { payload: unknown }) => void);
+      return Promise.resolve(() => {});
+    });
+    invoke.mockResolvedValue(undefined);
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+    invoke.mockClear();
+
+    listeners.get("menu-action")?.({ payload: "toggle:youtube" });
+    await settle();
+
+    expect(invoke).toHaveBeenCalledWith("close_webview", { payload: { id: "youtube" } });
+    expect(invoke).not.toHaveBeenCalledWith(
+      "delete_webview",
+      expect.objectContaining({ payload: expect.objectContaining({ id: "youtube" }) }),
+    );
+
+    unmount(component);
+  });
+
   it("closes disabled workspace services without deleting their session storage", async () => {
     localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
 

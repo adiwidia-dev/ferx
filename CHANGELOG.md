@@ -10,6 +10,9 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ### Fixed
 
+- Kept unread badge monitoring active for background services while overlays hide service webviews offscreen.
+- Fixed disabled service icons so their right-click menu remains available for enabling or deleting the service.
+- Fixed service reload menu actions to use the native webview reload API and made service disable close the webview without deleting session storage.
 - Updated Tauri to 2.11.1 or later to fix local-origin IPC checks for remote webview pages on Windows and Android.
 
 ---

@@ -402,7 +402,7 @@ describe("serializeServicesForStorage", () => {
 });
 
 describe("toggleServiceDisabled", () => {
-  it("unloads an active service immediately and switches to the next enabled service", () => {
+  it("closes an active service immediately and switches to the next enabled service", () => {
     const services = [
       createService({ id: "one", storageKey: "storage-one" }),
       createService({ id: "two", storageKey: "storage-two", disabled: true }),
@@ -416,10 +416,7 @@ describe("toggleServiceDisabled", () => {
         services[2],
       ],
       activeId: "three",
-      deleteWebview: {
-        id: "one",
-        storageKey: "storage-one",
-      },
+      closeWebviewId: "one",
     });
   });
 
