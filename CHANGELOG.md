@@ -17,6 +17,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ### Fixed
 
+- Updated Tauri to 2.11.1 or later to fix local-origin IPC checks for remote webview pages on Windows and Android.
 - Fixed Windows service webviews staying blank until manual reload after startup or adding a service.
 - Removed the duplicate Check updates button from the Settings page header.
 - Reduced todo panel render and textarea resize work for larger todo lists.
