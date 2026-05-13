@@ -17,6 +17,7 @@ pub(crate) fn external_webview_url(raw: &str) -> Option<tauri::WebviewUrl> {
 
 const SPOOFED_CHROME_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36";
 const TEAMS_EDGE_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0";
+const GOOGLE_AUTH_CHROMELESS_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari/537.36";
 
 fn is_teams_service(url: &str) -> bool {
     let hostname = extract_hostname(url)
@@ -38,6 +39,17 @@ fn is_google_service(url: &str) -> bool {
         || hostname_matches(&hostname, "googlevideo.com")
 }
 
+fn is_google_auth_sensitive_service(url: &str) -> bool {
+    let hostname = extract_hostname(url)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    hostname_matches(&hostname, "gmail.com")
+        || hostname_matches(&hostname, "googlemail.com")
+        || hostname_matches(&hostname, "mail.google.com")
+        || hostname_matches(&hostname, "accounts.google.com")
+}
+
 fn should_skip_notification_shim(url: &str) -> bool {
     matches!(
         microsoft_service_kind(url),
@@ -48,6 +60,8 @@ fn should_skip_notification_shim(url: &str) -> bool {
 pub(crate) fn user_agent_for_url(url: &str) -> Option<&'static str> {
     if is_teams_service(url) {
         Some(TEAMS_EDGE_USER_AGENT)
+    } else if is_google_auth_sensitive_service(url) {
+        Some(GOOGLE_AUTH_CHROMELESS_USER_AGENT)
     } else if matches!(
         microsoft_service_kind(url),
         Some(MicrosoftServiceKind::Outlook)
@@ -74,7 +88,7 @@ fn injected_js_for_url(
 ) -> String {
     let strategy_name = badge_strategy_for_url(url);
     let microsoft_service = microsoft_service_kind(url);
-    let google_compat = if is_google_service(url) {
+    let google_compat = if is_google_service(url) && !is_google_auth_sensitive_service(url) {
         google_auth_compat_script()
     } else {
         ""

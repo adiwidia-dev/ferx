@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 ### Fixed
 
 - Kept unread badge monitoring active for background services while overlays hide service webviews offscreen.
+- Let Gmail and Google sign-in hosts use a Ferdium-style Chrome user agent without the Chrome version and without the Chrome compatibility shim, reducing Google unsupported-browser sign-in failures.
 - Delayed resource usage reporting until service pages finish loading so the monitoring bridge cannot interrupt initial webview navigation.
 - Restored startup background preloading for all enabled inactive services after fixing the resource usage navigation race.
 - Fixed Outlook unread badges getting stuck when unrelated Microsoft app navigation counts appeared near the Inbox folder label.

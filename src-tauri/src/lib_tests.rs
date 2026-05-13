@@ -773,6 +773,28 @@ fn google_services_use_chrome_user_agent() {
 }
 
 #[test]
+fn gmail_services_use_chromeless_google_auth_user_agent() {
+    let expected = Some(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari/537.36",
+    );
+
+    assert_eq!(user_agent_for_url("https://gmail.com/"), expected);
+    assert_eq!(user_agent_for_url("https://mail.google.com/mail/u/0/"), expected);
+    assert_eq!(user_agent_for_url("https://accounts.google.com/"), expected);
+}
+
+#[test]
+fn gmail_setup_omits_chrome_google_auth_compat() {
+    let Some((_, script)) = service_webview_setup("https://gmail.com/", false) else {
+        panic!("expected valid gmail setup");
+    };
+
+    assert!(!script.contains("messageHandlers"));
+    assert!(!script.contains("navigator.userAgentData"));
+    assert!(!script.contains("Google Chrome"));
+}
+
+#[test]
 fn non_google_setup_omits_google_auth_compat() {
     let Some((_, script)) = service_webview_setup("https://discord.com/channels/@me", false)
     else {
