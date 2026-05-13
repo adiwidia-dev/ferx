@@ -654,7 +654,7 @@ fn service_webview_setup_injects_resource_usage_monitor_when_enabled() {
     };
 
     assert!(script.contains("window.__ferxResourceUsageMonitoringEnabled = true"));
-    assert!(script.contains("report_resource_usage"));
+    assert!(script.contains("https://ferx.resource/"));
     assert!(script.contains("networkInMbps"));
     assert!(script.contains("networkOutMbps: safeNumber(networkOutMbps)"));
     assert!(script.contains("window.fetch = function"));
@@ -707,7 +707,7 @@ fn service_webview_setup_skips_resource_usage_monitor_when_disabled() {
         panic!("expected valid discord setup");
     };
 
-    assert!(!script.contains("report_resource_usage"));
+    assert!(!script.contains("https://ferx.resource/"));
     assert!(!script.contains("__ferxResourceUsageMonitoringEnabled = true"));
 }
 
@@ -822,7 +822,7 @@ fn extracted_runtime_script_modules_preserve_known_markers() {
 
 #[test]
 fn extracted_resource_and_badge_script_modules_preserve_known_markers() {
-    assert!(resource_usage_monitor_script().contains("report_resource_usage"));
+    assert!(resource_usage_monitor_script().contains("https://ferx.resource/"));
     assert!(badge_engine_script("unsupported").contains("https://ferx.notify/"));
     assert!(outlook_badge_engine_script("outlook-folder-dom").contains("https://ferx.notify/"));
     assert!(teams_badge_engine_script().contains("invoke('report_teams_badge'"));

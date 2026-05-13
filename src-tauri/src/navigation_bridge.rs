@@ -44,6 +44,13 @@ pub(crate) fn handle_special_navigation(
         return false;
     }
 
+    if url.host_str() == Some("ferx.resource") {
+        if let Some(data) = url.query_pairs().find(|(k, _)| k == "data").map(|(_, v)| v.into_owned()) {
+            let _ = app_handle.emit("resource-usage-update", format!("{}:{}", service_id, data));
+        }
+        return false;
+    }
+
     if url.host_str() == Some("ferx.shortcut") {
         if let Some(key_str) = url.path().strip_prefix('/') {
             let _ = app_handle.emit("switch-shortcut", key_str);
