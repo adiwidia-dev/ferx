@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 ### Fixed
 
 - Kept unread badge monitoring active for background services while overlays hide service webviews offscreen.
+- Fixed Outlook unread badges getting stuck when unrelated Microsoft app navigation counts appeared near the Inbox folder label.
 - Fixed Outlook unread badges for newer folder list rows where the Inbox count is visible but not exposed as a tree item.
 - Fixed Outlook unread badge not updating on Tauri 2.11 by switching from the IPC invoke bridge to the navigation bridge used by all other services.
 - Fixed disabled service icons so their right-click menu remains available for enabling or deleting the service.
