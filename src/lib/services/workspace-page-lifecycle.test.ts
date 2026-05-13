@@ -13,6 +13,7 @@ import {
 import {
   consumeOpenServiceParam,
   createDebouncedStorageWriter,
+  MAX_BACKGROUND_PRELOADS,
   readWorkspacePageStartupState,
   registerFlushOnExit,
   scheduleCancellableTask,
@@ -80,6 +81,12 @@ describe("readWorkspacePageStartupState", () => {
     expect(startup.resourceUsageMonitoringEnabled).toBe(true);
     expect(startup.todoNotes).toHaveLength(1);
     expect(startup.toastMessage).toBe("");
+  });
+});
+
+describe("background service preloading", () => {
+  it("allows all enabled inactive services to preload during startup", () => {
+    expect(MAX_BACKGROUND_PRELOADS).toBe(Number.MAX_SAFE_INTEGER);
   });
 });
 

@@ -17,6 +17,7 @@
         window.__ferx_resource_usage_long_task_ms = 0;
         window.__ferx_resource_usage_last_tick = performance.now();
         window.__ferx_resource_usage_cpu_estimate = null;
+        window.__ferx_resource_usage_start_on_load = null;
         let lastResourceEntryIndex = 0;
 
         const safeNumber = (value) => Number.isFinite(value) ? value : null;
@@ -155,6 +156,12 @@
             window.__ferx_resource_usage_long_task_observer = null;
         };
 
+        const clearPendingStartOnLoad = () => {
+            if (!window.__ferx_resource_usage_start_on_load) return;
+            window.removeEventListener('load', window.__ferx_resource_usage_start_on_load);
+            window.__ferx_resource_usage_start_on_load = null;
+        };
+
         const sample = () => {
             if (!window.__ferxResourceUsageMonitoringEnabled) return;
 
@@ -194,6 +201,7 @@
                 clearInterval(window.__ferx_resource_usage_timer);
                 window.__ferx_resource_usage_timer = null;
             }
+            clearPendingStartOnLoad();
             if (!enabled) {
                 restoreNetworkUploadHooks();
                 disconnectLongTaskObserver();
@@ -202,11 +210,21 @@
 
             installNetworkUploadHooks();
             installLongTaskObserver();
-            window.__ferx_resource_usage_last_sample = performance.now();
-            lastResourceEntryIndex = performance.getEntriesByType('resource').length;
-            window.__ferx_resource_usage_last_network_bytes = 0;
-            window.__ferx_resource_usage_timer = setInterval(() => sample(), 1000);
-            sample();
+            const startSampling = () => {
+                if (!window.__ferxResourceUsageMonitoringEnabled || window.__ferx_resource_usage_timer) return;
+                window.__ferx_resource_usage_last_sample = performance.now();
+                lastResourceEntryIndex = performance.getEntriesByType('resource').length;
+                window.__ferx_resource_usage_last_network_bytes = 0;
+                window.__ferx_resource_usage_timer = setInterval(() => sample(), 1000);
+            };
+
+            if (document.readyState === 'loading') {
+                window.__ferx_resource_usage_start_on_load = startSampling;
+                window.addEventListener('load', startSampling, { once: true });
+                return;
+            }
+
+            startSampling();
         };
 
         window.__ferxSetResourceUsageMonitoring(true);

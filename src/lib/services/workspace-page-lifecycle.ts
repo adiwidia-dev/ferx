@@ -19,7 +19,7 @@ import {
 export const WORKSPACE_SAVE_DEBOUNCE_MS = 1200;
 export const PRELOAD_START_MS = 2000;
 export const PRELOAD_GAP_MS = 1000;
-export const MAX_BACKGROUND_PRELOADS = 3;
+export const MAX_BACKGROUND_PRELOADS = Number.MAX_SAFE_INTEGER;
 
 export function consumeOpenServiceParam(search: string): {
   openServiceId: string | null;

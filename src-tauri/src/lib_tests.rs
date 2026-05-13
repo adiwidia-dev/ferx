@@ -755,6 +755,8 @@ fn youtube_music_setup_includes_google_auth_compat() {
     assert!(script.contains("'webdriver'"));
     assert!(script.contains("Google Inc."));
     assert!(script.contains("Google Chrome"));
+    assert!(script.contains("version: '135'"));
+    assert!(script.contains("uaFullVersion: '135.0.0.0'"));
     assert!(script.contains("window.chrome"));
     assert!(script.contains("navigator.userAgentData"));
     assert!(script.contains("unhandledrejection"));

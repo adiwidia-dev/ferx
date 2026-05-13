@@ -11,6 +11,8 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 ### Fixed
 
 - Kept unread badge monitoring active for background services while overlays hide service webviews offscreen.
+- Delayed resource usage reporting until service pages finish loading so the monitoring bridge cannot interrupt initial webview navigation.
+- Restored startup background preloading for all enabled inactive services after fixing the resource usage navigation race.
 - Fixed Outlook unread badges getting stuck when unrelated Microsoft app navigation counts appeared near the Inbox folder label.
 - Fixed Outlook unread badges for newer folder list rows where the Inbox count is visible but not exposed as a tree item.
 - Fixed Outlook unread badge not updating on Tauri 2.11 by switching from the IPC invoke bridge to the navigation bridge used by all other services.
