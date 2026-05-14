@@ -8,6 +8,15 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ## [Unreleased]
 
+---
+
+## [0.5.0] — 2026-05-14
+
+### Changed
+
+- Updated Tauri to 2.11.1 or later to fix local-origin IPC checks for remote webview pages on Windows and Android.
+- Synced the JavaScript Tauri API and CLI packages with the Rust Tauri 2.11 runtime so `yarn tauri dev` no longer reports a package-version mismatch.
+
 ### Fixed
 
 - Reduced hidden Outlook and Teams badge monitoring overhead while keeping background badge and tray unread updates active for loaded services.
@@ -20,8 +29,6 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 - Fixed Outlook unread badge not updating on Tauri 2.11 by switching from the IPC invoke bridge to the navigation bridge used by all other services.
 - Fixed disabled service icons so their right-click menu remains available for enabling or deleting the service.
 - Fixed service reload menu actions to use the native webview reload API and made service disable close the webview without deleting session storage.
-- Synced the JavaScript Tauri API and CLI packages with the Rust Tauri 2.11 runtime so `yarn tauri dev` no longer reports a package-version mismatch.
-- Updated Tauri to 2.11.1 or later to fix local-origin IPC checks for remote webview pages on Windows and Android.
 
 ---
 
