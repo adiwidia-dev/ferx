@@ -65,14 +65,14 @@ export function getBadgeCapability(
         kind: "dom-targeted",
         usesMutationObserver: true,
         usesTitleObserver: true,
-        usesFallbackPolling: false,
+        usesFallbackPolling: true,
       };
     case "teams-dom":
       return {
         kind: "hybrid-title-dom",
         usesMutationObserver: true,
         usesTitleObserver: true,
-        usesFallbackPolling: false,
+        usesFallbackPolling: true,
       };
     case "whatsapp-title":
       return {

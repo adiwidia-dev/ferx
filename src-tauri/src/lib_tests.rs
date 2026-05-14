@@ -1,6 +1,6 @@
 use crate::service_runtime::{
-    badge_strategy_for_url, extract_hostname, hostname_matches, microsoft_service_kind,
-    MicrosoftServiceKind,
+    MicrosoftServiceKind, badge_strategy_for_url, extract_hostname, hostname_matches,
+    microsoft_service_kind,
 };
 use crate::service_webview::{
     external_webview_url, injected_js, service_webview_setup,
@@ -16,10 +16,10 @@ use crate::service_webview_runtime_scripts::{
     notification_script, spellcheck_script,
 };
 use crate::webview_commands::{
+    AudioMutedPayload, BadgeMonitoringMode, DeleteWebviewPayload, RightPanelWidthPayload,
+    ServiceWebviewCommandPayload, WebviewIdPayload, badge_monitoring_eval_script,
     close_all_service_webviews, previous_active_webview_to_hide, report_outlook_badge,
     report_resource_usage, report_teams_badge, safe_export_file_name, save_workspace_config_export,
-    AudioMutedPayload, DeleteWebviewPayload, RightPanelWidthPayload, ServiceWebviewCommandPayload,
-    WebviewIdPayload,
 };
 use crate::window_layout::effective_service_content_size;
 use serde_json::json;
@@ -46,6 +46,21 @@ fn previous_active_webview_to_hide_skips_empty_and_same_service() {
         previous_active_webview_to_hide("teams", "outlook"),
         Some("teams".to_string())
     );
+}
+
+#[test]
+fn badge_monitoring_eval_script_prefers_mode_aware_api_with_legacy_fallback() {
+    let active = badge_monitoring_eval_script(true, BadgeMonitoringMode::Active);
+    assert!(active.contains("__ferxSetBadgeMonitoringMode"));
+    assert!(active.contains("'active'"));
+    assert!(active.contains("true"));
+    assert!(active.contains("__ferxSetBadgeMonitoring?.(true)"));
+
+    let background = badge_monitoring_eval_script(false, BadgeMonitoringMode::Background);
+    assert!(background.contains("__ferxSetBadgeMonitoringMode"));
+    assert!(background.contains("'background'"));
+    assert!(background.contains("false"));
+    assert!(background.contains("__ferxSetBadgeMonitoring?.(false)"));
 }
 
 #[test]
@@ -217,10 +232,14 @@ fn close_webview_preserves_session_storage() {
         .unwrap_or(source.len());
     let close_body = &source[close_start..next_command];
 
-    assert!(!close_body.contains("remove_data_store"),
-        "close_webview must not delete the data store — use delete_webview for that");
-    assert!(!close_body.contains("remove_dir_all"),
-        "close_webview must not delete the session directory — use delete_webview for that");
+    assert!(
+        !close_body.contains("remove_data_store"),
+        "close_webview must not delete the data store — use delete_webview for that"
+    );
+    assert!(
+        !close_body.contains("remove_dir_all"),
+        "close_webview must not delete the session directory — use delete_webview for that"
+    );
 }
 
 #[test]
@@ -383,14 +402,23 @@ fn badge_strategy_uses_explicit_hostname_mapping() {
         badge_strategy_for_url("https://office.com/mail"),
         "outlook-folder-dom"
     );
-    assert_eq!(badge_strategy_for_url("https://teams.microsoft.com"), "teams-dom");
+    assert_eq!(
+        badge_strategy_for_url("https://teams.microsoft.com"),
+        "teams-dom"
+    );
     assert_eq!(
         badge_strategy_for_url("https://web.whatsapp.com"),
         "whatsapp-title"
     );
     assert_eq!(badge_strategy_for_url("https://example.com"), "unsupported");
-    assert_eq!(badge_strategy_for_url("https://notwhatsapp.com"), "unsupported");
-    assert_eq!(badge_strategy_for_url("https://teams.example.com"), "unsupported");
+    assert_eq!(
+        badge_strategy_for_url("https://notwhatsapp.com"),
+        "unsupported"
+    );
+    assert_eq!(
+        badge_strategy_for_url("https://teams.example.com"),
+        "unsupported"
+    );
     assert_eq!(
         badge_strategy_for_url("https://mail.office.example.com"),
         "unsupported"
@@ -474,7 +502,9 @@ fn service_webview_setup_accepts_valid_external_urls() {
 
     assert!(!initialization_script.contains("Object.defineProperty(window, 'Notification'"));
     assert!(initialization_script.contains("window.location.href = 'https://ferx.download/?url='"));
-    assert!(initialization_script.contains("window.location.href = 'https://ferx.shortcut/' + key"));
+    assert!(
+        initialization_script.contains("window.location.href = 'https://ferx.shortcut/' + key")
+    );
     assert!(initialization_script.contains("invoke('report_teams_badge'"));
     assert!(initialization_script.contains(".fui-Badge"));
     assert!(!initialization_script.contains("https://ferx.notify/"));
@@ -614,8 +644,7 @@ fn cloud_teams_setup_uses_teams_safeguards() {
 
 #[test]
 fn service_webview_setup_keeps_notification_shim_for_supported_apps() {
-    let Some((_, script)) = service_webview_setup("https://discord.com/channels/@me", false)
-    else {
+    let Some((_, script)) = service_webview_setup("https://discord.com/channels/@me", false) else {
         panic!("expected valid discord setup");
     };
 
@@ -680,7 +709,8 @@ fn resource_usage_monitor_restores_page_hooks_when_disabled() {
         "XMLHttpRequest.prototype.send = window.__ferx_resource_usage_original_xhr_send",
     ));
     assert!(
-        script.contains("navigator.sendBeacon = window.__ferx_resource_usage_original_send_beacon",)
+        script
+            .contains("navigator.sendBeacon = window.__ferx_resource_usage_original_send_beacon",)
     );
     assert!(script.contains("window.__ferx_resource_usage_long_task_observer?.disconnect()",));
 }
@@ -691,9 +721,11 @@ fn resource_usage_script_processes_resource_entries_incrementally() {
 
     assert!(script.contains("lastResourceEntryIndex"));
     assert!(script.contains("entries.length < lastResourceEntryIndex"));
-    assert!(script.contains(
-        "for (let index = lastResourceEntryIndex; index < entries.length; index += 1)"
-    ));
+    assert!(
+        script.contains(
+            "for (let index = lastResourceEntryIndex; index < entries.length; index += 1)"
+        )
+    );
 }
 
 #[test]
@@ -714,8 +746,14 @@ fn service_webview_setup_skips_resource_usage_monitor_when_disabled() {
 #[test]
 fn microsoft_apps_do_not_use_spoofed_chrome_user_agent() {
     assert_eq!(user_agent_for_url("https://outlook.office.com/mail"), None);
-    assert_eq!(user_agent_for_url("https://outlook.office365.com/mail"), None);
-    assert_eq!(user_agent_for_url("https://outlook.cloud.microsoft/mail"), None);
+    assert_eq!(
+        user_agent_for_url("https://outlook.office365.com/mail"),
+        None
+    );
+    assert_eq!(
+        user_agent_for_url("https://outlook.cloud.microsoft/mail"),
+        None
+    );
 }
 
 #[test]
@@ -779,7 +817,10 @@ fn gmail_services_use_chromeless_google_auth_user_agent() {
     );
 
     assert_eq!(user_agent_for_url("https://gmail.com/"), expected);
-    assert_eq!(user_agent_for_url("https://mail.google.com/mail/u/0/"), expected);
+    assert_eq!(
+        user_agent_for_url("https://mail.google.com/mail/u/0/"),
+        expected
+    );
     assert_eq!(user_agent_for_url("https://accounts.google.com/"), expected);
 }
 
@@ -796,8 +837,7 @@ fn gmail_setup_omits_chrome_google_auth_compat() {
 
 #[test]
 fn non_google_setup_omits_google_auth_compat() {
-    let Some((_, script)) = service_webview_setup("https://discord.com/channels/@me", false)
-    else {
+    let Some((_, script)) = service_webview_setup("https://discord.com/channels/@me", false) else {
         panic!("expected valid discord setup");
     };
 
@@ -826,7 +866,8 @@ fn teams_cloud_setup_keeps_supported_edge_user_agent_and_badge_detection() {
 
 #[test]
 fn discord_setup_keeps_existing_badge_transport() {
-    let Some((_, discord_script)) = service_webview_setup("https://discord.com/channels/@me", false)
+    let Some((_, discord_script)) =
+        service_webview_setup("https://discord.com/channels/@me", false)
     else {
         panic!("expected valid discord setup");
     };

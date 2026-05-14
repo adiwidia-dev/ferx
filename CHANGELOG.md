@@ -10,6 +10,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ### Fixed
 
+- Reduced hidden Outlook and Teams badge monitoring overhead while keeping background badge and tray unread updates active for loaded services.
 - Kept unread badge monitoring active for background services while overlays hide service webviews offscreen.
 - Let Gmail and Google sign-in hosts use a Ferdium-style Chrome user agent without the Chrome version and without the Chrome compatibility shim, reducing Google unsupported-browser sign-in failures.
 - Delayed resource usage reporting until service pages finish loading so the monitoring bridge cannot interrupt initial webview navigation.

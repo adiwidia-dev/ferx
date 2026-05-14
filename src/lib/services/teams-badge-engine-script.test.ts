@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import outlookBadgeEngineScript from "../../../src-tauri/scripts/outlook_badge_engine.js?raw";
+import teamsBadgeEngineScript from "../../../src-tauri/scripts/teams_badge_engine.js?raw";
 
 type Observation = {
   target: Node;
@@ -55,39 +55,35 @@ function installMutationObserverMock() {
   return observers;
 }
 
-function runOutlookBadgeScript(bodyMarkup: string, title = "Outlook") {
+function runTeamsBadgeScript(bodyMarkup: string, title = "Teams") {
   vi.useFakeTimers();
   document.title = title;
   document.body.innerHTML = bodyMarkup;
 
-  Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
-    configurable: true,
-    value: () => ({ width: 120, height: 24 }),
-  });
-
-  const reports: string[] = [];
-  window.__TAURI_INTERNALS__ = {};
-  window.__ferxBadgeReports = reports;
-
-  const script = outlookBadgeEngineScript
-    .replace(
-      "window.location.href = 'https://ferx.notify/' + payload;",
-      "window.__ferxBadgeReports.push(payload);",
-    )
-      .replace("__FERX_STRATEGY__", "outlook-folder-dom");
-
   const observers = installMutationObserverMock();
-  window.eval(script);
-  vi.runOnlyPendingTimers();
+  const reports: string[] = [];
+
+  window.__TAURI_INTERNALS__ = {
+    invoke: vi.fn((_command: string, input: { payload: string }) => {
+      reports.push(input.payload);
+      return Promise.resolve();
+    }),
+  };
+
+  window.eval(teamsBadgeEngineScript);
 
   return { observers, reports };
+}
+
+async function flushPromises() {
+  await Promise.resolve();
+  await Promise.resolve();
 }
 
 afterEach(() => {
   vi.useRealTimers();
   document.body.innerHTML = "";
   delete window.__TAURI_INTERNALS__;
-  delete window.__ferxBadgeReports;
   delete window.__ferx_badge_observers_active;
   delete window.__ferx_last_badge_state;
   delete window.__ferx_badge_dom_timer;
@@ -96,67 +92,15 @@ afterEach(() => {
   delete window.__ferxSetBadgeMonitoringMode;
 });
 
-describe("Outlook badge engine script", () => {
-  it("reports unread mail counts from structured Inbox folder rows", () => {
-    const { reports } = runOutlookBadgeScript(`
-      <div role="tree">
-        <div role="treeitem">
-          <span>Inbox</span>
-          <span>5</span>
-        </div>
-      </div>
-    `);
-
-    expect(reports.at(-1)).toBe("count:5");
-  });
-
-  it("does not report unrelated navigation badge counts as Inbox unread mail", () => {
-    const { reports } = runOutlookBadgeScript(`
-      <div role="tree">
-        <div>
-          <span>Inbox</span>
-          <button aria-label="Microsoft apps">5</button>
-        </div>
-      </div>
-    `);
-
-    expect(reports.at(-1)).toBe("clear");
-  });
-
-  it("does not report counts from broad Inbox containers with nested app controls", () => {
-    const { reports } = runOutlookBadgeScript(`
-      <div role="tree">
-        <button>
-          <span>Inbox</span>
-          <span>Microsoft apps</span>
-          <span>5</span>
-        </button>
-      </div>
-    `);
-
-    expect(reports.at(-1)).toBe("clear");
-  });
-
-  it("clears stale title counts when the visible Inbox folder has no count", () => {
-    const { reports } = runOutlookBadgeScript(`
-      <div role="tree">
-        <div role="treeitem">
-          <span>Inbox</span>
-        </div>
-      </div>
-    `, "(5) Outlook");
-
-    expect(reports.at(-1)).toBe("clear");
-  });
-
-  it("starts hidden services in background mode without observing the whole body", () => {
-    const { observers } = runOutlookBadgeScript(`
+describe("Teams badge engine script", () => {
+  it("starts hidden services in background mode without observing the whole body", async () => {
+    const { observers } = runTeamsBadgeScript(`
       <main>
-        <section>
-          <span>Inbox</span>
-        </section>
+        <span class="fui-Badge">2</span>
       </main>
     `);
+
+    await flushPromises();
 
     const bodySubtreeObservations = observers.flatMap((observer) =>
       observer.observations.filter(
@@ -170,43 +114,39 @@ describe("Outlook badge engine script", () => {
     expect(bodySubtreeObservations).toHaveLength(0);
   });
 
-  it("keeps background Outlook badge polling active for tray updates", () => {
-    const { reports } = runOutlookBadgeScript(`
-      <div role="tree">
-        <div role="treeitem">
-          <span>Inbox</span>
-        </div>
-      </div>
+  it("keeps background Teams badge polling active for tray updates", async () => {
+    const { reports } = runTeamsBadgeScript(`
+      <main>
+        <span class="fui-Badge">1</span>
+      </main>
     `);
 
-    expect(reports.at(-1)).toBe("clear");
+    await flushPromises();
+    expect(reports.at(-1)).toBe("count:1");
 
     document.body.innerHTML = `
-      <div role="tree">
-        <div role="treeitem">
-          <span>Inbox</span>
-          <span>3</span>
-        </div>
-      </div>
+      <main>
+        <span class="fui-Badge">5</span>
+      </main>
     `;
 
     vi.advanceTimersByTime(15_000);
+    await flushPromises();
 
-    expect(reports.at(-1)).toBe("count:3");
+    expect(reports.at(-1)).toBe("count:5");
   });
 
-  it("attaches targeted Outlook DOM observers only after switching to active mode", () => {
-    const { observers } = runOutlookBadgeScript(`
-      <nav aria-label="Folders">
-        <div role="treeitem">
-          <span>Inbox</span>
-          <span>4</span>
-        </div>
+  it("attaches targeted Teams DOM observers only after switching to active mode", async () => {
+    const { observers } = runTeamsBadgeScript(`
+      <nav data-tid="app-layout-area--sidebar">
+        <span class="fui-Badge">6</span>
       </nav>
     `);
 
     const nav = document.querySelector("nav");
     expect(nav).not.toBeNull();
+
+    await flushPromises();
     expect(
       observers.some((observer) =>
         observer.observations.some((observation) => observation.target === nav),
@@ -229,7 +169,6 @@ describe("Outlook badge engine script", () => {
 declare global {
   interface Window {
     __TAURI_INTERNALS__?: object;
-    __ferxBadgeReports?: string[];
     __ferx_badge_observers_active?: boolean;
     __ferx_last_badge_state?: string;
     __ferx_badge_dom_timer?: number | null;

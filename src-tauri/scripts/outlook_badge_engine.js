@@ -9,10 +9,13 @@
         window.__ferx_last_badge_state = '__ferx:init__';
         window.__ferx_badge_dom_timer = window.__ferx_badge_dom_timer || null;
         window.__ferx_badge_monitoring_enabled = window.__ferx_badge_monitoring_enabled ?? true;
+        window.__ferx_badge_monitoring_mode = window.__ferx_badge_monitoring_mode || 'background';
         let observer = null;
         let evaluationTimer = null;
+        let observationRetryTimer = null;
         let safetyPollTimer = null;
         const BADGE_EVALUATION_DELAY_MS = 300;
+        const BADGE_OBSERVATION_RETRY_MS = 1000;
         const BADGE_SAFETY_POLL_MS = 15000;
 
         const observeOptions = {
@@ -44,17 +47,9 @@
             });
         };
 
-        const resolveObservationTargets = () => {
-            const roots = uniqueElements(
-                observationSelectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)))
-            );
-
-            if (roots.length > 0) {
-                return roots;
-            }
-
-            return [document.body || document.documentElement].filter(Boolean);
-        };
+        const resolveObservationTargets = () => uniqueElements(
+            observationSelectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)))
+        );
 
         const normalizeTitle = (title) => (title || '').replace(/[\u200E\u200F\u200B-\u200D]/g, '').trim();
         const titleCountState = (title) => {
@@ -196,6 +191,8 @@
 
         const outlookVisibleFolderRowState = () => {
             const roots = resolveObservationTargets();
+            if (roots.length === 0) return null;
+
             const candidates = uniqueElements(roots.flatMap((root) =>
                 Array.from(root.querySelectorAll('div, span, a, button, li, [tabindex]'))
             ));
@@ -295,6 +292,33 @@
             }
         };
 
+        const isActiveMonitoringMode = () => window.__ferx_badge_monitoring_mode === 'active';
+
+        const clearObservationRetry = () => {
+            if (observationRetryTimer !== null) {
+                clearTimeout(observationRetryTimer);
+                observationRetryTimer = null;
+            }
+        };
+
+        const disconnectDomObserver = () => {
+            if (observer) {
+                observer.disconnect();
+                observer = null;
+            }
+            clearObservationRetry();
+        };
+
+        const scheduleObservationRetry = () => {
+            if (!window.__ferx_badge_monitoring_enabled || !isActiveMonitoringMode()) return;
+            if (observationRetryTimer !== null) return;
+
+            observationRetryTimer = setTimeout(() => {
+                observationRetryTimer = null;
+                observeDom();
+            }, BADGE_OBSERVATION_RETRY_MS);
+        };
+
         const observeTitle = () => {
             const bindTitleObserver = () => {
                 const titleEl = document.querySelector('title');
@@ -328,26 +352,30 @@
         };
 
         const observeDom = () => {
-            if (observer) {
-                observer.disconnect();
+            disconnectDomObserver();
+
+            if (!window.__ferx_badge_monitoring_enabled || !isActiveMonitoringMode()) return;
+
+            const targets = resolveObservationTargets();
+            if (targets.length === 0) {
+                scheduleObservationRetry();
+                return;
             }
 
             observer = new MutationObserver(() => {
                 scheduleBadgeEvaluation();
             });
 
-            for (const target of resolveObservationTargets()) {
+            for (const target of targets) {
                 observer.observe(target, observeOptions);
             }
         };
 
-        window.__ferxSetBadgeMonitoring = (enabled) => {
-            window.__ferx_badge_monitoring_enabled = enabled;
-            if (!enabled) {
-                if (observer) {
-                    observer.disconnect();
-                    observer = null;
-                }
+        window.__ferxSetBadgeMonitoringMode = (mode, enabled = true) => {
+            window.__ferx_badge_monitoring_mode = mode === 'active' ? 'active' : 'background';
+            window.__ferx_badge_monitoring_enabled = enabled === true;
+            if (!window.__ferx_badge_monitoring_enabled) {
+                disconnectDomObserver();
 
                 if (evaluationTimer !== null) {
                     clearTimeout(evaluationTimer);
@@ -359,15 +387,28 @@
                 return;
             }
 
-            observeDom();
             startSafetyPoll();
+            if (isActiveMonitoringMode()) {
+                observeDom();
+            } else {
+                disconnectDomObserver();
+            }
             runBadgeEvaluation();
+        };
+
+        window.__ferxSetBadgeMonitoring = (enabled) => {
+            window.__ferxSetBadgeMonitoringMode(
+                window.__ferx_badge_monitoring_mode,
+                enabled === true
+            );
         };
 
         const start = () => {
             observeTitle();
-            observeDom();
             startSafetyPoll();
+            if (isActiveMonitoringMode()) {
+                observeDom();
+            }
             runBadgeEvaluation();
         };
 

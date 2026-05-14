@@ -1,24 +1,21 @@
 use crate::app_state::{
-    badge_monitoring_pref, clear_active_webview, clear_badge_monitoring_prefs,
-    get_active_webview, remove_badge_monitoring_pref, service_audio_muted,
-    set_active_resource_usage_monitoring, set_active_webview, set_badge_monitoring_pref,
-    set_service_audio_muted,
+    badge_monitoring_pref, clear_active_webview, clear_badge_monitoring_prefs, get_active_webview,
+    remove_badge_monitoring_pref, service_audio_muted, set_active_resource_usage_monitoring,
+    set_active_webview, set_badge_monitoring_pref, set_service_audio_muted,
     set_stored_right_panel_width,
 };
 use crate::download_dialog::handle_service_webview_download;
 use crate::file_drop::register_file_drop_handler;
 use crate::navigation_bridge::emit_badge_update;
 use crate::navigation_bridge::handle_special_navigation;
-use crate::service_storage::{
-    data_store_identifier_for_storage_key, session_dir_for_storage_key,
-};
+use crate::service_storage::{data_store_identifier_for_storage_key, session_dir_for_storage_key};
 use crate::service_webview::{
     resource_usage_monitor_eval_script, service_webview_setup_with_resource_monitoring,
     user_agent_for_url,
 };
 use crate::window_layout::{
-    apply_active_child_webview_bounds, effective_service_content_size,
-    right_panel_physical_width, service_content_top_offset, sidebar_physical_width,
+    apply_active_child_webview_bounds, effective_service_content_size, right_panel_physical_width,
+    service_content_top_offset, sidebar_physical_width,
 };
 use serde::Deserialize;
 use tauri::webview::Color;
@@ -68,18 +65,36 @@ pub(crate) struct ServiceWebviewCommandPayload {
     pub(crate) resource_usage_monitoring_enabled: bool,
 }
 
-fn set_badge_monitoring(webview: &tauri::Webview, enabled: bool) {
+#[derive(Clone, Copy)]
+pub(crate) enum BadgeMonitoringMode {
+    Active,
+    Background,
+}
+
+impl BadgeMonitoringMode {
+    fn as_js_literal(self) -> &'static str {
+        match self {
+            Self::Active => "active",
+            Self::Background => "background",
+        }
+    }
+}
+
+pub(crate) fn badge_monitoring_eval_script(enabled: bool, mode: BadgeMonitoringMode) -> String {
     let enabled_literal = if enabled { "true" } else { "false" };
-    let _ = webview.eval(format!(
-        "window.__ferxSetBadgeMonitoring?.({enabled_literal});"
-    ));
+    let mode_literal = mode.as_js_literal();
+    format!(
+        "if (window.__ferxSetBadgeMonitoringMode) {{ window.__ferxSetBadgeMonitoringMode('{mode_literal}', {enabled_literal}); }} else {{ window.__ferxSetBadgeMonitoring?.({enabled_literal}); }}"
+    )
+}
+
+fn set_badge_monitoring_mode(webview: &tauri::Webview, enabled: bool, mode: BadgeMonitoringMode) {
+    let _ = webview.eval(format!("{}", badge_monitoring_eval_script(enabled, mode)));
 }
 
 fn set_audio_muted(webview: &tauri::Webview, muted: bool) {
     let muted_literal = if muted { "true" } else { "false" };
-    let _ = webview.eval(format!(
-        "window.__ferxSetAudioMuted?.({muted_literal});"
-    ));
+    let _ = webview.eval(format!("window.__ferxSetAudioMuted?.({muted_literal});"));
 }
 
 fn close_service_webviews(app: &AppHandle) {
@@ -133,15 +148,18 @@ pub async fn hide_all_webviews(app: AppHandle) {
         let scale_factor = window.scale_factor().unwrap_or(1.0);
         let physical_size = window.inner_size().unwrap_or_default();
         let sidebar_width = sidebar_physical_width(scale_factor);
-        let right_panel_width = right_panel_physical_width(
-            scale_factor,
-            crate::app_state::right_panel_width(&app),
-        );
+        let right_panel_width =
+            right_panel_physical_width(scale_factor, crate::app_state::right_panel_width(&app));
         let offscreen_size =
             effective_service_content_size(physical_size, sidebar_width, 0, right_panel_width);
 
         for (name, webview) in app.webviews() {
             if name != "main" {
+                set_badge_monitoring_mode(
+                    &webview,
+                    badge_monitoring_pref(&app, &name),
+                    BadgeMonitoringMode::Background,
+                );
                 let _ = webview.set_bounds(tauri::Rect {
                     position: tauri::Position::Physical(PhysicalPosition::new(-10000, -10000)),
                     size: tauri::Size::Physical(offscreen_size),
@@ -348,10 +366,8 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
         let sidebar_width = sidebar_physical_width(scale_factor);
         let top_offset =
             service_content_top_offset(scale_factor, resource_usage_monitoring_enabled);
-        let right_panel_width = right_panel_physical_width(
-            scale_factor,
-            crate::app_state::right_panel_width(&app),
-        );
+        let right_panel_width =
+            right_panel_physical_width(scale_factor, crate::app_state::right_panel_width(&app));
 
         let active_pos = PhysicalPosition::new(sidebar_width as i32, top_offset as i32);
         let active_size = effective_service_content_size(
@@ -363,7 +379,11 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
         let offscreen_pos = PhysicalPosition::new(-10000, -10000);
 
         if let Some(active_webview) = app.get_webview(&id) {
-            set_badge_monitoring(&active_webview, badge_monitoring_pref(&app, &id));
+            set_badge_monitoring_mode(
+                &active_webview,
+                badge_monitoring_pref(&app, &id),
+                BadgeMonitoringMode::Active,
+            );
             set_audio_muted(&active_webview, service_audio_muted(&app));
             let _ = active_webview.eval(resource_usage_monitor_eval_script(
                 resource_usage_monitoring_enabled,
@@ -377,6 +397,11 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
 
             if let Some(previous_id) = previous_active_to_hide {
                 if let Some(previous_webview) = app.get_webview(&previous_id) {
+                    set_badge_monitoring_mode(
+                        &previous_webview,
+                        badge_monitoring_pref(&app, &previous_id),
+                        BadgeMonitoringMode::Background,
+                    );
                     let _ = previous_webview.eval(resource_usage_monitor_eval_script(false));
                     let _ = previous_webview.set_bounds(tauri::Rect {
                         position: tauri::Position::Physical(offscreen_pos),
@@ -425,12 +450,21 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
         match window.add_child(builder, active_pos, active_size) {
             Ok(webview) => {
                 register_file_drop_handler(&webview);
-                set_badge_monitoring(&webview, badge_monitoring_pref(&app, &id));
+                set_badge_monitoring_mode(
+                    &webview,
+                    badge_monitoring_pref(&app, &id),
+                    BadgeMonitoringMode::Active,
+                );
                 set_audio_muted(&webview, service_audio_muted(&app));
                 let _ = webview.show();
                 let _ = webview.set_focus();
                 if let Some(previous_id) = previous_active_to_hide {
                     if let Some(previous_webview) = app.get_webview(&previous_id) {
+                        set_badge_monitoring_mode(
+                            &previous_webview,
+                            badge_monitoring_pref(&app, &previous_id),
+                            BadgeMonitoringMode::Background,
+                        );
                         let _ = previous_webview.eval(resource_usage_monitor_eval_script(false));
                         let _ = previous_webview.set_bounds(tauri::Rect {
                             position: tauri::Position::Physical(offscreen_pos),
@@ -519,10 +553,8 @@ pub async fn load_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
         let scale_factor = window.scale_factor().unwrap_or(1.0);
         let physical_size = window.inner_size().unwrap_or_default();
         let sidebar_width = sidebar_physical_width(scale_factor);
-        let right_panel_width = right_panel_physical_width(
-            scale_factor,
-            crate::app_state::right_panel_width(&app),
-        );
+        let right_panel_width =
+            right_panel_physical_width(scale_factor, crate::app_state::right_panel_width(&app));
 
         match window.add_child(
             builder,
@@ -531,7 +563,11 @@ pub async fn load_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
         ) {
             Ok(webview) => {
                 register_file_drop_handler(&webview);
-                set_badge_monitoring(&webview, badge_monitoring_enabled);
+                set_badge_monitoring_mode(
+                    &webview,
+                    badge_monitoring_enabled,
+                    BadgeMonitoringMode::Background,
+                );
                 set_audio_muted(&webview, service_audio_muted(&app));
             }
             Err(error) => {

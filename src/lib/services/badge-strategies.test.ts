@@ -88,7 +88,7 @@ describe("getBadgeCapability", () => {
       kind: "dom-targeted" satisfies BadgeStrategyKind,
       usesMutationObserver: true,
       usesTitleObserver: true,
-      usesFallbackPolling: false,
+      usesFallbackPolling: true,
     });
   });
 
@@ -97,7 +97,7 @@ describe("getBadgeCapability", () => {
       kind: "hybrid-title-dom" satisfies BadgeStrategyKind,
       usesMutationObserver: true,
       usesTitleObserver: true,
-      usesFallbackPolling: false,
+      usesFallbackPolling: true,
     });
   });
 });
