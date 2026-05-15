@@ -1,11 +1,10 @@
 
     (() => {
-        const normalizeText = (text) => (text || '').replace(/[‎‏​-‍]/g, '').trim();
-
-        const safeParseInt = (text) => {
-            const n = parseInt(normalizeText(text), 10);
-            return Number.isFinite(n) && n > 0 ? n : 0;
-        };
+        const {
+            normalizeText,
+            safePositiveInt: safeParseInt,
+            isTimestampLikeElement
+        } = window.__ferxBadgeUtils;
 
         const firstPositiveCount = (text) => {
             const match = normalizeText(text).match(/\b(\d{1,5})\b/);
@@ -22,14 +21,6 @@
 
             const fromText = firstPositiveCount(fallbackText);
             return fromText > 0 ? fromText : 1;
-        };
-
-        const isTimestampLikeElement = (element) => {
-            if (!element) return false;
-            if (element.closest?.('time')) return true;
-            const label = normalizeText(element.getAttribute?.('aria-label') || element.getAttribute?.('title'));
-            const testId = normalizeText(element.getAttribute?.('data-testid'));
-            return /\b(?:time|date)\b/i.test(label) || /\b(?:time|date)\b/i.test(testId);
         };
 
         const rowSelector = '[role="listitem"], [role="treeitem"], [role="link"], [data-item-id], [data-conversation-id], [data-space-id]';

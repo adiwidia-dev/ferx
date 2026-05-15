@@ -8,7 +8,8 @@ use crate::service_webview::{
     user_agent_for_url,
 };
 use crate::service_webview_badge_scripts::{
-    badge_engine_script, outlook_badge_engine_script, teams_badge_engine_script,
+    badge_engine_script, google_chat_badge_engine_script, outlook_badge_engine_script,
+    teams_badge_engine_script, telegram_badge_engine_script, whatsapp_badge_engine_script,
 };
 use crate::service_webview_resource_usage::resource_usage_monitor_script;
 use crate::service_webview_runtime_scripts::{
@@ -921,6 +922,29 @@ fn badge_engine_scaffold_script_exposes_init_function() {
     assert!(script.contains("__ferx_badge_observers_active"));
     assert!(script.contains("BADGE_SAFETY_POLL_MS"));
     assert!(script.contains("BADGE_OBSERVATION_RETRY_MS"));
+}
+
+#[test]
+fn custom_badge_scripts_include_shared_utilities_before_engine_logic() {
+    for script in [
+        outlook_badge_engine_script(),
+        teams_badge_engine_script(),
+        telegram_badge_engine_script(),
+        google_chat_badge_engine_script(),
+        whatsapp_badge_engine_script(),
+    ] {
+        let utils_index = script
+            .find("window.__ferxBadgeUtils")
+            .expect("custom badge script should include shared badge utilities");
+        let init_index = script
+            .find("window.__ferxInitBadgeMonitor")
+            .expect("custom badge script should include scaffold init");
+
+        assert!(
+            utils_index < init_index,
+            "shared badge utilities must be available before scaffold-based engine code runs"
+        );
+    }
 }
 
 #[test]

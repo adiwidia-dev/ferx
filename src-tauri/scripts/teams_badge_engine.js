@@ -1,20 +1,7 @@
 
     (() => {
-        const safeParseInt = (text) => {
-            const n = parseInt((text || '').trim(), 10);
-            return Number.isFinite(n) && n > 0 ? n : 0;
-        };
-
-        const normalizeTitle = (title) => (title || '').replace(/[‎‏​-‍]/g, '').trim();
-
-        const uniqueElements = (elements) => {
-            const seen = new Set();
-            return elements.filter((element) => {
-                if (!element || seen.has(element)) return false;
-                seen.add(element);
-                return true;
-            });
-        };
+        const { normalizeText, safePositiveInt: safeParseInt, uniqueElements } = window.__ferxBadgeUtils;
+        const normalizeTitle = normalizeText;
 
         const observationSelectors = [
             '[data-tid="app-layout-area--sidebar"]',

@@ -1,23 +1,11 @@
 
     (() => {
-        const safeParseInt = (text) => {
-            const n = parseInt((text || '').trim(), 10);
-            return Number.isFinite(n) && n > 0 ? n : 0;
-        };
+        const { safePositiveInt: safeParseInt, uniqueElements, normalizeText } = window.__ferxBadgeUtils;
 
         const isMutedElement = (element) => Boolean(
             element?.matches?.('.is-muted, .muted') ||
             element?.closest?.('.is-muted, .muted')
         );
-
-        const uniqueElements = (elements) => {
-            const seen = new Set();
-            return elements.filter((element) => {
-                if (!element || seen.has(element)) return false;
-                seen.add(element);
-                return true;
-            });
-        };
 
         const observationSelectors = [
             '.chatlist',
@@ -70,7 +58,7 @@
         };
 
         const titleCount = () => {
-            const title = (document.title || '').replace(/[‎‏​-‍]/g, '').trim();
+            const title = normalizeText(document.title);
             const match = title.match(/\((\d+)\)/)
                 || title.match(/\[(\d+)\]/)
                 || title.match(/^(\d+)\s+(?:new|notification|notifications|unread|message|messages)\b/i);

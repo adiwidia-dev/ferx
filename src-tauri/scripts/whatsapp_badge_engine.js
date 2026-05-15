@@ -1,11 +1,10 @@
 
     (() => {
-        const normalizeText = (text) => (text || '').replace(/[‎‏​-‍]/g, '').trim();
-
-        const safeParseInt = (text) => {
-            const n = parseInt(normalizeText(text), 10);
-            return Number.isFinite(n) && n > 0 ? n : 0;
-        };
+        const {
+            normalizeText,
+            safePositiveInt: safeParseInt,
+            isTimestampLikeElement
+        } = window.__ferxBadgeUtils;
 
         const unreadLabelCount = (label, fallbackText) => {
             const normalized = normalizeText(label);
@@ -15,14 +14,6 @@
             const textMatch = normalizeText(fallbackText).match(/\b(\d{1,5})\b/);
             if (textMatch) return safeParseInt(textMatch[1]);
             return 1;
-        };
-
-        const isTimestampLikeElement = (element) => {
-            if (!element) return false;
-            if (element.closest?.('time')) return true;
-            const label = normalizeText(element.getAttribute?.('aria-label') || element.getAttribute?.('title'));
-            const testId = normalizeText(element.getAttribute?.('data-testid'));
-            return /\b(?:time|date)\b/i.test(label) || /\b(?:time|date)\b/i.test(testId);
         };
 
         const domUnreadTotal = () => {

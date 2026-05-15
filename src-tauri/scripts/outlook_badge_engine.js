@@ -1,20 +1,7 @@
 
     (() => {
-        const normalizeTitle = (title) => (title || '').replace(/[‎‏​-‍]/g, '').trim();
-
-        const safeParseInt = (text) => {
-            const n = parseInt((text || '').trim(), 10);
-            return Number.isFinite(n) && n > 0 ? n : 0;
-        };
-
-        const uniqueElements = (elements) => {
-            const seen = new Set();
-            return elements.filter((element) => {
-                if (!element || seen.has(element)) return false;
-                seen.add(element);
-                return true;
-            });
-        };
+        const { normalizeText, safePositiveInt: safeParseInt, uniqueElements } = window.__ferxBadgeUtils;
+        const normalizeTitle = normalizeText;
 
         const observationSelectors = [
             '[role="tree"]',
@@ -39,7 +26,7 @@
         };
 
         const parseOutlookInboxCount = (text) => {
-            const normalized = (text || '').replace(/[‎‏​-‍]/g, ' ').replace(/\s+/g, ' ').trim();
+            const normalized = normalizeText(text).replace(/\s+/g, ' ');
             if (!normalized) return null;
             if (!/(?:\bInbox\b|\bKotak Masuk\b)/i.test(normalized)) return null;
 

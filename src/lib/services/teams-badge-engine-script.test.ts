@@ -1,101 +1,21 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import scaffoldScript from "../../../src-tauri/scripts/badge_engine_scaffold.js?raw";
 import teamsBadgeEngineScript from "../../../src-tauri/scripts/teams_badge_engine.js?raw";
-
-type Observation = {
-  target: Node;
-  options?: MutationObserverInit;
-};
-
-type MockObserver = {
-  observations: Observation[];
-  disconnected: boolean;
-  trigger: () => void;
-};
-
-function installMutationObserverMock() {
-  const observers: MockObserver[] = [];
-
-  class MockMutationObserver {
-    private callback: MutationCallback;
-    observations: Observation[] = [];
-    disconnected = false;
-
-    constructor(callback: MutationCallback) {
-      this.callback = callback;
-      observers.push(this);
-    }
-
-    observe(target: Node, options?: MutationObserverInit) {
-      this.observations.push({ target, options });
-    }
-
-    disconnect() {
-      this.disconnected = true;
-    }
-
-    takeRecords() {
-      return [];
-    }
-
-    trigger() {
-      this.callback([], this as unknown as MutationObserver);
-    }
-  }
-
-  Object.defineProperty(window, "MutationObserver", {
-    configurable: true,
-    value: MockMutationObserver,
-  });
-  Object.defineProperty(globalThis, "MutationObserver", {
-    configurable: true,
-    value: MockMutationObserver,
-  });
-
-  return observers;
-}
+import {
+  cleanupBadgeTestGlobals,
+  flushBadgeAsync,
+  runBadgeEngineScript,
+} from "./badge-engine-test-utils";
 
 function runTeamsBadgeScript(bodyMarkup: string, title = "Teams") {
-  vi.useFakeTimers();
-  document.title = title;
-  document.body.innerHTML = bodyMarkup;
-
-  const observers = installMutationObserverMock();
-  const reports: string[] = [];
-
-  window.__TAURI_INTERNALS__ = {};
-
-  window.__ferxBadgeReports = reports;
-
-  const patchedScaffold = scaffoldScript.replace(
-    "window.location.href = 'https://ferx.notify/' + payload;",
-    "window.__ferxBadgeReports.push(payload);",
-  );
-  window.eval(patchedScaffold);
-  window.eval(teamsBadgeEngineScript);
-
-  return { observers, reports };
+  return runBadgeEngineScript({
+    bodyMarkup,
+    title,
+    engineScript: teamsBadgeEngineScript,
+  });
 }
 
-async function flushPromises() {
-  await Promise.resolve();
-  await Promise.resolve();
-}
-
-afterEach(() => {
-  vi.useRealTimers();
-  document.body.innerHTML = "";
-  delete window.__TAURI_INTERNALS__;
-  delete window.__ferxBadgeReports;
-  delete window.__ferx_badge_observers_active;
-  delete window.__ferx_last_badge_state;
-  delete window.__ferx_badge_dom_timer;
-  delete window.__ferx_badge_monitoring_enabled;
-  delete window.__ferx_badge_monitoring_mode;
-  delete window.__ferxSetBadgeMonitoringMode;
-  delete (window as Window & { __ferxInitBadgeMonitor?: unknown }).__ferxInitBadgeMonitor;
-});
+afterEach(cleanupBadgeTestGlobals);
 
 describe("Teams badge engine script", () => {
   it("reports Teams badges without requiring the Tauri invoke bridge", async () => {
@@ -105,7 +25,7 @@ describe("Teams badge engine script", () => {
       </main>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:2");
   });
@@ -117,7 +37,7 @@ describe("Teams badge engine script", () => {
       </main>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
 
     const bodySubtreeObservations = observers.flatMap((observer) =>
       observer.observations.filter(
@@ -138,7 +58,7 @@ describe("Teams badge engine script", () => {
       </main>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
     expect(reports.at(-1)).toBe("count:1");
 
     document.body.innerHTML = `
@@ -148,7 +68,7 @@ describe("Teams badge engine script", () => {
     `;
 
     vi.advanceTimersByTime(15_000);
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:5");
   });
@@ -163,7 +83,7 @@ describe("Teams badge engine script", () => {
       </nav>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:1");
   });
@@ -182,7 +102,7 @@ describe("Teams badge engine script", () => {
       </main>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:1");
   });
@@ -201,7 +121,7 @@ describe("Teams badge engine script", () => {
       </nav>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:1");
   });
@@ -215,7 +135,7 @@ describe("Teams badge engine script", () => {
       </main>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:3");
   });
@@ -230,7 +150,7 @@ describe("Teams badge engine script", () => {
     const nav = document.querySelector("nav");
     expect(nav).not.toBeNull();
 
-    await flushPromises();
+    await flushBadgeAsync();
     expect(
       observers.some((observer) =>
         observer.observations.some((observation) => observation.target === nav),
@@ -249,19 +169,3 @@ describe("Teams badge engine script", () => {
     ).toBe(true);
   });
 });
-
-declare global {
-  interface Window {
-    __TAURI_INTERNALS__?: object;
-    __ferxBadgeReports?: string[];
-    __ferx_badge_observers_active?: boolean;
-    __ferx_last_badge_state?: string;
-    __ferx_badge_dom_timer?: number | null;
-    __ferx_badge_monitoring_enabled?: boolean;
-    __ferx_badge_monitoring_mode?: "active" | "background";
-    __ferxSetBadgeMonitoringMode?: (
-      mode: "active" | "background",
-      enabled?: boolean,
-    ) => void;
-  }
-}

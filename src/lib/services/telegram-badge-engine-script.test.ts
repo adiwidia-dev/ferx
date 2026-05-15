@@ -1,101 +1,21 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import scaffoldScript from "../../../src-tauri/scripts/badge_engine_scaffold.js?raw";
 import telegramBadgeEngineScript from "../../../src-tauri/scripts/telegram_badge_engine.js?raw";
-
-type Observation = {
-  target: Node;
-  options?: MutationObserverInit;
-};
-
-type MockObserver = {
-  observations: Observation[];
-  disconnected: boolean;
-  trigger: () => void;
-};
-
-function installMutationObserverMock() {
-  const observers: MockObserver[] = [];
-
-  class MockMutationObserver {
-    private callback: MutationCallback;
-    observations: Observation[] = [];
-    disconnected = false;
-
-    constructor(callback: MutationCallback) {
-      this.callback = callback;
-      observers.push(this);
-    }
-
-    observe(target: Node, options?: MutationObserverInit) {
-      this.observations.push({ target, options });
-    }
-
-    disconnect() {
-      this.disconnected = true;
-    }
-
-    takeRecords() {
-      return [];
-    }
-
-    trigger() {
-      this.callback([], this as unknown as MutationObserver);
-    }
-  }
-
-  Object.defineProperty(window, "MutationObserver", {
-    configurable: true,
-    value: MockMutationObserver,
-  });
-  Object.defineProperty(globalThis, "MutationObserver", {
-    configurable: true,
-    value: MockMutationObserver,
-  });
-
-  return observers;
-}
+import {
+  cleanupBadgeTestGlobals,
+  flushBadgeAsync,
+  runBadgeEngineScript,
+} from "./badge-engine-test-utils";
 
 function runTelegramBadgeScript(bodyMarkup: string, initialTitle = "Telegram") {
-  vi.useFakeTimers();
-  document.title = initialTitle;
-  document.body.innerHTML = bodyMarkup;
-
-  const observers = installMutationObserverMock();
-  const reports: string[] = [];
-
-  window.__TAURI_INTERNALS__ = {};
-
-  window.__ferxBadgeReports = reports;
-
-  const patchedScaffold = scaffoldScript.replace(
-    "window.location.href = 'https://ferx.notify/' + payload;",
-    "window.__ferxBadgeReports.push(payload);",
-  );
-  window.eval(patchedScaffold);
-  window.eval(telegramBadgeEngineScript);
-
-  return { observers, reports };
+  return runBadgeEngineScript({
+    bodyMarkup,
+    title: initialTitle,
+    engineScript: telegramBadgeEngineScript,
+  });
 }
 
-async function flushPromises() {
-  await Promise.resolve();
-  await Promise.resolve();
-}
-
-afterEach(() => {
-  vi.useRealTimers();
-  document.body.innerHTML = "";
-  delete window.__TAURI_INTERNALS__;
-  delete window.__ferxBadgeReports;
-  delete window.__ferx_badge_observers_active;
-  delete window.__ferx_last_badge_state;
-  delete window.__ferx_badge_dom_timer;
-  delete window.__ferx_badge_monitoring_enabled;
-  delete window.__ferx_badge_monitoring_mode;
-  delete window.__ferxSetBadgeMonitoringMode;
-  delete (window as Window & { __ferxInitBadgeMonitor?: unknown }).__ferxInitBadgeMonitor;
-});
+afterEach(cleanupBadgeTestGlobals);
 
 describe("Telegram badge engine script", () => {
   it("reports Telegram Web K unread badges without requiring the Tauri invoke bridge", async () => {
@@ -113,7 +33,7 @@ describe("Telegram badge engine script", () => {
       </ul>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:1");
   });
@@ -133,7 +53,7 @@ describe("Telegram badge engine script", () => {
       </ul>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:2");
   });
@@ -149,7 +69,7 @@ describe("Telegram badge engine script", () => {
       </ul>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("clear");
   });
@@ -169,7 +89,7 @@ describe("Telegram badge engine script", () => {
       </div>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:5");
   });
@@ -183,7 +103,7 @@ describe("Telegram badge engine script", () => {
       </ul>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
     expect(reports.at(-1)).toBe("count:1");
 
     document.body.innerHTML = `
@@ -195,7 +115,7 @@ describe("Telegram badge engine script", () => {
     `;
 
     vi.advanceTimersByTime(15_000);
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:4");
   });
@@ -208,7 +128,7 @@ describe("Telegram badge engine script", () => {
       "(3) Telegram Web",
     );
 
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:3");
   });
@@ -217,7 +137,7 @@ describe("Telegram badge engine script", () => {
     // Start with no chat list and a plain title (no unread count).
     const { reports } = runTelegramBadgeScript(`<div id="initial-loading"></div>`);
 
-    await flushPromises();
+    await flushBadgeAsync();
     expect(reports.at(-1)).toBe("clear");
 
     // Telegram updates the title with a new unread count after the SPA has initialised.
@@ -225,7 +145,7 @@ describe("Telegram badge engine script", () => {
 
     // The 15-second safety poll re-reads the title and emits the new count.
     vi.advanceTimersByTime(15_000);
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:5");
   });
@@ -240,7 +160,7 @@ describe("Telegram badge engine script", () => {
       </div>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:2");
   });
@@ -252,14 +172,14 @@ describe("Telegram badge engine script", () => {
       </div>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
     expect(reports.at(-1)).toBe("count:1");
 
     const el = document.querySelector(".unread-count")!;
     el.textContent = "5";
 
     vi.advanceTimersByTime(15_000);
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:5");
   });
@@ -271,13 +191,13 @@ describe("Telegram badge engine script", () => {
       </div>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
     expect(reports.at(-1)).toBe("count:3");
 
     document.querySelector(".unread-count")?.remove();
 
     vi.advanceTimersByTime(15_000);
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("clear");
   });
@@ -289,7 +209,7 @@ describe("Telegram badge engine script", () => {
       </div>
     `);
 
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("clear");
   });
@@ -306,7 +226,7 @@ describe("Telegram badge engine script", () => {
     const chatList = document.querySelector(".chat-list");
     expect(chatList).not.toBeNull();
 
-    await flushPromises();
+    await flushBadgeAsync();
     expect(reports.at(-1)).toBe("count:1");
 
     expect(
@@ -319,7 +239,7 @@ describe("Telegram badge engine script", () => {
     ).toBe(false);
 
     window.__ferxSetBadgeMonitoringMode?.("active", true);
-    await flushPromises();
+    await flushBadgeAsync();
 
     const activeObserver = observers.find((observer) =>
       observer.observations.some(
@@ -330,7 +250,7 @@ describe("Telegram badge engine script", () => {
     expect(activeObserver).toBeDefined();
 
     window.__ferxSetBadgeMonitoringMode?.("background", true);
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(activeObserver?.disconnected).toBe(true);
 
@@ -343,7 +263,7 @@ describe("Telegram badge engine script", () => {
     `;
 
     vi.advanceTimersByTime(15_000);
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:4");
   });
@@ -354,24 +274,8 @@ describe("Telegram badge engine script", () => {
       "4 notifications",
     );
 
-    await flushPromises();
+    await flushBadgeAsync();
 
     expect(reports.at(-1)).toBe("count:4");
   });
 });
-
-declare global {
-  interface Window {
-    __TAURI_INTERNALS__?: object;
-    __ferxBadgeReports?: string[];
-    __ferx_badge_observers_active?: boolean;
-    __ferx_last_badge_state?: string;
-    __ferx_badge_dom_timer?: number | null;
-    __ferx_badge_monitoring_enabled?: boolean;
-    __ferx_badge_monitoring_mode?: "active" | "background";
-    __ferxSetBadgeMonitoringMode?: (
-      mode: "active" | "background",
-      enabled?: boolean,
-    ) => void;
-  }
-}

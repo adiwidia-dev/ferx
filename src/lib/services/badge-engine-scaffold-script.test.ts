@@ -1,32 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import scaffoldScript from "../../../src-tauri/scripts/badge_engine_scaffold.js?raw";
-
-function installMutationObserverMock() {
-  class MockMutationObserver {
-    callback: MutationCallback;
-    observations: { target: Node; options?: MutationObserverInit }[] = [];
-    disconnected = false;
-    constructor(callback: MutationCallback) {
-      this.callback = callback;
-    }
-    observe(target: Node, options?: MutationObserverInit) {
-      this.observations.push({ target, options });
-    }
-    disconnect() {
-      this.disconnected = true;
-    }
-    takeRecords() { return []; }
-  }
-  Object.defineProperty(window, "MutationObserver", {
-    configurable: true,
-    value: MockMutationObserver,
-  });
-  Object.defineProperty(globalThis, "MutationObserver", {
-    configurable: true,
-    value: MockMutationObserver,
-  });
-}
+import {
+  cleanupBadgeTestGlobals,
+  flushBadgeAsync,
+  installMutationObserverMock,
+} from "./badge-engine-test-utils";
 
 function runScaffold(config: Record<string, unknown>) {
   vi.useFakeTimers();
@@ -45,19 +24,7 @@ function runScaffold(config: Record<string, unknown>) {
   return { reports };
 }
 
-afterEach(() => {
-  vi.useRealTimers();
-  document.body.innerHTML = "";
-  delete (window as Window & { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__;
-  delete window.__ferxBadgeReports;
-  delete window.__ferx_badge_observers_active;
-  delete window.__ferx_last_badge_state;
-  delete window.__ferx_badge_dom_timer;
-  delete window.__ferx_badge_monitoring_enabled;
-  delete window.__ferx_badge_monitoring_mode;
-  delete (window as Window & { __ferxInitBadgeMonitor?: unknown }).__ferxInitBadgeMonitor;
-  delete window.__ferxSetBadgeMonitoringMode;
-});
+afterEach(cleanupBadgeTestGlobals);
 
 describe("badge_engine_scaffold", () => {
   it("exposes window.__ferxInitBadgeMonitor after scaffold evaluation", () => {
@@ -98,7 +65,7 @@ describe("badge_engine_scaffold", () => {
       titleBindingFlag: "__ferx_test_title_bound",
       tauriGuard: true,
     });
-    await flush();
+    await flushBadgeAsync();
     expect(reports).toContain("count:42");
   });
 
@@ -109,7 +76,7 @@ describe("badge_engine_scaffold", () => {
       observeOptions: {},
       titleBindingFlag: "__ferx_test_title_bound",
     });
-    await flush();
+    await flushBadgeAsync();
     expect(reports.at(-1)).toBe("count:5");
   });
 
@@ -120,8 +87,8 @@ describe("badge_engine_scaffold", () => {
       observeOptions: {},
       titleBindingFlag: "__ferx_test_title_bound",
     });
-    await flush();
-    await flush();
+    await flushBadgeAsync();
+    await flushBadgeAsync();
     const fives = reports.filter((p) => p === "count:5");
     expect(fives.length).toBe(1);
   });
@@ -133,7 +100,7 @@ describe("badge_engine_scaffold", () => {
       observeOptions: {},
       titleBindingFlag: "__ferx_test_title_bound",
     });
-    await flush();
+    await flushBadgeAsync();
     expect(reports.at(-1)).toBe("clear");
   });
 
@@ -144,7 +111,7 @@ describe("badge_engine_scaffold", () => {
       observeOptions: {},
       titleBindingFlag: "__ferx_test_title_bound",
     });
-    await flush();
+    await flushBadgeAsync();
     expect(reports.at(-1)).toBe("count:7");
   });
 
@@ -160,7 +127,7 @@ describe("badge_engine_scaffold", () => {
     window.__ferxSetBadgeMonitoringMode?.("background", true);
     window.__ferxSetBadgeMonitoringMode?.("background", true);
     window.__ferxSetBadgeMonitoringMode?.("background", true);
-    await flush();
+    await flushBadgeAsync();
     expect(callCount).toBeLessThanOrEqual(2);
   });
 
@@ -172,10 +139,10 @@ describe("badge_engine_scaffold", () => {
       observeOptions: {},
       titleBindingFlag: "__ferx_test_title_bound",
     });
-    await flush();
+    await flushBadgeAsync();
     const initial = callCount;
     await vi.advanceTimersByTimeAsync(15000);
-    await flush();
+    await flushBadgeAsync();
     expect(callCount).toBeGreaterThan(initial);
   });
 
@@ -187,11 +154,11 @@ describe("badge_engine_scaffold", () => {
       observeOptions: {},
       titleBindingFlag: "__ferx_test_title_bound",
     });
-    await flush();
+    await flushBadgeAsync();
     window.__ferxSetBadgeMonitoringMode?.("background", false);
     const before = callCount;
     await vi.advanceTimersByTimeAsync(20000);
-    await flush();
+    await flushBadgeAsync();
     expect(callCount).toBe(before);
   });
 
@@ -227,7 +194,7 @@ describe("badge_engine_scaffold", () => {
       titleBindingFlag: "__ferx_test_title_bound",
     });
     window.__ferxSetBadgeMonitoringMode?.("active", true);
-    await flush();
+    await flushBadgeAsync();
     expect(observed).toBe(target);
   });
 
@@ -240,10 +207,10 @@ describe("badge_engine_scaffold", () => {
       titleBindingFlag: "__ferx_test_title_bound",
     });
     window.__ferxSetBadgeMonitoringMode?.("active", true);
-    await flush();
+    await flushBadgeAsync();
     const before = callsToResolve;
     await vi.advanceTimersByTimeAsync(1100);
-    await flush();
+    await flushBadgeAsync();
     expect(callsToResolve).toBeGreaterThan(before);
   });
 
@@ -255,7 +222,7 @@ describe("badge_engine_scaffold", () => {
       observeOptions: {},
       titleBindingFlag: "__ferx_marker_title_bound",
     });
-    await flush();
+    await flushBadgeAsync();
     const titleEl = document.querySelector("title") as HTMLTitleElement & Record<string, unknown>;
     expect(titleEl.__ferx_marker_title_bound).toBe(true);
   });
@@ -268,33 +235,14 @@ describe("badge_engine_scaffold", () => {
       observeOptions: {},
       titleBindingFlag: "__ferx_test_title_bound",
     });
-    await flush();
+    await flushBadgeAsync();
     const initial = callCount;
     window.dispatchEvent(new Event("focus"));
-    await flush();
+    await flushBadgeAsync();
     window.dispatchEvent(new Event("hashchange"));
-    await flush();
+    await flushBadgeAsync();
     window.dispatchEvent(new Event("popstate"));
-    await flush();
+    await flushBadgeAsync();
     expect(callCount).toBeGreaterThan(initial);
   });
 });
-
-async function flush() {
-  for (let i = 0; i < 10; i += 1) {
-    await Promise.resolve();
-    await vi.advanceTimersByTimeAsync(0);
-  }
-}
-
-declare global {
-  interface Window {
-    __ferxBadgeReports?: string[];
-    __ferx_badge_observers_active?: boolean;
-    __ferx_last_badge_state?: string;
-    __ferx_badge_dom_timer?: number | null;
-    __ferx_badge_monitoring_enabled?: boolean;
-    __ferx_badge_monitoring_mode?: "active" | "background";
-    __ferxSetBadgeMonitoringMode?: (mode: "active" | "background", enabled?: boolean) => void;
-  }
-}

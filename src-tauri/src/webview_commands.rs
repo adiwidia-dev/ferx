@@ -163,6 +163,64 @@ fn move_previous_active_webview_to_background(
     }
 }
 
+fn service_webview_builder(
+    app: &AppHandle,
+    command_name: &str,
+    id: &str,
+    url: &str,
+    storage_key: &str,
+    allow_notifications: bool,
+    spell_check_enabled: bool,
+    resource_usage_monitoring_enabled: bool,
+) -> Option<tauri::WebviewBuilder<tauri::Wry>> {
+    let Some((webview_url, initialization_script)) = service_webview_setup_with_resource_monitoring(
+        url,
+        allow_notifications,
+        spell_check_enabled,
+        resource_usage_monitoring_enabled,
+    ) else {
+        eprintln!("Invalid external url for {command_name}: {url}");
+        let _ = app.emit("show-toast", "Invalid service URL");
+        return None;
+    };
+
+    let app_handle = app.clone();
+    let service_id = id.to_string();
+    let mut builder =
+        tauri::WebviewBuilder::new(id, webview_url).background_color(Color(255, 255, 255, 255));
+
+    #[cfg(target_os = "macos")]
+    {
+        if session_dir_for_storage_key(&app_handle, storage_key).is_none() {
+            eprintln!("Invalid storage_key for {command_name}: {storage_key}");
+            return None;
+        }
+
+        builder = builder.data_store_identifier(data_store_identifier_for_storage_key(storage_key));
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let Some(data_dir) = session_dir_for_storage_key(&app_handle, storage_key) else {
+            eprintln!("Invalid storage_key for {command_name}: {storage_key}");
+            return None;
+        };
+        let _ = std::fs::create_dir_all(&data_dir);
+        builder = builder.data_directory(data_dir);
+    }
+
+    let builder = if let Some(user_agent) = user_agent_for_url(url) {
+        builder.user_agent(user_agent)
+    } else {
+        builder
+    }
+    .initialization_script(initialization_script)
+    .on_navigation(move |url| handle_special_navigation(&app_handle, &service_id, url))
+    .on_download(handle_service_webview_download);
+
+    Some(builder)
+}
+
 fn close_service_webviews(app: &AppHandle) {
     clear_active_webview(app);
     clear_badge_monitoring_prefs(app);
@@ -411,14 +469,16 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
         resource_usage_monitoring_enabled,
     } = payload;
 
-    let Some((webview_url, initialization_script)) = service_webview_setup_with_resource_monitoring(
+    let Some(builder) = service_webview_builder(
+        &app,
+        "open_service",
+        &id,
         &url,
+        &storage_key,
         allow_notifications,
         spell_check_enabled,
         resource_usage_monitoring_enabled,
     ) else {
-        eprintln!("Invalid external url for open_service: {url}");
-        let _ = app.emit("show-toast", "Invalid service URL");
         return;
     };
 
@@ -463,41 +523,6 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
             );
             return;
         }
-
-        let app_handle = app.clone();
-        let service_id = id.clone();
-        let mut builder = tauri::WebviewBuilder::new(&id, webview_url)
-            .background_color(Color(255, 255, 255, 255));
-
-        #[cfg(target_os = "macos")]
-        {
-            if session_dir_for_storage_key(&app_handle, &storage_key).is_none() {
-                eprintln!("Invalid storage_key for open_service: {storage_key}");
-                return;
-            }
-
-            builder =
-                builder.data_store_identifier(data_store_identifier_for_storage_key(&storage_key));
-        }
-
-        #[cfg(not(target_os = "macos"))]
-        {
-            let Some(data_dir) = session_dir_for_storage_key(&app_handle, &storage_key) else {
-                eprintln!("Invalid storage_key for open_service: {storage_key}");
-                return;
-            };
-            let _ = std::fs::create_dir_all(&data_dir);
-            builder = builder.data_directory(data_dir);
-        }
-
-        let builder = if let Some(user_agent) = user_agent_for_url(&url) {
-            builder.user_agent(user_agent)
-        } else {
-            builder
-        }
-        .initialization_script(&initialization_script)
-        .on_navigation(move |url| handle_special_navigation(&app_handle, &service_id, url))
-        .on_download(handle_service_webview_download);
 
         match window.add_child(builder, active_pos, active_size) {
             Ok(webview) => {
@@ -546,53 +571,18 @@ pub async fn load_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
     set_badge_monitoring_pref(&app, &id, badge_monitoring_enabled);
 
     if let Some(window) = app.get_window("main") {
-        let app_handle = app.clone();
-        let service_id = id.clone();
-
-        let Some((webview_url, initialization_script)) =
-            service_webview_setup_with_resource_monitoring(
-                &url,
-                allow_notifications,
-                spell_check_enabled,
-                resource_usage_monitoring_enabled,
-            )
-        else {
-            eprintln!("Invalid external url for load_service: {url}");
-            let _ = app.emit("show-toast", "Invalid service URL");
+        let Some(builder) = service_webview_builder(
+            &app,
+            "load_service",
+            &id,
+            &url,
+            &storage_key,
+            allow_notifications,
+            spell_check_enabled,
+            resource_usage_monitoring_enabled,
+        ) else {
             return;
         };
-        let mut builder = tauri::WebviewBuilder::new(&id, webview_url)
-            .background_color(Color(255, 255, 255, 255));
-
-        #[cfg(target_os = "macos")]
-        {
-            if session_dir_for_storage_key(&app_handle, &storage_key).is_none() {
-                eprintln!("Invalid storage_key for load_service: {storage_key}");
-                return;
-            }
-
-            builder =
-                builder.data_store_identifier(data_store_identifier_for_storage_key(&storage_key));
-        }
-
-        #[cfg(not(target_os = "macos"))]
-        {
-            let Some(data_dir) = session_dir_for_storage_key(&app_handle, &storage_key) else {
-                eprintln!("Invalid storage_key for load_service: {storage_key}");
-                return;
-            };
-            let _ = std::fs::create_dir_all(&data_dir);
-            builder = builder.data_directory(data_dir);
-        }
-
-        let builder = if let Some(user_agent) = user_agent_for_url(&url) {
-            builder.user_agent(user_agent)
-        } else {
-            builder
-        }
-        .initialization_script(&initialization_script)
-        .on_navigation(move |url| handle_special_navigation(&app_handle, &service_id, url))
-        .on_download(handle_service_webview_download);
 
         let scale_factor = window.scale_factor().unwrap_or(1.0);
         let physical_size = window.inner_size().unwrap_or_default();
