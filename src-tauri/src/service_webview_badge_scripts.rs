@@ -7,7 +7,11 @@ pub(crate) fn outlook_badge_engine_script(strategy_name: &str) -> String {
 }
 
 pub(crate) fn teams_badge_engine_script() -> String {
-    include_str!("../scripts/teams_badge_engine.js").to_owned()
+    format!(
+        "{}\n{}",
+        badge_engine_scaffold_script(),
+        include_str!("../scripts/teams_badge_engine.js"),
+    )
 }
 
 pub(crate) fn telegram_badge_engine_script() -> String {
