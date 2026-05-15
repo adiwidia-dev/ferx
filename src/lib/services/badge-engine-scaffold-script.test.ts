@@ -101,6 +101,52 @@ describe("badge_engine_scaffold", () => {
     await flush();
     expect(reports).toContain("count:42");
   });
+
+  it("emits the count payload via the navigation transport", async () => {
+    const { reports } = runScaffold({
+      readState: () => "count:5",
+      resolveObservationTargets: () => [],
+      observeOptions: {},
+      titleBindingFlag: "__ferx_test_title_bound",
+    });
+    await flush();
+    expect(reports.at(-1)).toBe("count:5");
+  });
+
+  it("dedups consecutive identical states", async () => {
+    const { reports } = runScaffold({
+      readState: () => "count:5",
+      resolveObservationTargets: () => [],
+      observeOptions: {},
+      titleBindingFlag: "__ferx_test_title_bound",
+    });
+    await flush();
+    await flush();
+    const fives = reports.filter((p) => p === "count:5");
+    expect(fives.length).toBe(1);
+  });
+
+  it("falls back to clear on readState exception", async () => {
+    const { reports } = runScaffold({
+      readState: () => { throw new Error("boom"); },
+      resolveObservationTargets: () => [],
+      observeOptions: {},
+      titleBindingFlag: "__ferx_test_title_bound",
+    });
+    await flush();
+    expect(reports.at(-1)).toBe("clear");
+  });
+
+  it("supports async readState", async () => {
+    const { reports } = runScaffold({
+      readState: async () => "count:7",
+      resolveObservationTargets: () => [],
+      observeOptions: {},
+      titleBindingFlag: "__ferx_test_title_bound",
+    });
+    await flush();
+    expect(reports.at(-1)).toBe("count:7");
+  });
 });
 
 async function flush() {
