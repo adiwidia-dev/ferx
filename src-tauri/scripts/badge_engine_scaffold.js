@@ -156,9 +156,53 @@
             window.__ferxSetBadgeMonitoringMode(window.__ferx_badge_monitoring_mode, enabled === true);
         };
 
-        if (isActiveMonitoringMode()) {
-            observeDom();
+        const observeTitle = () => {
+            const flag = config.titleBindingFlag;
+            const bindTitleObserver = () => {
+                const titleEl = document.querySelector('title');
+                if (!titleEl || titleEl[flag]) return false;
+                titleEl[flag] = true;
+                new MutationObserver(() => {
+                    if (!window.__ferx_badge_monitoring_enabled) return;
+                    scheduleBadgeEvaluation();
+                }).observe(titleEl, { childList: true, subtree: true, characterData: true });
+                return true;
+            };
+            bindTitleObserver();
+            const head = document.head || document.documentElement;
+            if (!head) return;
+            new MutationObserver(() => {
+                if (!bindTitleObserver()) return;
+                if (!window.__ferx_badge_monitoring_enabled) return;
+                scheduleBadgeEvaluation();
+            }).observe(head, { childList: true });
+        };
+
+        const start = () => {
+            observeTitle();
+            startSafetyPoll();
+            if (isActiveMonitoringMode()) {
+                observeDom();
+            }
+            void runBadgeEvaluation();
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', start, { once: true });
+        } else {
+            start();
         }
-        startSafetyPoll();
-        void runBadgeEvaluation();
+
+        window.addEventListener('focus', () => {
+            if (!window.__ferx_badge_monitoring_enabled) return;
+            void runBadgeEvaluation();
+        });
+        window.addEventListener('hashchange', () => {
+            if (!window.__ferx_badge_monitoring_enabled) return;
+            void runBadgeEvaluation();
+        });
+        window.addEventListener('popstate', () => {
+            if (!window.__ferx_badge_monitoring_enabled) return;
+            void runBadgeEvaluation();
+        });
     };

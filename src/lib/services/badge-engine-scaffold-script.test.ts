@@ -246,6 +246,38 @@ describe("badge_engine_scaffold", () => {
     await flush();
     expect(callsToResolve).toBeGreaterThan(before);
   });
+
+  it("uses config.titleBindingFlag to mark the title element", async () => {
+    document.head.innerHTML = "<title>App</title>";
+    runScaffold({
+      readState: () => "clear",
+      resolveObservationTargets: () => [],
+      observeOptions: {},
+      titleBindingFlag: "__ferx_marker_title_bound",
+    });
+    await flush();
+    const titleEl = document.querySelector("title") as HTMLTitleElement & Record<string, unknown>;
+    expect(titleEl.__ferx_marker_title_bound).toBe(true);
+  });
+
+  it("re-evaluates on focus, hashchange, and popstate events", async () => {
+    let callCount = 0;
+    runScaffold({
+      readState: () => { callCount += 1; return "clear"; },
+      resolveObservationTargets: () => [],
+      observeOptions: {},
+      titleBindingFlag: "__ferx_test_title_bound",
+    });
+    await flush();
+    const initial = callCount;
+    window.dispatchEvent(new Event("focus"));
+    await flush();
+    window.dispatchEvent(new Event("hashchange"));
+    await flush();
+    window.dispatchEvent(new Event("popstate"));
+    await flush();
+    expect(callCount).toBeGreaterThan(initial);
+  });
 });
 
 async function flush() {
