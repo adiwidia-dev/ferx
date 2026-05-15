@@ -89,12 +89,16 @@ pub(crate) fn badge_monitoring_eval_script(enabled: bool, mode: BadgeMonitoringM
 }
 
 fn set_badge_monitoring_mode(webview: &tauri::Webview, enabled: bool, mode: BadgeMonitoringMode) {
-    let _ = webview.eval(format!("{}", badge_monitoring_eval_script(enabled, mode)));
+    if let Err(e) = webview.eval(format!("{}", badge_monitoring_eval_script(enabled, mode))) {
+        eprintln!("badge monitoring eval failed for {}: {e}", webview.label());
+    }
 }
 
 fn set_audio_muted(webview: &tauri::Webview, muted: bool) {
     let muted_literal = if muted { "true" } else { "false" };
-    let _ = webview.eval(format!("window.__ferxSetAudioMuted?.({muted_literal});"));
+    if let Err(e) = webview.eval(format!("window.__ferxSetAudioMuted?.({muted_literal});")) {
+        eprintln!("audio muted eval failed for {}: {e}", webview.label());
+    }
 }
 
 fn close_service_webviews(app: &AppHandle) {
@@ -270,10 +274,12 @@ pub fn report_teams_badge(app: AppHandle, webview: tauri::Webview, payload: Stri
 #[tauri::command]
 #[specta::specta]
 pub fn report_resource_usage(app: AppHandle, webview: tauri::Webview, payload: String) {
-    let _ = app.emit(
+    if let Err(e) = app.emit(
         "resource-usage-update",
         format!("{}:{payload}", webview.label()),
-    );
+    ) {
+        eprintln!("resource-usage-update emit failed: {e}");
+    }
 }
 
 #[tauri::command]
@@ -385,9 +391,11 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
                 BadgeMonitoringMode::Active,
             );
             set_audio_muted(&active_webview, service_audio_muted(&app));
-            let _ = active_webview.eval(resource_usage_monitor_eval_script(
+            if let Err(e) = active_webview.eval(resource_usage_monitor_eval_script(
                 resource_usage_monitoring_enabled,
-            ));
+            )) {
+                eprintln!("resource monitor eval failed for {}: {e}", active_webview.label());
+            }
             let _ = active_webview.set_bounds(tauri::Rect {
                 position: tauri::Position::Physical(active_pos),
                 size: tauri::Size::Physical(active_size),
@@ -402,7 +410,9 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
                         badge_monitoring_pref(&app, &previous_id),
                         BadgeMonitoringMode::Background,
                     );
-                    let _ = previous_webview.eval(resource_usage_monitor_eval_script(false));
+                    if let Err(e) = previous_webview.eval(resource_usage_monitor_eval_script(false)) {
+                        eprintln!("resource monitor eval failed for {}: {e}", previous_webview.label());
+                    }
                     let _ = previous_webview.set_bounds(tauri::Rect {
                         position: tauri::Position::Physical(offscreen_pos),
                         size: tauri::Size::Physical(active_size),
@@ -465,7 +475,9 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
                             badge_monitoring_pref(&app, &previous_id),
                             BadgeMonitoringMode::Background,
                         );
-                        let _ = previous_webview.eval(resource_usage_monitor_eval_script(false));
+                        if let Err(e) = previous_webview.eval(resource_usage_monitor_eval_script(false)) {
+                        eprintln!("resource monitor eval failed for {}: {e}", previous_webview.label());
+                    }
                         let _ = previous_webview.set_bounds(tauri::Rect {
                             position: tauri::Position::Physical(offscreen_pos),
                             size: tauri::Size::Physical(active_size),

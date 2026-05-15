@@ -13,7 +13,9 @@ pub(crate) fn badge_update_event_payload(label: &str, payload: &str) -> Option<S
 
 pub(crate) fn emit_badge_update(app: &AppHandle, label: &str, payload: &str) {
     if let Some(event_payload) = badge_update_event_payload(label, payload) {
-        let _ = app.emit("update-badge", event_payload);
+        if let Err(e) = app.emit("update-badge", event_payload) {
+            eprintln!("update-badge emit failed for {label}: {e}");
+        }
     }
 }
 
@@ -46,14 +48,18 @@ pub(crate) fn handle_special_navigation(
 
     if url.host_str() == Some("ferx.resource") {
         if let Some(data) = url.query_pairs().find(|(k, _)| k == "data").map(|(_, v)| v.into_owned()) {
-            let _ = app_handle.emit("resource-usage-update", format!("{}:{}", service_id, data));
+            if let Err(e) = app_handle.emit("resource-usage-update", format!("{}:{}", service_id, data)) {
+                eprintln!("resource-usage-update emit failed for {service_id}: {e}");
+            }
         }
         return false;
     }
 
     if url.host_str() == Some("ferx.shortcut") {
         if let Some(key_str) = url.path().strip_prefix('/') {
-            let _ = app_handle.emit("switch-shortcut", key_str);
+            if let Err(e) = app_handle.emit("switch-shortcut", key_str) {
+                eprintln!("switch-shortcut emit failed: {e}");
+            }
         }
         return false;
     }

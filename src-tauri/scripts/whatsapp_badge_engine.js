@@ -12,8 +12,10 @@
         let evaluationInFlight = false;
         let evaluationQueued = false;
         let safetyPollTimer = null;
+        let observationRetryTimer = null;
         const BADGE_EVALUATION_DELAY_MS = 300;
         const BADGE_SAFETY_POLL_MS = 15000;
+        const BADGE_OBSERVATION_RETRY_MS = 1000;
 
         const observeOptions = {
             childList: true,
@@ -164,11 +166,19 @@
 
         const isActiveMonitoringMode = () => window.__ferx_badge_monitoring_mode === 'active';
 
+        const clearObservationRetry = () => {
+            if (observationRetryTimer !== null) {
+                clearTimeout(observationRetryTimer);
+                observationRetryTimer = null;
+            }
+        };
+
         const disconnectDomObserver = () => {
             if (observer) {
                 observer.disconnect();
                 observer = null;
             }
+            clearObservationRetry();
         };
 
         const resolveObservationTargets = () => {
@@ -178,13 +188,26 @@
             return target ? [target] : [];
         };
 
+        const scheduleObservationRetry = () => {
+            if (!window.__ferx_badge_monitoring_enabled || !isActiveMonitoringMode()) return;
+            if (observationRetryTimer !== null) return;
+
+            observationRetryTimer = setTimeout(() => {
+                observationRetryTimer = null;
+                observeDom();
+            }, BADGE_OBSERVATION_RETRY_MS);
+        };
+
         const observeDom = () => {
             disconnectDomObserver();
 
             if (!window.__ferx_badge_monitoring_enabled || !isActiveMonitoringMode()) return;
 
             const targets = resolveObservationTargets();
-            if (targets.length === 0) return;
+            if (targets.length === 0) {
+                scheduleObservationRetry();
+                return;
+            }
 
             observer = new MutationObserver(() => {
                 if (!window.__ferx_badge_monitoring_enabled) return;
