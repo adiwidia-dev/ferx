@@ -21,3 +21,7 @@ pub(crate) fn google_chat_badge_engine_script() -> String {
 pub(crate) fn whatsapp_badge_engine_script() -> String {
     include_str!("../scripts/whatsapp_badge_engine.js").to_owned()
 }
+
+pub(crate) fn badge_engine_scaffold_script() -> String {
+    include_str!("../scripts/badge_engine_scaffold.js").to_owned()
+}

@@ -921,6 +921,16 @@ fn extracted_resource_and_badge_script_modules_preserve_known_markers() {
 }
 
 #[test]
+fn badge_engine_scaffold_script_exposes_init_function() {
+    use crate::service_webview_badge_scripts::badge_engine_scaffold_script;
+    let script = badge_engine_scaffold_script();
+    assert!(script.contains("window.__ferxInitBadgeMonitor"));
+    assert!(script.contains("__ferx_badge_observers_active"));
+    assert!(script.contains("BADGE_SAFETY_POLL_MS"));
+    assert!(script.contains("BADGE_OBSERVATION_RETRY_MS"));
+}
+
+#[test]
 fn service_webview_setup_rejects_invalid_external_urls() {
     assert!(service_webview_setup("not a url", false).is_none());
 }
