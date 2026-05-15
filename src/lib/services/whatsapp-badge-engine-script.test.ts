@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
+import scaffoldScript from "../../../src-tauri/scripts/badge_engine_scaffold.js?raw";
 import whatsappBadgeEngineScript from "../../../src-tauri/scripts/whatsapp_badge_engine.js?raw";
 
 type Observation = {
@@ -70,13 +71,14 @@ function runWhatsAppBadgeScript(
 
   window.__TAURI_INTERNALS__ = {};
 
-  const script = whatsappBadgeEngineScript.replace(
+  window.__ferxBadgeReports = reports;
+
+  const patchedScaffold = scaffoldScript.replace(
     "window.location.href = 'https://ferx.notify/' + payload;",
     "window.__ferxBadgeReports.push(payload);",
   );
-  window.__ferxBadgeReports = reports;
-
-  window.eval(script);
+  window.eval(patchedScaffold);
+  window.eval(whatsappBadgeEngineScript);
   document.dispatchEvent(new Event("DOMContentLoaded"));
 
   return { observers, reports };
@@ -100,6 +102,7 @@ afterEach(() => {
   delete window.__ferx_badge_monitoring_enabled;
   delete window.__ferx_badge_monitoring_mode;
   delete window.__ferxSetBadgeMonitoringMode;
+  delete (window as Window & { __ferxInitBadgeMonitor?: unknown }).__ferxInitBadgeMonitor;
 });
 
 describe("WhatsApp badge engine script", () => {
