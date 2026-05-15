@@ -4,7 +4,7 @@ use crate::service_runtime::{
 };
 use crate::service_webview_badge_scripts::{
     badge_engine_script, google_chat_badge_engine_script, outlook_badge_engine_script,
-    teams_badge_engine_script, telegram_badge_engine_script,
+    teams_badge_engine_script, telegram_badge_engine_script, whatsapp_badge_engine_script,
 };
 use crate::service_webview_resource_usage::resource_usage_monitor_script;
 use crate::service_webview_runtime_scripts::{
@@ -113,6 +113,7 @@ fn injected_js_for_url(
             Some(MicrosoftServiceKind::Teams) => teams_badge_engine_script(),
             None if strategy_name == "telegram-dom" => telegram_badge_engine_script(),
             None if strategy_name == "google-chat-dom" => google_chat_badge_engine_script(),
+            None if strategy_name == "whatsapp-dom" => whatsapp_badge_engine_script(),
             None => badge_engine_script(strategy_name),
         }
     )

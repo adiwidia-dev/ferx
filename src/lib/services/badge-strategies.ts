@@ -1,6 +1,6 @@
 export type BadgeStrategyName =
   | "title-numeric"
-  | "whatsapp-title"
+  | "whatsapp-dom"
   | "telegram-dom"
   | "google-chat-dom"
   | "teams-dom"
@@ -52,7 +52,7 @@ export function resolveBadgeStrategy(url: string): BadgeStrategyName {
   }
 
   if (matchesHostname(hostname, "web.whatsapp.com")) {
-    return "whatsapp-title";
+    return "whatsapp-dom";
   }
 
   if (matchesHostname(hostname, "web.telegram.org")) {
@@ -84,13 +84,7 @@ export function getBadgeCapability(
         usesTitleObserver: true,
         usesFallbackPolling: true,
       };
-    case "whatsapp-title":
-      return {
-        kind: "title-numeric",
-        usesMutationObserver: false,
-        usesTitleObserver: true,
-        usesFallbackPolling: false,
-      };
+    case "whatsapp-dom":
     case "telegram-dom":
     case "google-chat-dom":
       return {

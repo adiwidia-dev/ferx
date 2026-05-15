@@ -40,9 +40,9 @@ describe("resolveBadgeStrategy", () => {
     );
   });
 
-  it("resolves WhatsApp URLs to the WhatsApp title strategy", () => {
+  it("resolves WhatsApp URLs to the WhatsApp DOM strategy", () => {
     expect(resolveBadgeStrategy("https://web.whatsapp.com/")).toBe(
-      "whatsapp-title",
+      "whatsapp-dom",
     );
   });
 
@@ -110,6 +110,15 @@ describe("getBadgeCapability", () => {
   it("marks Teams as a hybrid title+DOM observer strategy", () => {
     expect(getBadgeCapability("teams-dom")).toEqual({
       kind: "hybrid-title-dom" satisfies BadgeStrategyKind,
+      usesMutationObserver: true,
+      usesTitleObserver: true,
+      usesFallbackPolling: true,
+    });
+  });
+
+  it("marks WhatsApp as an isolated custom DOM script", () => {
+    expect(getBadgeCapability("whatsapp-dom")).toEqual({
+      kind: "custom-script" satisfies BadgeStrategyKind,
       usesMutationObserver: true,
       usesTitleObserver: true,
       usesFallbackPolling: true,

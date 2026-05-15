@@ -43,10 +43,6 @@
                 needsDomObservation: false,
                 readState: () => titleCountState(document.title)
             },
-            'whatsapp-title': {
-                needsDomObservation: false,
-                readState: () => titleCountState(document.title)
-            }
         };
 
         const strategy = strategies[window.__ferx_badge_strategy] || strategies['unsupported'];

@@ -51,7 +51,7 @@ pub(crate) fn badge_strategy_for_url(url: &str) -> &'static str {
             .to_ascii_lowercase(),
         "web.whatsapp.com",
     ) {
-        "whatsapp-title"
+        "whatsapp-dom"
     } else {
         "unsupported"
     }

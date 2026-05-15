@@ -10,6 +10,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ### Fixed
 
+- Fixed WhatsApp unread badges by using a dedicated badge monitor that sums unread message counts instead of unread chat counts.
 - Kept sidebar utility controls visible by making the service icon list scroll independently when many services are added.
 - Let Google Chat use the same Google sign-in compatibility path as Gmail to avoid unsupported-browser sign-in failures.
 - Fixed Google Chat unread badges with an isolated badge monitor for direct-message and space unread indicators.

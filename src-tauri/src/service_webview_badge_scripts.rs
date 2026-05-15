@@ -17,3 +17,7 @@ pub(crate) fn telegram_badge_engine_script() -> String {
 pub(crate) fn google_chat_badge_engine_script() -> String {
     include_str!("../scripts/google_chat_badge_engine.js").to_owned()
 }
+
+pub(crate) fn whatsapp_badge_engine_script() -> String {
+    include_str!("../scripts/whatsapp_badge_engine.js").to_owned()
+}

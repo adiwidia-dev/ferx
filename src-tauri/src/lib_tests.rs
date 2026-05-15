@@ -408,7 +408,7 @@ fn badge_strategy_uses_explicit_hostname_mapping() {
     );
     assert_eq!(
         badge_strategy_for_url("https://web.whatsapp.com"),
-        "whatsapp-title"
+        "whatsapp-dom"
     );
     assert_eq!(
         badge_strategy_for_url("https://web.telegram.org/k/"),
@@ -464,7 +464,6 @@ fn injected_js_builds_observer_driven_badge_engine() {
     assert!(script.contains("new MutationObserver"));
     assert!(script.contains("document.title"));
     assert!(script.contains("teams-title"));
-    assert!(script.contains("whatsapp-title"));
     assert!(!script.contains("setInterval(() =>"));
 }
 
