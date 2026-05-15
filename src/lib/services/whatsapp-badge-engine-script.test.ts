@@ -13,13 +13,6 @@ type MockObserver = {
   trigger: () => void;
 };
 
-type WhatsAppChatRecord = {
-  unreadCount?: number;
-  archive?: boolean;
-  muteExpiration?: number;
-  isAutoMuted?: boolean;
-};
-
 function installMutationObserverMock() {
   const observers: MockObserver[] = [];
 
@@ -62,67 +55,10 @@ function installMutationObserverMock() {
   return observers;
 }
 
-function installIndexedDbMock(chats: WhatsAppChatRecord[] | null) {
-  const indexedDb = {
-    databases: vi.fn(() =>
-      Promise.resolve(chats ? [{ name: "model-storage" }] : []),
-    ),
-    open: vi.fn(() => {
-      const request: {
-        result?: unknown;
-        onsuccess?: () => void;
-        addEventListener: (eventName: string, callback: () => void) => void;
-      } = {
-        addEventListener: vi.fn(),
-      };
-
-      request.result = {
-        close: vi.fn(),
-        transaction: vi.fn(() => ({
-          objectStore: vi.fn(() => ({
-            getAll: vi.fn(() => {
-              const query: {
-                onsuccess?: (event: { target: { result: WhatsAppChatRecord[] } }) => void;
-                addEventListener: (eventName: string, callback: () => void) => void;
-              } = {
-                addEventListener: vi.fn(),
-              };
-
-              Promise.resolve().then(() => {
-                query.onsuccess?.({ target: { result: chats || [] } });
-              });
-
-              return query;
-            }),
-          })),
-        })),
-      };
-
-      Promise.resolve().then(() => {
-        request.onsuccess?.();
-      });
-
-      return request;
-    }),
-  };
-
-  Object.defineProperty(window, "indexedDB", {
-    configurable: true,
-    value: indexedDb,
-  });
-  Object.defineProperty(globalThis, "indexedDB", {
-    configurable: true,
-    value: indexedDb,
-  });
-
-  return indexedDb;
-}
-
 function runWhatsAppBadgeScript(
   bodyMarkup: string,
   options: {
     title?: string;
-    chats?: WhatsAppChatRecord[] | null;
   } = {},
 ) {
   vi.useFakeTimers();
@@ -130,7 +66,6 @@ function runWhatsAppBadgeScript(
   document.body.innerHTML = bodyMarkup;
 
   const observers = installMutationObserverMock();
-  const indexedDb = installIndexedDbMock(options.chats ?? null);
   const reports: string[] = [];
 
   window.__TAURI_INTERNALS__ = {};
@@ -144,7 +79,7 @@ function runWhatsAppBadgeScript(
   window.eval(script);
   document.dispatchEvent(new Event("DOMContentLoaded"));
 
-  return { indexedDb, observers, reports };
+  return { observers, reports };
 }
 
 async function flushAsync() {
@@ -191,10 +126,6 @@ describe("WhatsApp badge engine script", () => {
   it("emits clear while chat list has not loaded yet", async () => {
     const { reports } = runWhatsAppBadgeScript("", {
       title: "(2) WhatsApp",
-      chats: [
-        { unreadCount: 4, archive: false },
-        { unreadCount: 1, archive: false },
-      ],
     });
 
     await flushAsync();
@@ -235,7 +166,7 @@ describe("WhatsApp badge engine script", () => {
           </div>
         </div>
       `,
-      { chats: null },
+      {},
     );
 
     const paneSide = document.querySelector("#pane-side");

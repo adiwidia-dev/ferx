@@ -12,8 +12,6 @@
         let evaluationInFlight = false;
         let evaluationQueued = false;
         let safetyPollTimer = null;
-        let dbCache = null;
-        let dbOpenPromise = null;
         const BADGE_EVALUATION_DELAY_MS = 300;
         const BADGE_SAFETY_POLL_MS = 15000;
 
@@ -30,81 +28,6 @@
         const safeParseInt = (text) => {
             const n = parseInt(normalizeText(text), 10);
             return Number.isFinite(n) && n > 0 ? n : 0;
-        };
-
-        const normalizeUnreadCount = (value) => {
-            const n = Number(value);
-            return Number.isFinite(n) && n > 0 ? n : 0;
-        };
-
-        const requestToPromise = (request) => new Promise((resolve, reject) => {
-            request.onsuccess = (event) => resolve(event?.target?.result ?? request.result);
-            request.onerror = () => reject(request.error || new Error('IndexedDB request failed'));
-            request.addEventListener?.('error', () => reject(request.error || new Error('IndexedDB request failed')));
-        });
-
-        const modelStorageExists = async () => {
-            if (typeof indexedDB?.databases !== 'function') {
-                return true;
-            }
-
-            const databases = await indexedDB.databases();
-            return databases.some((database) => database?.name === 'model-storage');
-        };
-
-        const openModelStorageDb = async () => {
-            if (dbCache) return dbCache;
-            if (dbOpenPromise) return dbOpenPromise;
-
-            dbOpenPromise = (async () => {
-                try {
-                    if (!(await modelStorageExists())) return null;
-
-                    const request = indexedDB.open('model-storage');
-                    const db = await requestToPromise(request);
-                    db.onversionchange = () => {
-                        db.close?.();
-                        dbCache = null;
-                        dbOpenPromise = null;
-                    };
-                    dbCache = db;
-                    return dbCache;
-                } catch (_error) {
-                    dbCache = null;
-                    return null;
-                } finally {
-                    dbOpenPromise = null;
-                }
-            })();
-
-            return dbOpenPromise;
-        };
-
-        const databaseUnreadTotal = async () => {
-            const db = await openModelStorageDb();
-            if (!db) return null;
-
-            try {
-                const transaction = db.transaction('chat', 'readonly');
-                const store = transaction.objectStore('chat');
-                const chats = await requestToPromise(store.getAll());
-                let total = 0;
-                const now = Date.now();
-
-                for (const chat of chats || []) {
-                    if (chat?.archive) continue;
-                    const mute = chat?.muteExpiration;
-                    if (typeof mute === 'number' && mute > 0) {
-                        if ((mute < 1e12 ? mute * 1000 : mute) > now) continue;
-                    }
-                    total += normalizeUnreadCount(chat?.unreadCount);
-                }
-
-                return total;
-            } catch (_error) {
-                dbCache = null;
-                return null;
-            }
         };
 
         const unreadLabelCount = (label, fallbackText) => {
@@ -160,16 +83,7 @@
             return total;
         };
 
-        const titleCount = () => {
-            const title = normalizeText(document.title);
-            const match = title.match(/\((\d+)\)/)
-                || title.match(/\[(\d+)\]/)
-                || title.match(/^(\d+)\s*(?:unread|baru|new|messages?)/i);
-            if (!match) return 0;
-            return safeParseInt(match[1]);
-        };
-
-        const readState = async () => {
+        const readState = () => {
             const domTotal = domUnreadTotal();
             return domTotal > 0 ? 'count:' + domTotal : 'clear';
         };
