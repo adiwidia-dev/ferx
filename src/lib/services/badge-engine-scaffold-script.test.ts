@@ -163,6 +163,37 @@ describe("badge_engine_scaffold", () => {
     await flush();
     expect(callCount).toBeLessThanOrEqual(2);
   });
+
+  it("starts safety poll on init and fires evaluation every 15s", async () => {
+    let callCount = 0;
+    runScaffold({
+      readState: () => { callCount += 1; return "clear"; },
+      resolveObservationTargets: () => [],
+      observeOptions: {},
+      titleBindingFlag: "__ferx_test_title_bound",
+    });
+    await flush();
+    const initial = callCount;
+    await vi.advanceTimersByTimeAsync(15000);
+    await flush();
+    expect(callCount).toBeGreaterThan(initial);
+  });
+
+  it("stops safety poll when monitoring is disabled", async () => {
+    let callCount = 0;
+    runScaffold({
+      readState: () => { callCount += 1; return "clear"; },
+      resolveObservationTargets: () => [],
+      observeOptions: {},
+      titleBindingFlag: "__ferx_test_title_bound",
+    });
+    await flush();
+    window.__ferxSetBadgeMonitoringMode?.("background", false);
+    const before = callCount;
+    await vi.advanceTimersByTimeAsync(20000);
+    await flush();
+    expect(callCount).toBe(before);
+  });
 });
 
 async function flush() {

@@ -13,6 +13,8 @@
         let evaluationInFlight = false;
         let evaluationQueued = false;
         const BADGE_EVALUATION_DELAY_MS = 300;
+        const BADGE_SAFETY_POLL_MS = 15000;
+        let safetyPollTimer = null;
 
         const readState = config.readState;
 
@@ -63,6 +65,20 @@
             window.__ferx_badge_dom_timer = evaluationTimer;
         };
 
+        const startSafetyPoll = () => {
+            if (safetyPollTimer !== null) clearInterval(safetyPollTimer);
+            safetyPollTimer = setInterval(() => {
+                void runBadgeEvaluation();
+            }, BADGE_SAFETY_POLL_MS);
+        };
+
+        const stopSafetyPoll = () => {
+            if (safetyPollTimer !== null) {
+                clearInterval(safetyPollTimer);
+                safetyPollTimer = null;
+            }
+        };
+
         window.__ferxSetBadgeMonitoringMode = (mode, enabled = true) => {
             window.__ferx_badge_monitoring_mode = mode === 'active' ? 'active' : 'background';
             window.__ferx_badge_monitoring_enabled = enabled === true;
@@ -73,9 +89,11 @@
                     window.__ferx_badge_dom_timer = null;
                 }
                 evaluationQueued = false;
+                stopSafetyPoll();
                 emitBadgeState('clear');
                 return;
             }
+            startSafetyPoll();
             void runBadgeEvaluation();
         };
 
@@ -83,5 +101,6 @@
             window.__ferxSetBadgeMonitoringMode(window.__ferx_badge_monitoring_mode, enabled === true);
         };
 
+        startSafetyPoll();
         void runBadgeEvaluation();
     };
