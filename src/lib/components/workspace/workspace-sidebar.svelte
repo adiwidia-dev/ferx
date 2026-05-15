@@ -77,10 +77,11 @@
 </script>
 
 <aside
-  class="w-20 border-r flex flex-col items-center pt-14 pb-6 gap-4 bg-background shrink-0"
+  class="flex h-screen w-20 shrink-0 flex-col items-center gap-4 overflow-hidden border-r bg-background pt-14 pb-4"
+  data-testid="workspace-sidebar"
   data-tauri-drag-region
 >
-  <div class="flex flex-col items-center gap-4 w-full px-2">
+  <div class="flex w-full shrink-0 flex-col items-center gap-4 px-2">
     <WorkspaceSwitcher
       bind:open={isWorkspaceSwitcherOpen}
       {workspaces}
@@ -95,7 +96,12 @@
     />
 
     <div class="w-10 h-[1px] bg-border"></div>
+  </div>
 
+  <div
+    class="flex min-h-0 w-full flex-1 flex-col items-center gap-4 overflow-y-auto overflow-x-hidden px-2 py-1"
+    data-testid="workspace-service-list"
+  >
     {#each services as service, index (service.id)}
       <div
         role="listitem"
@@ -160,7 +166,8 @@
   </div>
 
   <div
-    class="mt-auto flex flex-col items-center gap-4 w-full pb-2"
+    class="flex w-full shrink-0 flex-col items-center gap-4 pb-2"
+    data-testid="workspace-utility-controls"
     style="-webkit-app-region: no-drag;"
   >
     <div class="w-10 h-[1px] bg-border"></div>
