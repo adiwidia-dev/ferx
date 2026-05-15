@@ -11,6 +11,13 @@ async function waitForDialogCleanup() {
   flushSync();
 }
 
+async function unmountDialog(component: ReturnType<typeof mount>) {
+  await new Promise((resolve) => setTimeout(resolve, 2));
+  flushSync();
+  unmount(component);
+  await waitForDialogCleanup();
+}
+
 describe("ServiceEditorDialog", () => {
   it("uses service terminology for add and edit modes", async () => {
     const addComponent = mount(ServiceEditorDialog, {
@@ -27,8 +34,7 @@ describe("ServiceEditorDialog", () => {
     expect(document.body.textContent).toContain("Add New Service");
     expect(document.body.textContent).not.toContain("Add New Workspace");
 
-    unmount(addComponent);
-    await waitForDialogCleanup();
+    await unmountDialog(addComponent);
     document.body.innerHTML = "";
 
     const editComponent = mount(ServiceEditorDialog, {
@@ -54,8 +60,7 @@ describe("ServiceEditorDialog", () => {
       "https://slack.com/app",
     );
 
-    unmount(editComponent);
-    await waitForDialogCleanup();
+    await unmountDialog(editComponent);
   });
 
   it("keeps required service fields and saves the selected icon ring color", async () => {
@@ -97,7 +102,6 @@ describe("ServiceEditorDialog", () => {
       iconBgColor: "#A855F7",
     });
 
-    unmount(component);
-    await waitForDialogCleanup();
+    await unmountDialog(component);
   });
 });

@@ -77,7 +77,7 @@ cargo check --manifest-path src-tauri/Cargo.toml --lib
 Same three commands the CI runs:
 
 ```bash
-yarn check
+yarn run check
 yarn test --run
 cargo test --manifest-path src-tauri/Cargo.toml --lib
 ```
@@ -237,7 +237,7 @@ yarn bump-version X.Y.Z
 git checkout main && git pull --ff-only
 git checkout -b release/vX.Y.Z
 yarn bump-version X.Y.Z
-yarn check && yarn test --run && cargo test --manifest-path src-tauri/Cargo.toml --lib
+yarn run check && yarn test --run && cargo test --manifest-path src-tauri/Cargo.toml --lib
 git commit -am "chore(release): X.Y.Z"
 git push -u origin release/vX.Y.Z
 # ...open PR, merge to main...

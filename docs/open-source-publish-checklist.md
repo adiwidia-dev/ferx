@@ -17,7 +17,7 @@
 ## CI Expectations
 
 - Confirm `.github/workflows/ci.yml` exists and targets `main` on `push` and `pull_request`.
-- Confirm the CI workflow runs `yarn check`, `yarn test --run`, and `cargo test --manifest-path src-tauri/Cargo.toml --lib`.
+- Confirm the CI workflow runs `yarn run check`, `yarn test --run`, and `cargo test --manifest-path src-tauri/Cargo.toml --lib`.
 - If CI is already enabled on GitHub, confirm the latest run is green before announcing the repo push as ready.
 
 ## GitHub Settings

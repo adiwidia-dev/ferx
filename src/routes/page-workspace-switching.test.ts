@@ -69,13 +69,19 @@ function createWorkspaceState(): WorkspaceGroupsState {
 async function settle() {
   flushSync();
   await Promise.resolve();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 2));
   flushSync();
 }
 
 async function waitFor(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
   flushSync();
+}
+
+async function unmountPage(component: ReturnType<typeof mount>) {
+  await settle();
+  unmount(component);
+  await settle();
 }
 
 describe("workspace switching webview commands", () => {
@@ -135,7 +141,7 @@ describe("workspace switching webview commands", () => {
       expect.objectContaining({ payload: expect.objectContaining({ id: "gemini" }) }),
     );
 
-    unmount(component);
+    await unmountPage(component);
   });
 
   it("opens the workspace picker from one click after native webviews are hidden", async () => {
@@ -170,7 +176,7 @@ describe("workspace switching webview commands", () => {
 
     expect(document.querySelector('[data-testid="workspace-picker-panel"]')).toBeTruthy();
 
-    unmount(component);
+    await unmountPage(component);
   });
 
   it("opens the add service dialog from one click after native webviews are hidden", async () => {
@@ -203,7 +209,7 @@ describe("workspace switching webview commands", () => {
 
     expect(document.body.textContent).toContain("Add New Service");
 
-    unmount(component);
+    await unmountPage(component);
   });
 
   it("shows the existing native service context menu directly", async () => {
@@ -228,7 +234,7 @@ describe("workspace switching webview commands", () => {
       muteAudio: false,
     });
 
-    unmount(component);
+    await unmountPage(component);
   });
 
   it("shows the native service context menu for saved services with legacy notification prefs", async () => {
@@ -259,7 +265,7 @@ describe("workspace switching webview commands", () => {
       muteAudio: true,
     });
 
-    unmount(component);
+    await unmountPage(component);
   });
 
   it("shows the native service context menu for disabled services", async () => {
@@ -294,7 +300,7 @@ describe("workspace switching webview commands", () => {
       muteAudio: false,
     });
 
-    unmount(component);
+    await unmountPage(component);
   });
 
   it("reloads the selected service when the native reload menu action fires", async () => {
@@ -317,7 +323,7 @@ describe("workspace switching webview commands", () => {
 
     expect(invoke).toHaveBeenCalledWith("reload_webview", { payload: { id: "youtube" } });
 
-    unmount(component);
+    await unmountPage(component);
   });
 
   it("closes a service webview without deleting storage when the native disable menu action fires", async () => {
@@ -344,7 +350,7 @@ describe("workspace switching webview commands", () => {
       expect.objectContaining({ payload: expect.objectContaining({ id: "youtube" }) }),
     );
 
-    unmount(component);
+    await unmountPage(component);
   });
 
   it("closes disabled workspace services without deleting their session storage", async () => {
@@ -372,7 +378,7 @@ describe("workspace switching webview commands", () => {
       expect.objectContaining({ payload: expect.objectContaining({ id: "gemini" }) }),
     );
 
-    unmount(component);
+    await unmountPage(component);
   });
 
   it("closes only orphaned service webviews when deleting a workspace", async () => {
@@ -438,7 +444,7 @@ describe("workspace switching webview commands", () => {
       document.querySelector<HTMLElement>('[title="YouTube Music (Cmd+1)"]')?.textContent,
     ).toContain("8");
 
-    unmount(component);
+    await unmountPage(component);
     document.body.innerHTML = "";
 
     component = mount(WorkspacePage, {
@@ -450,7 +456,7 @@ describe("workspace switching webview commands", () => {
       document.querySelector<HTMLElement>('[title="YouTube Music (Cmd+1)"]')?.textContent,
     ).toContain("8");
 
-    unmount(component);
+    await unmountPage(component);
   });
 
   it("mutes and unmutes service webviews when Do Not Disturb changes", async () => {
@@ -477,7 +483,7 @@ describe("workspace switching webview commands", () => {
       payload: { muted: false },
     });
 
-    unmount(component);
+    await unmountPage(component);
   });
 
   it("keeps Do Not Disturb enabled after the workspace page remounts", async () => {
@@ -492,7 +498,7 @@ describe("workspace switching webview commands", () => {
     await settle();
     expect(document.querySelector('[title="Turn Off Do Not Disturb"]')).toBeTruthy();
 
-    unmount(component);
+    await unmountPage(component);
     document.body.innerHTML = "";
 
     component = mount(WorkspacePage, {
@@ -502,6 +508,6 @@ describe("workspace switching webview commands", () => {
 
     expect(document.querySelector('[title="Turn Off Do Not Disturb"]')).toBeTruthy();
 
-    unmount(component);
+    await unmountPage(component);
   });
 });
