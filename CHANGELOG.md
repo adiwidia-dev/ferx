@@ -8,14 +8,22 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ## [Unreleased]
 
+---
+
+## [0.6.0] — 2026-05-15
+
+### Added
+
+- Added unread badge support for Google Chat direct messages and spaces.
+- Added unread badge support for Telegram on `web.telegram.org`.
+- Added a dedicated WhatsApp unread badge monitor that sums unread message counts.
+
 ### Fixed
 
 - Fixed Google Chat and WhatsApp unread badges so numeric timestamps in read rows are not counted as unread messages.
-- Fixed WhatsApp unread badges by using a dedicated badge monitor that sums unread message counts instead of unread chat counts.
+- Improved unread badge reliability for services that render navigation elements late by adding observation retry and safety polling.
 - Kept sidebar utility controls visible by making the service icon list scroll independently when many services are added.
 - Let Google Chat use the same Google sign-in compatibility path as Gmail to avoid unsupported-browser sign-in failures.
-- Fixed Google Chat unread badges with an isolated badge monitor for direct-message and space unread indicators.
-- Fixed Telegram unread badges on `web.telegram.org` with an isolated badge monitor that follows Ferx's active/background tray-update lifecycle.
 - Fixed Microsoft Teams badges on `teams.cloud.microsoft` by reporting badge updates through the navigation bridge when remote-webview IPC is unavailable.
 - Fixed Microsoft Teams badge counts being doubled when Teams renders duplicate badge nodes for one navigation item.
 - Upgraded Svelte to 5.55.7 to address Dependabot-reported XSS vulnerabilities in Svelte.
@@ -197,6 +205,8 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 - Service config validation and safety guardrails: invalid URLs, malformed payloads, and unsupported schemes are rejected before any state change is applied.
 - CI baseline: pre-push validation runs type-check, unit tests, and Rust tests.
 
+[0.6.0]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.6.0
+[0.5.0]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.5.0
 [0.4.2]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.4.2
 [0.4.1]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.4.1
 [0.4.0]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.4.0
