@@ -12,6 +12,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 - Fixed Microsoft Teams badges on `teams.cloud.microsoft` by reporting badge updates through the navigation bridge when remote-webview IPC is unavailable.
 - Fixed Microsoft Teams badge counts being doubled when Teams renders duplicate badge nodes for one navigation item.
+- Upgraded Svelte to 5.55.7 to address Dependabot-reported XSS vulnerabilities in Svelte.
 
 ---
 
