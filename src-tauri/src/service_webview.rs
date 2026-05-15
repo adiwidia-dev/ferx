@@ -1,9 +1,10 @@
 use crate::service_runtime::{
-    badge_strategy_for_url, extract_hostname, hostname_matches, microsoft_service_kind,
-    MicrosoftServiceKind,
+    MicrosoftServiceKind, badge_strategy_for_url, extract_hostname, hostname_matches,
+    microsoft_service_kind,
 };
 use crate::service_webview_badge_scripts::{
     badge_engine_script, outlook_badge_engine_script, teams_badge_engine_script,
+    telegram_badge_engine_script,
 };
 use crate::service_webview_resource_usage::resource_usage_monitor_script;
 use crate::service_webview_runtime_scripts::{
@@ -109,6 +110,7 @@ fn injected_js_for_url(
         match microsoft_service {
             Some(MicrosoftServiceKind::Outlook) => outlook_badge_engine_script(strategy_name),
             Some(MicrosoftServiceKind::Teams) => teams_badge_engine_script(),
+            None if strategy_name == "telegram-dom" => telegram_badge_engine_script(),
             None => badge_engine_script(strategy_name),
         }
     )

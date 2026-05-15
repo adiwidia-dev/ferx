@@ -46,6 +46,15 @@ describe("resolveBadgeStrategy", () => {
     );
   });
 
+  it("resolves Telegram URLs to the Telegram DOM strategy", () => {
+    expect(resolveBadgeStrategy("https://web.telegram.org/k/")).toBe(
+      "telegram-dom",
+    );
+    expect(resolveBadgeStrategy("https://web.telegram.org/a/")).toBe(
+      "telegram-dom",
+    );
+  });
+
   it("falls back conservatively for unknown services", () => {
     expect(resolveBadgeStrategy("https://example.com/app")).toBe("unsupported");
   });
@@ -95,6 +104,15 @@ describe("getBadgeCapability", () => {
   it("marks Teams as a hybrid title+DOM observer strategy", () => {
     expect(getBadgeCapability("teams-dom")).toEqual({
       kind: "hybrid-title-dom" satisfies BadgeStrategyKind,
+      usesMutationObserver: true,
+      usesTitleObserver: true,
+      usesFallbackPolling: true,
+    });
+  });
+
+  it("marks Telegram as an isolated custom DOM script", () => {
+    expect(getBadgeCapability("telegram-dom")).toEqual({
+      kind: "custom-script" satisfies BadgeStrategyKind,
       usesMutationObserver: true,
       usesTitleObserver: true,
       usesFallbackPolling: true,

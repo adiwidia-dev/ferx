@@ -410,6 +410,10 @@ fn badge_strategy_uses_explicit_hostname_mapping() {
         badge_strategy_for_url("https://web.whatsapp.com"),
         "whatsapp-title"
     );
+    assert_eq!(
+        badge_strategy_for_url("https://web.telegram.org/k/"),
+        "telegram-dom"
+    );
     assert_eq!(badge_strategy_for_url("https://example.com"), "unsupported");
     assert_eq!(
         badge_strategy_for_url("https://notwhatsapp.com"),

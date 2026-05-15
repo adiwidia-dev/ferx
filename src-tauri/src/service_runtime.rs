@@ -21,10 +21,23 @@ pub(crate) enum MicrosoftServiceKind {
 }
 
 pub(crate) fn badge_strategy_for_url(url: &str) -> &'static str {
-    if matches!(microsoft_service_kind(url), Some(MicrosoftServiceKind::Outlook)) {
+    if matches!(
+        microsoft_service_kind(url),
+        Some(MicrosoftServiceKind::Outlook)
+    ) {
         "outlook-folder-dom"
-    } else if matches!(microsoft_service_kind(url), Some(MicrosoftServiceKind::Teams)) {
+    } else if matches!(
+        microsoft_service_kind(url),
+        Some(MicrosoftServiceKind::Teams)
+    ) {
         "teams-dom"
+    } else if hostname_matches(
+        &extract_hostname(url)
+            .unwrap_or_default()
+            .to_ascii_lowercase(),
+        "web.telegram.org",
+    ) {
+        "telegram-dom"
     } else if hostname_matches(
         &extract_hostname(url)
             .unwrap_or_default()

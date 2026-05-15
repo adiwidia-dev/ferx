@@ -1,6 +1,7 @@
 export type BadgeStrategyName =
   | "title-numeric"
   | "whatsapp-title"
+  | "telegram-dom"
   | "teams-dom"
   | "outlook-folder-dom"
   | "unsupported";
@@ -53,6 +54,10 @@ export function resolveBadgeStrategy(url: string): BadgeStrategyName {
     return "whatsapp-title";
   }
 
+  if (matchesHostname(hostname, "web.telegram.org")) {
+    return "telegram-dom";
+  }
+
   return "unsupported";
 }
 
@@ -80,6 +85,13 @@ export function getBadgeCapability(
         usesMutationObserver: false,
         usesTitleObserver: true,
         usesFallbackPolling: false,
+      };
+    case "telegram-dom":
+      return {
+        kind: "custom-script",
+        usesMutationObserver: true,
+        usesTitleObserver: true,
+        usesFallbackPolling: true,
       };
     default:
       return {
