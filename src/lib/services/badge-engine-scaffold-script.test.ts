@@ -147,6 +147,22 @@ describe("badge_engine_scaffold", () => {
     await flush();
     expect(reports.at(-1)).toBe("count:7");
   });
+
+  it("debounces rapid evaluation requests", async () => {
+    let callCount = 0;
+    const config = {
+      readState: () => { callCount += 1; return "count:" + callCount; },
+      resolveObservationTargets: () => [],
+      observeOptions: {},
+      titleBindingFlag: "__ferx_test_title_bound",
+    };
+    runScaffold(config);
+    window.__ferxSetBadgeMonitoringMode?.("background", true);
+    window.__ferxSetBadgeMonitoringMode?.("background", true);
+    window.__ferxSetBadgeMonitoringMode?.("background", true);
+    await flush();
+    expect(callCount).toBeLessThanOrEqual(2);
+  });
 });
 
 async function flush() {
