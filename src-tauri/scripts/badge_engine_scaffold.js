@@ -14,7 +14,13 @@
         let evaluationQueued = false;
         const BADGE_EVALUATION_DELAY_MS = 300;
         const BADGE_SAFETY_POLL_MS = 15000;
+        const BADGE_OBSERVATION_RETRY_MS = 1000;
         let safetyPollTimer = null;
+        let observer = null;
+        let observationRetryTimer = null;
+
+        const resolveObservationTargets = config.resolveObservationTargets;
+        const observeOptions = config.observeOptions;
 
         const readState = config.readState;
 
@@ -79,6 +85,49 @@
             }
         };
 
+        const isActiveMonitoringMode = () => window.__ferx_badge_monitoring_mode === 'active';
+
+        const clearObservationRetry = () => {
+            if (observationRetryTimer !== null) {
+                clearTimeout(observationRetryTimer);
+                observationRetryTimer = null;
+            }
+        };
+
+        const disconnectDomObserver = () => {
+            if (observer) {
+                observer.disconnect();
+                observer = null;
+            }
+            clearObservationRetry();
+        };
+
+        const scheduleObservationRetry = () => {
+            if (!window.__ferx_badge_monitoring_enabled || !isActiveMonitoringMode()) return;
+            if (observationRetryTimer !== null) return;
+            observationRetryTimer = setTimeout(() => {
+                observationRetryTimer = null;
+                observeDom();
+            }, BADGE_OBSERVATION_RETRY_MS);
+        };
+
+        const observeDom = () => {
+            disconnectDomObserver();
+            if (!window.__ferx_badge_monitoring_enabled || !isActiveMonitoringMode()) return;
+            const targets = resolveObservationTargets();
+            if (targets.length === 0) {
+                scheduleObservationRetry();
+                return;
+            }
+            observer = new MutationObserver(() => {
+                if (!window.__ferx_badge_monitoring_enabled) return;
+                scheduleBadgeEvaluation();
+            });
+            for (const target of targets) {
+                observer.observe(target, observeOptions);
+            }
+        };
+
         window.__ferxSetBadgeMonitoringMode = (mode, enabled = true) => {
             window.__ferx_badge_monitoring_mode = mode === 'active' ? 'active' : 'background';
             window.__ferx_badge_monitoring_enabled = enabled === true;
@@ -89,11 +138,17 @@
                     window.__ferx_badge_dom_timer = null;
                 }
                 evaluationQueued = false;
+                disconnectDomObserver();
                 stopSafetyPoll();
                 emitBadgeState('clear');
                 return;
             }
             startSafetyPoll();
+            if (isActiveMonitoringMode()) {
+                observeDom();
+            } else {
+                disconnectDomObserver();
+            }
             void runBadgeEvaluation();
         };
 
@@ -101,6 +156,9 @@
             window.__ferxSetBadgeMonitoringMode(window.__ferx_badge_monitoring_mode, enabled === true);
         };
 
+        if (isActiveMonitoringMode()) {
+            observeDom();
+        }
         startSafetyPoll();
         void runBadgeEvaluation();
     };

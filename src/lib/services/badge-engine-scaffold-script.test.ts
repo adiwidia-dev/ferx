@@ -194,6 +194,58 @@ describe("badge_engine_scaffold", () => {
     await flush();
     expect(callCount).toBe(before);
   });
+
+  it("attaches MutationObserver to resolved targets in active mode", async () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = '<div id="watch-me"></div>';
+    const target = document.querySelector("#watch-me");
+    let observed: Node | null = null;
+    class CaptureObserver {
+      observe(t: Node) { observed = t; }
+      disconnect() {}
+      takeRecords() { return []; }
+    }
+    Object.defineProperty(window, "MutationObserver", {
+      configurable: true,
+      value: CaptureObserver,
+    });
+    Object.defineProperty(globalThis, "MutationObserver", {
+      configurable: true,
+      value: CaptureObserver,
+    });
+    const reports: string[] = [];
+    window.__ferxBadgeReports = reports;
+    const patched = scaffoldScript.replace(
+      "window.location.href = 'https://ferx.notify/' + payload;",
+      "window.__ferxBadgeReports.push(payload);",
+    );
+    window.eval(patched);
+    (window as Window & { __ferxInitBadgeMonitor?: (c: unknown) => void }).__ferxInitBadgeMonitor?.({
+      readState: () => "clear",
+      resolveObservationTargets: () => target ? [target] : [],
+      observeOptions: { childList: true },
+      titleBindingFlag: "__ferx_test_title_bound",
+    });
+    window.__ferxSetBadgeMonitoringMode?.("active", true);
+    await flush();
+    expect(observed).toBe(target);
+  });
+
+  it("retries observation when targets are not yet available", async () => {
+    let callsToResolve = 0;
+    runScaffold({
+      readState: () => "clear",
+      resolveObservationTargets: () => { callsToResolve += 1; return []; },
+      observeOptions: {},
+      titleBindingFlag: "__ferx_test_title_bound",
+    });
+    window.__ferxSetBadgeMonitoringMode?.("active", true);
+    await flush();
+    const before = callsToResolve;
+    await vi.advanceTimersByTimeAsync(1100);
+    await flush();
+    expect(callsToResolve).toBeGreaterThan(before);
+  });
 });
 
 async function flush() {
