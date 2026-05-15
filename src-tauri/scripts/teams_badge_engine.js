@@ -1,8 +1,5 @@
 
     (() => {
-        const invoke = window.__TAURI_INTERNALS__?.invoke;
-        if (typeof invoke !== 'function') return;
-
         if (window.__ferx_badge_observers_active) return;
         window.__ferx_badge_observers_active = true;
 
@@ -39,6 +36,16 @@
             '[class*="Activity"]'
         ];
 
+        const appBadgeSelectors = [
+            '[data-tid="app-layout-area--sidebar"] .fui-Badge',
+            '[data-tid*="app-bar"] .fui-Badge',
+            '[data-tid*="rail"] .fui-Badge',
+            '[role="navigation"] .fui-Badge',
+            'nav .fui-Badge',
+            '[class*="app-bar"] .fui-Badge',
+            '[class*="AppBar"] .fui-Badge'
+        ];
+
         const uniqueElements = (elements) => {
             const seen = new Set();
             return elements.filter((element) => {
@@ -52,6 +59,10 @@
 
         const resolveObservationTargets = () => uniqueElements(
             observationSelectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)))
+        );
+
+        const queryUnique = (selectors) => uniqueElements(
+            selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)))
         );
 
         const safeParseInt = (text) => {
@@ -70,24 +81,74 @@
             return Number.isFinite(count) && count > 0 ? count : null;
         };
 
-        const teamsDomState = () => {
-            let total = 0;
+        const ownerForBadge = (badge) => badge.closest?.([
+            '[role="treeitem"]',
+            '[role="button"]',
+            'button',
+            'a',
+            'li'
+        ].join(', ')) || badge.parentElement?.closest?.([
+            '[data-tid*="app-bar"]',
+            '[data-tid*="rail"]',
+            '[data-tid]'
+        ].join(', ')) || badge;
 
-            const fuiBadges = document.querySelectorAll('.fui-Badge');
-            for (const badge of fuiBadges) {
-                total += safeParseInt(badge.textContent);
+        const normalizedOwnerValue = (owner, attribute) => {
+            const value = owner?.getAttribute?.(attribute);
+            return value ? value.trim().toLowerCase() : '';
+        };
+
+        const ownerKeyForBadge = (badge) => {
+            const owner = ownerForBadge(badge);
+            const semanticKey = [
+                ['data-tid', normalizedOwnerValue(owner, 'data-tid')],
+                ['data-testid', normalizedOwnerValue(owner, 'data-testid')],
+                ['aria-label', normalizedOwnerValue(owner, 'aria-label')],
+                ['title', normalizedOwnerValue(owner, 'title')],
+                ['id', normalizedOwnerValue(owner, 'id')]
+            ].find(([, value]) => value);
+
+            if (semanticKey) {
+                return `${owner.tagName?.toLowerCase() || 'element'}:${semanticKey[0]}:${semanticKey[1]}`;
             }
+
+            return owner;
+        };
+
+        const countUniqueBadges = (badges) => {
+            const countsByOwner = new Map();
+            for (const badge of badges) {
+                const count = safeParseInt(badge.textContent);
+                if (count <= 0) continue;
+
+                const owner = ownerKeyForBadge(badge);
+                countsByOwner.set(owner, Math.max(countsByOwner.get(owner) || 0, count));
+            }
+
+            let total = 0;
+            for (const count of countsByOwner.values()) {
+                total += count;
+            }
+            return total;
+        };
+
+        const teamsDomState = () => {
+            const appBadges = queryUnique(appBadgeSelectors);
+            const appTotal = countUniqueBadges(appBadges);
+
+            if (appTotal > 0) return 'count:' + appTotal;
+
+            const fuiBadges = Array.from(document.querySelectorAll('.fui-Badge'));
+            const total = countUniqueBadges(fuiBadges);
 
             if (total > 0) return 'count:' + total;
 
             const legacyBadges = document.querySelectorAll(
                 '.activity-badge.dot-activity-badge .activity-badge'
             );
-            for (const badge of legacyBadges) {
-                total += safeParseInt(badge.textContent);
-            }
+            const legacyTotal = countUniqueBadges(legacyBadges);
 
-            if (total > 0) return 'count:' + total;
+            if (legacyTotal > 0) return 'count:' + legacyTotal;
 
             return null;
         };
@@ -102,27 +163,23 @@
             return 'clear';
         };
 
-        const emitBadgeState = async (nextState) => {
+        const emitBadgeState = (nextState) => {
             const payload = (typeof nextState === 'string' && nextState.startsWith('count:'))
                 ? nextState
                 : 'clear';
 
             if (payload === window.__ferx_last_badge_state) return;
 
-            try {
-                await invoke('report_teams_badge', { payload });
-                window.__ferx_last_badge_state = payload;
-            } catch (_e) {
-                // Swallow; the next observer tick will retry.
-            }
+            window.__ferx_last_badge_state = payload;
+            window.location.href = 'https://ferx.notify/' + payload;
         };
 
         const evaluateBadgeState = async () => {
             if (!window.__ferx_badge_monitoring_enabled) return;
             try {
-                await emitBadgeState(readState());
+                emitBadgeState(readState());
             } catch (_error) {
-                await emitBadgeState('clear');
+                emitBadgeState('clear');
             }
         };
 

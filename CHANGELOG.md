@@ -8,6 +8,11 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed Microsoft Teams badges on `teams.cloud.microsoft` by reporting badge updates through the navigation bridge when remote-webview IPC is unavailable.
+- Fixed Microsoft Teams badge counts being doubled when Teams renders duplicate badge nodes for one navigation item.
+
 ---
 
 ## [0.5.0] — 2026-05-14

@@ -63,14 +63,15 @@ function runTeamsBadgeScript(bodyMarkup: string, title = "Teams") {
   const observers = installMutationObserverMock();
   const reports: string[] = [];
 
-  window.__TAURI_INTERNALS__ = {
-    invoke: vi.fn((_command: string, input: { payload: string }) => {
-      reports.push(input.payload);
-      return Promise.resolve();
-    }),
-  };
+  window.__TAURI_INTERNALS__ = {};
 
-  window.eval(teamsBadgeEngineScript);
+  const script = teamsBadgeEngineScript.replace(
+    "window.location.href = 'https://ferx.notify/' + payload;",
+    "window.__ferxBadgeReports.push(payload);",
+  );
+  window.__ferxBadgeReports = reports;
+
+  window.eval(script);
 
   return { observers, reports };
 }
@@ -84,6 +85,7 @@ afterEach(() => {
   vi.useRealTimers();
   document.body.innerHTML = "";
   delete window.__TAURI_INTERNALS__;
+  delete window.__ferxBadgeReports;
   delete window.__ferx_badge_observers_active;
   delete window.__ferx_last_badge_state;
   delete window.__ferx_badge_dom_timer;
@@ -93,6 +95,18 @@ afterEach(() => {
 });
 
 describe("Teams badge engine script", () => {
+  it("reports Teams badges without requiring the Tauri invoke bridge", async () => {
+    const { reports } = runTeamsBadgeScript(`
+      <main>
+        <span class="fui-Badge">2</span>
+      </main>
+    `);
+
+    await flushPromises();
+
+    expect(reports.at(-1)).toBe("count:2");
+  });
+
   it("starts hidden services in background mode without observing the whole body", async () => {
     const { observers } = runTeamsBadgeScript(`
       <main>
@@ -136,6 +150,73 @@ describe("Teams badge engine script", () => {
     expect(reports.at(-1)).toBe("count:5");
   });
 
+  it("does not double count duplicate Teams v2 badges for one navigation item", async () => {
+    const { reports } = runTeamsBadgeScript(`
+      <nav>
+        <button data-tid="app-bar-chat">
+          <span class="fui-Badge" data-tid="visible-chat-badge">1</span>
+          <span class="fui-Badge" data-tid="mirrored-chat-badge">1</span>
+        </button>
+      </nav>
+    `);
+
+    await flushPromises();
+
+    expect(reports.at(-1)).toBe("count:1");
+  });
+
+  it("prefers Teams app rail badges over mirrored in-page badges", async () => {
+    const { reports } = runTeamsBadgeScript(`
+      <nav data-tid="app-layout-area--sidebar">
+        <button data-tid="app-bar-chat" aria-label="Chat">
+          <span class="fui-Badge">1</span>
+        </button>
+      </nav>
+      <main>
+        <button role="button" aria-label="Chat">
+          <span class="fui-Badge">1</span>
+        </button>
+      </main>
+    `);
+
+    await flushPromises();
+
+    expect(reports.at(-1)).toBe("count:1");
+  });
+
+  it("deduplicates mirrored Teams app rail instances by semantic owner", async () => {
+    const { reports } = runTeamsBadgeScript(`
+      <nav data-tid="app-layout-area--sidebar">
+        <button data-tid="app-bar-chat" aria-label="Chat">
+          <span class="fui-Badge">1</span>
+        </button>
+      </nav>
+      <nav data-tid="app-layout-area--sidebar-hidden">
+        <button data-tid="app-bar-chat" aria-label="Chat">
+          <span class="fui-Badge">1</span>
+        </button>
+      </nav>
+    `);
+
+    await flushPromises();
+
+    expect(reports.at(-1)).toBe("count:1");
+  });
+
+  it("reports legacy Teams badge selectors through the navigation bridge", async () => {
+    const { reports } = runTeamsBadgeScript(`
+      <main>
+        <div class="activity-badge dot-activity-badge">
+          <span class="activity-badge">3</span>
+        </div>
+      </main>
+    `);
+
+    await flushPromises();
+
+    expect(reports.at(-1)).toBe("count:3");
+  });
+
   it("attaches targeted Teams DOM observers only after switching to active mode", async () => {
     const { observers } = runTeamsBadgeScript(`
       <nav data-tid="app-layout-area--sidebar">
@@ -169,6 +250,7 @@ describe("Teams badge engine script", () => {
 declare global {
   interface Window {
     __TAURI_INTERNALS__?: object;
+    __ferxBadgeReports?: string[];
     __ferx_badge_observers_active?: boolean;
     __ferx_last_badge_state?: string;
     __ferx_badge_dom_timer?: number | null;

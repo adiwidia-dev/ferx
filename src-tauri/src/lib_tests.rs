@@ -505,9 +505,9 @@ fn service_webview_setup_accepts_valid_external_urls() {
     assert!(
         initialization_script.contains("window.location.href = 'https://ferx.shortcut/' + key")
     );
-    assert!(initialization_script.contains("invoke('report_teams_badge'"));
+    assert!(initialization_script.contains("https://ferx.notify/"));
     assert!(initialization_script.contains(".fui-Badge"));
-    assert!(!initialization_script.contains("https://ferx.notify/"));
+    assert!(!initialization_script.contains("invoke('report_teams_badge'"));
 }
 
 #[test]
@@ -560,13 +560,16 @@ fn outlook_badge_script_keeps_badge_reporting_fallback_and_safety_poll() {
 fn teams_badge_script_keeps_badge_reporting_fallback_and_safety_poll() {
     let script = teams_badge_engine_script();
 
-    assert!(script.contains("report_teams_badge"));
+    assert!(script.contains("https://ferx.notify/"));
+    assert!(!script.contains("invoke('report_teams_badge'"));
     assert!(script.contains("MutationObserver"));
     assert!(script.contains("__ferxSetBadgeMonitoring"));
     assert!(script.contains("BADGE_SAFETY_POLL_MS"));
     assert!(script.contains("resolveObservationTargets"));
     assert!(script.contains("scheduleBadgeEvaluation"));
     assert!(script.contains("evaluationInFlight"));
+    assert!(script.contains("countUniqueBadges"));
+    assert!(script.contains("ownerForBadge"));
 }
 
 #[test]
@@ -596,10 +599,11 @@ fn service_webview_setup_badge_reporting_methods_per_microsoft_app() {
         panic!("expected valid outlook setup");
     };
 
-    // Teams still uses the invoke bridge.
-    assert!(!teams_script.contains("https://ferx.notify/"));
+    // Teams uses the same navigation bridge as Outlook so teams.cloud.microsoft
+    // still reports badges when remote-webview IPC is unavailable.
+    assert!(teams_script.contains("https://ferx.notify/"));
     assert!(teams_script.contains("new MutationObserver"));
-    assert!(teams_script.contains("invoke('report_teams_badge'"));
+    assert!(!teams_script.contains("invoke('report_teams_badge'"));
 
     // Outlook uses the navigation bridge (same as other services) for
     // Tauri 2.11+ compatibility where remote-webview invoke is restricted.
@@ -627,7 +631,7 @@ fn cloud_teams_setup_uses_teams_safeguards() {
     };
 
     assert!(!teams_script.contains("Object.defineProperty(window, 'Notification'"));
-    assert!(!teams_script.contains("https://ferx.notify/"));
+    assert!(teams_script.contains("https://ferx.notify/"));
     assert!(teams_script.contains("https://ferx.download/"));
     assert!(teams_script.contains("https://ferx.shortcut/"));
     assert_eq!(
@@ -859,8 +863,8 @@ fn teams_cloud_setup_keeps_supported_edge_user_agent_and_badge_detection() {
     );
     assert!(!teams_script.is_empty());
     assert!(teams_script.contains("https://ferx.download/"));
-    assert!(!teams_script.contains("https://ferx.notify/"));
-    assert!(teams_script.contains("invoke('report_teams_badge'"));
+    assert!(teams_script.contains("https://ferx.notify/"));
+    assert!(!teams_script.contains("invoke('report_teams_badge'"));
     assert!(teams_script.contains(".fui-Badge"));
 }
 
@@ -890,7 +894,8 @@ fn extracted_resource_and_badge_script_modules_preserve_known_markers() {
     assert!(resource_usage_monitor_script().contains("https://ferx.resource/"));
     assert!(badge_engine_script("unsupported").contains("https://ferx.notify/"));
     assert!(outlook_badge_engine_script("outlook-folder-dom").contains("https://ferx.notify/"));
-    assert!(teams_badge_engine_script().contains("invoke('report_teams_badge'"));
+    assert!(teams_badge_engine_script().contains("https://ferx.notify/"));
+    assert!(!teams_badge_engine_script().contains("invoke('report_teams_badge'"));
 }
 
 #[test]
