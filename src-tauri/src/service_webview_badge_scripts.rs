@@ -19,7 +19,11 @@ pub(crate) fn telegram_badge_engine_script() -> String {
 }
 
 pub(crate) fn google_chat_badge_engine_script() -> String {
-    include_str!("../scripts/google_chat_badge_engine.js").to_owned()
+    format!(
+        "{}\n{}",
+        badge_engine_scaffold_script(),
+        include_str!("../scripts/google_chat_badge_engine.js"),
+    )
 }
 
 pub(crate) fn whatsapp_badge_engine_script() -> String {
