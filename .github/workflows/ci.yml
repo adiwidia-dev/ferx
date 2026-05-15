@@ -37,10 +37,13 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Run Svelte checks
-        run: yarn check
+        run: yarn run check
 
       - name: Run Vitest suite
         run: yarn test --run
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 
       - name: Run Rust library tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib

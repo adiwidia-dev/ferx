@@ -1,17 +1,17 @@
-mod badge_payload;
 mod app_state;
+mod badge_payload;
 mod desktop_ui;
 mod download_dialog;
 mod file_drop;
 #[cfg(target_os = "macos")]
 mod macos_defaults;
 mod navigation_bridge;
-mod service_webview_badge_scripts;
-mod service_webview_resource_usage;
-mod service_webview_runtime_scripts;
 mod service_runtime;
 mod service_storage;
 mod service_webview;
+mod service_webview_badge_scripts;
+mod service_webview_resource_usage;
+mod service_webview_runtime_scripts;
 mod webview_commands;
 mod window_layout;
 
@@ -34,7 +34,15 @@ fn show_context_menu(
     affect_tray: bool,
     mute_audio: bool,
 ) {
-    desktop_ui::show_context_menu(app, window, id, disabled, show_badge, affect_tray, mute_audio);
+    desktop_ui::show_context_menu(
+        app,
+        window,
+        id,
+        disabled,
+        show_badge,
+        affect_tray,
+        mute_audio,
+    );
 }
 
 #[tauri::command]
@@ -95,10 +103,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .manage(app_state::ActiveWebview(std::sync::Mutex::new(String::new())))
-        .manage(app_state::ActiveResourceUsageMonitoring(std::sync::Mutex::new(
-            false,
+        .manage(app_state::ActiveWebview(std::sync::Mutex::new(
+            String::new(),
         )))
+        .manage(app_state::ActiveResourceUsageMonitoring(
+            std::sync::Mutex::new(false),
+        ))
         .manage(app_state::BadgeMonitoringPrefs(std::sync::Mutex::new(
             std::collections::HashMap::new(),
         )))

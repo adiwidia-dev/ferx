@@ -47,8 +47,14 @@ pub(crate) fn handle_special_navigation(
     }
 
     if url.host_str() == Some("ferx.resource") {
-        if let Some(data) = url.query_pairs().find(|(k, _)| k == "data").map(|(_, v)| v.into_owned()) {
-            if let Err(e) = app_handle.emit("resource-usage-update", format!("{}:{}", service_id, data)) {
+        if let Some(data) = url
+            .query_pairs()
+            .find(|(k, _)| k == "data")
+            .map(|(_, v)| v.into_owned())
+        {
+            if let Err(e) =
+                app_handle.emit("resource-usage-update", format!("{}:{}", service_id, data))
+            {
                 eprintln!("resource-usage-update emit failed for {service_id}: {e}");
             }
         }

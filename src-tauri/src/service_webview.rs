@@ -1,6 +1,6 @@
 use crate::service_runtime::{
-    MicrosoftServiceKind, badge_strategy_for_url, extract_hostname, hostname_matches,
-    microsoft_service_kind,
+    badge_strategy_for_url, extract_hostname, hostname_matches, microsoft_service_kind,
+    MicrosoftServiceKind,
 };
 use crate::service_webview_badge_scripts::{
     badge_engine_script, google_chat_badge_engine_script, outlook_badge_engine_script,

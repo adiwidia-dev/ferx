@@ -30,7 +30,11 @@ pub(crate) fn show_context_menu(
     let toggle_badge = match MenuItem::with_id(
         &app,
         format!("toggle-badge:{}", id),
-        if show_badge { "Disable Unread Badge" } else { "Enable Unread Badge" },
+        if show_badge {
+            "Disable Unread Badge"
+        } else {
+            "Enable Unread Badge"
+        },
         true,
         None::<&str>,
     ) {
@@ -43,7 +47,11 @@ pub(crate) fn show_context_menu(
     let toggle_tray = match MenuItem::with_id(
         &app,
         format!("toggle-tray:{}", id),
-        if affect_tray { "Disable Unread Tray" } else { "Enable Unread Tray" },
+        if affect_tray {
+            "Disable Unread Tray"
+        } else {
+            "Enable Unread Tray"
+        },
         true,
         None::<&str>,
     ) {
@@ -56,7 +64,11 @@ pub(crate) fn show_context_menu(
     let toggle_notifications = match MenuItem::with_id(
         &app,
         format!("toggle-notifications:{}", id),
-        if mute_audio { "Enable Notification Sound" } else { "Disable Notification Sound" },
+        if mute_audio {
+            "Enable Notification Sound"
+        } else {
+            "Disable Notification Sound"
+        },
         true,
         None::<&str>,
     ) {

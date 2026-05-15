@@ -1,6 +1,4 @@
-use crate::app_state::{
-    active_resource_usage_monitoring, right_panel_width, ActiveWebview,
-};
+use crate::app_state::{active_resource_usage_monitoring, right_panel_width, ActiveWebview};
 use tauri::Manager;
 
 pub const RESIZE_DEBOUNCE_MS: u64 = 32;

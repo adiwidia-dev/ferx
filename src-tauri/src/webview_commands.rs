@@ -101,6 +101,68 @@ fn set_audio_muted(webview: &tauri::Webview, muted: bool) {
     }
 }
 
+fn set_resource_usage_monitoring(webview: &tauri::Webview, enabled: bool) {
+    if let Err(e) = webview.eval(resource_usage_monitor_eval_script(enabled)) {
+        eprintln!("resource monitor eval failed for {}: {e}", webview.label());
+    }
+}
+
+fn activate_service_webview(
+    app: &AppHandle,
+    webview: &tauri::Webview,
+    id: &str,
+    position: tauri::PhysicalPosition<i32>,
+    size: tauri::PhysicalSize<u32>,
+    resource_usage_monitoring_enabled: bool,
+) {
+    set_badge_monitoring_mode(
+        webview,
+        badge_monitoring_pref(app, id),
+        BadgeMonitoringMode::Active,
+    );
+    set_audio_muted(webview, service_audio_muted(app));
+    set_resource_usage_monitoring(webview, resource_usage_monitoring_enabled);
+    let _ = webview.set_bounds(tauri::Rect {
+        position: tauri::Position::Physical(position),
+        size: tauri::Size::Physical(size),
+    });
+    let _ = webview.show();
+    let _ = webview.set_focus();
+}
+
+fn move_service_webview_to_background(
+    app: &AppHandle,
+    webview: &tauri::Webview,
+    id: &str,
+    position: tauri::PhysicalPosition<i32>,
+    size: tauri::PhysicalSize<u32>,
+) {
+    set_badge_monitoring_mode(
+        webview,
+        badge_monitoring_pref(app, id),
+        BadgeMonitoringMode::Background,
+    );
+    set_resource_usage_monitoring(webview, false);
+    let _ = webview.set_bounds(tauri::Rect {
+        position: tauri::Position::Physical(position),
+        size: tauri::Size::Physical(size),
+    });
+}
+
+fn move_previous_active_webview_to_background(
+    app: &AppHandle,
+    previous_active_to_hide: Option<&str>,
+    position: tauri::PhysicalPosition<i32>,
+    size: tauri::PhysicalSize<u32>,
+) {
+    let Some(previous_id) = previous_active_to_hide else {
+        return;
+    };
+    if let Some(previous_webview) = app.get_webview(previous_id) {
+        move_service_webview_to_background(app, &previous_webview, previous_id, position, size);
+    }
+}
+
 fn close_service_webviews(app: &AppHandle) {
     clear_active_webview(app);
     clear_badge_monitoring_prefs(app);
@@ -385,40 +447,20 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
         let offscreen_pos = PhysicalPosition::new(-10000, -10000);
 
         if let Some(active_webview) = app.get_webview(&id) {
-            set_badge_monitoring_mode(
+            activate_service_webview(
+                &app,
                 &active_webview,
-                badge_monitoring_pref(&app, &id),
-                BadgeMonitoringMode::Active,
-            );
-            set_audio_muted(&active_webview, service_audio_muted(&app));
-            if let Err(e) = active_webview.eval(resource_usage_monitor_eval_script(
+                &id,
+                active_pos,
+                active_size,
                 resource_usage_monitoring_enabled,
-            )) {
-                eprintln!("resource monitor eval failed for {}: {e}", active_webview.label());
-            }
-            let _ = active_webview.set_bounds(tauri::Rect {
-                position: tauri::Position::Physical(active_pos),
-                size: tauri::Size::Physical(active_size),
-            });
-            let _ = active_webview.show();
-            let _ = active_webview.set_focus();
-
-            if let Some(previous_id) = previous_active_to_hide {
-                if let Some(previous_webview) = app.get_webview(&previous_id) {
-                    set_badge_monitoring_mode(
-                        &previous_webview,
-                        badge_monitoring_pref(&app, &previous_id),
-                        BadgeMonitoringMode::Background,
-                    );
-                    if let Err(e) = previous_webview.eval(resource_usage_monitor_eval_script(false)) {
-                        eprintln!("resource monitor eval failed for {}: {e}", previous_webview.label());
-                    }
-                    let _ = previous_webview.set_bounds(tauri::Rect {
-                        position: tauri::Position::Physical(offscreen_pos),
-                        size: tauri::Size::Physical(active_size),
-                    });
-                }
-            }
+            );
+            move_previous_active_webview_to_background(
+                &app,
+                previous_active_to_hide.as_deref(),
+                offscreen_pos,
+                active_size,
+            );
             return;
         }
 
@@ -460,30 +502,20 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
         match window.add_child(builder, active_pos, active_size) {
             Ok(webview) => {
                 register_file_drop_handler(&webview);
-                set_badge_monitoring_mode(
+                activate_service_webview(
+                    &app,
                     &webview,
-                    badge_monitoring_pref(&app, &id),
-                    BadgeMonitoringMode::Active,
+                    &id,
+                    active_pos,
+                    active_size,
+                    resource_usage_monitoring_enabled,
                 );
-                set_audio_muted(&webview, service_audio_muted(&app));
-                let _ = webview.show();
-                let _ = webview.set_focus();
-                if let Some(previous_id) = previous_active_to_hide {
-                    if let Some(previous_webview) = app.get_webview(&previous_id) {
-                        set_badge_monitoring_mode(
-                            &previous_webview,
-                            badge_monitoring_pref(&app, &previous_id),
-                            BadgeMonitoringMode::Background,
-                        );
-                        if let Err(e) = previous_webview.eval(resource_usage_monitor_eval_script(false)) {
-                        eprintln!("resource monitor eval failed for {}: {e}", previous_webview.label());
-                    }
-                        let _ = previous_webview.set_bounds(tauri::Rect {
-                            position: tauri::Position::Physical(offscreen_pos),
-                            size: tauri::Size::Physical(active_size),
-                        });
-                    }
-                }
+                move_previous_active_webview_to_background(
+                    &app,
+                    previous_active_to_hide.as_deref(),
+                    offscreen_pos,
+                    active_size,
+                );
             }
             Err(error) => {
                 eprintln!("open_service: webview creation failed for {id}: {error}");

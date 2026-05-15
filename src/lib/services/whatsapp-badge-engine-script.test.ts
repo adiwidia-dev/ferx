@@ -160,6 +160,21 @@ describe("WhatsApp badge engine script", () => {
     expect(reports.at(-1)).toBe("count:5");
   });
 
+  it("does not treat read-chat numeric timestamps as unread badges", async () => {
+    const { reports } = runWhatsAppBadgeScript(`
+      <div id="pane-side">
+        <div role="row" aria-label="Project Team">
+          <span>Project Team</span>
+          <span data-testid="msg-time">1</span>
+        </div>
+      </div>
+    `);
+
+    await flushAsync();
+
+    expect(reports.at(-1)).toBe("clear");
+  });
+
   it("keeps background mode on polling only and attaches DOM observers only while active", async () => {
     const { observers, reports } = runWhatsAppBadgeScript(
       `

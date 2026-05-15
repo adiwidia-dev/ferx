@@ -1,6 +1,6 @@
 use crate::service_runtime::{
-    MicrosoftServiceKind, badge_strategy_for_url, extract_hostname, hostname_matches,
-    microsoft_service_kind,
+    badge_strategy_for_url, extract_hostname, hostname_matches, microsoft_service_kind,
+    MicrosoftServiceKind,
 };
 use crate::service_webview::{
     external_webview_url, injected_js, service_webview_setup,
@@ -16,10 +16,10 @@ use crate::service_webview_runtime_scripts::{
     notification_script, spellcheck_script,
 };
 use crate::webview_commands::{
-    AudioMutedPayload, BadgeMonitoringMode, DeleteWebviewPayload, RightPanelWidthPayload,
-    ServiceWebviewCommandPayload, WebviewIdPayload, badge_monitoring_eval_script,
-    close_all_service_webviews, previous_active_webview_to_hide, report_outlook_badge,
-    report_resource_usage, report_teams_badge, safe_export_file_name, save_workspace_config_export,
+    badge_monitoring_eval_script, close_all_service_webviews, previous_active_webview_to_hide,
+    report_outlook_badge, report_resource_usage, report_teams_badge, safe_export_file_name,
+    save_workspace_config_export, AudioMutedPayload, BadgeMonitoringMode, DeleteWebviewPayload,
+    RightPanelWidthPayload, ServiceWebviewCommandPayload, WebviewIdPayload,
 };
 use crate::window_layout::effective_service_content_size;
 use serde_json::json;
@@ -77,13 +77,19 @@ fn open_service_explicitly_activates_new_child_webviews_on_creation() {
         .find("Err(error) =>")
         .expect("expected open_service child-webview creation error branch");
     let creation_success_branch = &open_service_tail[ok_branch..err_branch];
+    let activate_helper = source
+        .split("fn move_service_webview_to_background")
+        .next()
+        .expect("expected activate_service_webview helper");
 
     assert!(
-        creation_success_branch.contains("webview.show()"),
+        creation_success_branch.contains("activate_service_webview(")
+            && activate_helper.contains("webview.show()"),
         "newly-created service webviews must be shown explicitly on Windows"
     );
     assert!(
-        creation_success_branch.contains("webview.set_focus()"),
+        creation_success_branch.contains("activate_service_webview(")
+            && activate_helper.contains("webview.set_focus()"),
         "newly-created service webviews must be focused explicitly on Windows"
     );
 }
@@ -507,9 +513,7 @@ fn service_webview_setup_accepts_valid_external_urls() {
 
     assert!(!initialization_script.contains("Object.defineProperty(window, 'Notification'"));
     assert!(initialization_script.contains("window.location.href = 'https://ferx.download/?url='"));
-    assert!(
-        initialization_script.contains("window.location.href = 'https://ferx.shortcut/' + key")
-    );
+    assert!(initialization_script.contains("window.location.href = 'https://ferx.shortcut/' + key"));
     assert!(initialization_script.contains("https://ferx.notify/"));
     assert!(initialization_script.contains(".fui-Badge"));
     assert!(!initialization_script.contains("invoke('report_teams_badge'"));
@@ -716,10 +720,8 @@ fn resource_usage_monitor_restores_page_hooks_when_disabled() {
     assert!(script.contains(
         "XMLHttpRequest.prototype.send = window.__ferx_resource_usage_original_xhr_send",
     ));
-    assert!(
-        script
-            .contains("navigator.sendBeacon = window.__ferx_resource_usage_original_send_beacon",)
-    );
+    assert!(script
+        .contains("navigator.sendBeacon = window.__ferx_resource_usage_original_send_beacon",));
     assert!(script.contains("window.__ferx_resource_usage_long_task_observer?.disconnect()",));
 }
 
@@ -729,11 +731,8 @@ fn resource_usage_script_processes_resource_entries_incrementally() {
 
     assert!(script.contains("lastResourceEntryIndex"));
     assert!(script.contains("entries.length < lastResourceEntryIndex"));
-    assert!(
-        script.contains(
-            "for (let index = lastResourceEntryIndex; index < entries.length; index += 1)"
-        )
-    );
+    assert!(script
+        .contains("for (let index = lastResourceEntryIndex; index < entries.length; index += 1)"));
 }
 
 #[test]
@@ -829,10 +828,7 @@ fn gmail_services_use_chromeless_google_auth_user_agent() {
         user_agent_for_url("https://mail.google.com/mail/u/0/"),
         expected
     );
-    assert_eq!(
-        user_agent_for_url("https://chat.google.com/app"),
-        expected
-    );
+    assert_eq!(user_agent_for_url("https://chat.google.com/app"), expected);
     assert_eq!(user_agent_for_url("https://accounts.google.com/"), expected);
 }
 

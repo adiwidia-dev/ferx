@@ -18,6 +18,9 @@ pub(crate) fn press_and_hold_key_popup_enabled() -> bool {
 mod tests {
     #[test]
     fn runtime_default_key_matches_plist_key() {
-        assert_eq!(super::PRESS_AND_HOLD_DEFAULT_KEY, "ApplePressAndHoldEnabled");
+        assert_eq!(
+            super::PRESS_AND_HOLD_DEFAULT_KEY,
+            "ApplePressAndHoldEnabled"
+        );
     }
 }

@@ -17,6 +17,14 @@
             return 1;
         };
 
+        const isTimestampLikeElement = (element) => {
+            if (!element) return false;
+            if (element.closest?.('time')) return true;
+            const label = normalizeText(element.getAttribute?.('aria-label') || element.getAttribute?.('title'));
+            const testId = normalizeText(element.getAttribute?.('data-testid'));
+            return /\b(?:time|date)\b/i.test(label) || /\b(?:time|date)\b/i.test(testId);
+        };
+
         const domUnreadTotal = () => {
             const sidePane = document.querySelector('#pane-side, [aria-label*="Chat list" i], [aria-label*="chat list" i]');
             if (!sidePane) return 0;
@@ -35,6 +43,7 @@
                 }
                 if (rowCount <= 0) {
                     const numericBadge = Array.from(row.querySelectorAll('*')).find((candidate) => {
+                        if (isTimestampLikeElement(candidate)) return false;
                         if (candidate.children.length > 0) return false;
                         return /^\d{1,5}$/.test(normalizeText(candidate.textContent));
                     });

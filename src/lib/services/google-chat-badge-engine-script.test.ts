@@ -178,6 +178,23 @@ describe("Google Chat badge engine script", () => {
     expect(reports.at(-1)).toBe("count:2");
   });
 
+  it("does not treat read-row numeric timestamps as unread badges", async () => {
+    const { reports } = runGoogleChatBadgeScript(`
+      <aside aria-label="Chat navigation">
+        <section aria-label="Direct messages">
+          <div role="listitem" aria-label="Ada Lovelace">
+            <span>Ada Lovelace</span>
+            <time>1</time>
+          </div>
+        </section>
+      </aside>
+    `);
+
+    await flushPromises();
+
+    expect(reports.at(-1)).toBe("clear");
+  });
+
   it("uses Ferdium's legacy Google Chat direct and indirect badge signals as fallbacks", async () => {
     const { reports } = runGoogleChatBadgeScript(`
       <head>
