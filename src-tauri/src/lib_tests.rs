@@ -94,12 +94,10 @@ fn outlook_badge_script_uses_navigation_bridge_payloads() {
         panic!("expected valid outlook setup");
     };
 
-    assert!(script.contains("payload = 'unknown'"));
-    assert!(script.contains("payload = 'clear'"));
+    assert!(script.contains("'clear'"));
     assert!(script.contains("window.__TAURI_INTERNALS__"));
     assert!(script.contains("https://ferx.notify/"));
     assert!(!script.contains("invoke('report_outlook_badge'"));
-    assert!(!script.contains("await emitBadgeState('clear')"));
     assert!(!script.contains("console.info"));
     assert!(!script.contains("console.warn"));
 }
@@ -524,7 +522,6 @@ fn outlook_setup_restores_badge_detection_without_notify_navigation() {
         panic!("expected valid outlook setup");
     };
 
-    assert!(outlook_script.contains("window.__ferx_badge_strategy = 'outlook-folder-dom'"));
     assert!(outlook_script.contains("new MutationObserver"));
     assert!(outlook_script.contains("https://ferx.notify/"));
     assert!(!outlook_script.contains("invoke('report_outlook_badge'"));
@@ -553,7 +550,7 @@ fn outlook_badge_script_uses_screen_reader_and_folder_fallbacks() {
 
 #[test]
 fn outlook_badge_script_keeps_badge_reporting_fallback_and_safety_poll() {
-    let script = outlook_badge_engine_script("outlook-folder-dom");
+    let script = outlook_badge_engine_script();
 
     assert!(script.contains("https://ferx.notify/"));
     assert!(script.contains("MutationObserver"));
@@ -915,7 +912,7 @@ fn extracted_runtime_script_modules_preserve_known_markers() {
 fn extracted_resource_and_badge_script_modules_preserve_known_markers() {
     assert!(resource_usage_monitor_script().contains("https://ferx.resource/"));
     assert!(badge_engine_script("unsupported").contains("https://ferx.notify/"));
-    assert!(outlook_badge_engine_script("outlook-folder-dom").contains("https://ferx.notify/"));
+    assert!(outlook_badge_engine_script().contains("https://ferx.notify/"));
     assert!(teams_badge_engine_script().contains("https://ferx.notify/"));
     assert!(!teams_badge_engine_script().contains("invoke('report_teams_badge'"));
 }

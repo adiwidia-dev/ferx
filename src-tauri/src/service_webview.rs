@@ -109,7 +109,7 @@ fn injected_js_for_url(
         resource_usage_monitor_eval_script(resource_usage_monitoring_enabled),
         common_webview_script(),
         match microsoft_service {
-            Some(MicrosoftServiceKind::Outlook) => outlook_badge_engine_script(strategy_name),
+            Some(MicrosoftServiceKind::Outlook) => outlook_badge_engine_script(),
             Some(MicrosoftServiceKind::Teams) => teams_badge_engine_script(),
             None if strategy_name == "telegram-dom" => telegram_badge_engine_script(),
             None if strategy_name == "google-chat-dom" => google_chat_badge_engine_script(),

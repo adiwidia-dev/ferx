@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
+import scaffoldScript from "../../../src-tauri/scripts/badge_engine_scaffold.js?raw";
 import outlookBadgeEngineScript from "../../../src-tauri/scripts/outlook_badge_engine.js?raw";
 
 type Observation = {
@@ -69,18 +70,23 @@ function runOutlookBadgeScript(bodyMarkup: string, title = "Outlook") {
   window.__TAURI_INTERNALS__ = {};
   window.__ferxBadgeReports = reports;
 
-  const script = outlookBadgeEngineScript
-    .replace(
-      "window.location.href = 'https://ferx.notify/' + payload;",
-      "window.__ferxBadgeReports.push(payload);",
-    )
-      .replace("__FERX_STRATEGY__", "outlook-folder-dom");
-
   const observers = installMutationObserverMock();
-  window.eval(script);
-  vi.runOnlyPendingTimers();
+
+  const patchedScaffold = scaffoldScript.replace(
+    "window.location.href = 'https://ferx.notify/' + payload;",
+    "window.__ferxBadgeReports.push(payload);",
+  );
+  window.eval(patchedScaffold);
+  window.eval(outlookBadgeEngineScript);
 
   return { observers, reports };
+}
+
+async function flushAsync() {
+  for (let i = 0; i < 10; i += 1) {
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+  }
 }
 
 afterEach(() => {
@@ -94,10 +100,11 @@ afterEach(() => {
   delete window.__ferx_badge_monitoring_enabled;
   delete window.__ferx_badge_monitoring_mode;
   delete window.__ferxSetBadgeMonitoringMode;
+  delete (window as Window & { __ferxInitBadgeMonitor?: unknown }).__ferxInitBadgeMonitor;
 });
 
 describe("Outlook badge engine script", () => {
-  it("reports unread mail counts from structured Inbox folder rows", () => {
+  it("reports unread mail counts from structured Inbox folder rows", async () => {
     const { reports } = runOutlookBadgeScript(`
       <div role="tree">
         <div role="treeitem">
@@ -106,11 +113,12 @@ describe("Outlook badge engine script", () => {
         </div>
       </div>
     `);
+    await flushAsync();
 
     expect(reports.at(-1)).toBe("count:5");
   });
 
-  it("does not report unrelated navigation badge counts as Inbox unread mail", () => {
+  it("does not report unrelated navigation badge counts as Inbox unread mail", async () => {
     const { reports } = runOutlookBadgeScript(`
       <div role="tree">
         <div>
@@ -119,11 +127,12 @@ describe("Outlook badge engine script", () => {
         </div>
       </div>
     `);
+    await flushAsync();
 
     expect(reports.at(-1)).toBe("clear");
   });
 
-  it("does not report counts from broad Inbox containers with nested app controls", () => {
+  it("does not report counts from broad Inbox containers with nested app controls", async () => {
     const { reports } = runOutlookBadgeScript(`
       <div role="tree">
         <button>
@@ -133,11 +142,12 @@ describe("Outlook badge engine script", () => {
         </button>
       </div>
     `);
+    await flushAsync();
 
     expect(reports.at(-1)).toBe("clear");
   });
 
-  it("clears stale title counts when the visible Inbox folder has no count", () => {
+  it("clears stale title counts when the visible Inbox folder has no count", async () => {
     const { reports } = runOutlookBadgeScript(`
       <div role="tree">
         <div role="treeitem">
@@ -145,11 +155,12 @@ describe("Outlook badge engine script", () => {
         </div>
       </div>
     `, "(5) Outlook");
+    await flushAsync();
 
     expect(reports.at(-1)).toBe("clear");
   });
 
-  it("starts hidden services in background mode without observing the whole body", () => {
+  it("starts hidden services in background mode without observing the whole body", async () => {
     const { observers } = runOutlookBadgeScript(`
       <main>
         <section>
@@ -157,6 +168,7 @@ describe("Outlook badge engine script", () => {
         </section>
       </main>
     `);
+    await flushAsync();
 
     const bodySubtreeObservations = observers.flatMap((observer) =>
       observer.observations.filter(
@@ -170,7 +182,7 @@ describe("Outlook badge engine script", () => {
     expect(bodySubtreeObservations).toHaveLength(0);
   });
 
-  it("keeps background Outlook badge polling active for tray updates", () => {
+  it("keeps background Outlook badge polling active for tray updates", async () => {
     const { reports } = runOutlookBadgeScript(`
       <div role="tree">
         <div role="treeitem">
@@ -178,6 +190,7 @@ describe("Outlook badge engine script", () => {
         </div>
       </div>
     `);
+    await flushAsync();
 
     expect(reports.at(-1)).toBe("clear");
 
@@ -190,12 +203,13 @@ describe("Outlook badge engine script", () => {
       </div>
     `;
 
-    vi.advanceTimersByTime(15_000);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await flushAsync();
 
     expect(reports.at(-1)).toBe("count:3");
   });
 
-  it("attaches targeted Outlook DOM observers only after switching to active mode", () => {
+  it("attaches targeted Outlook DOM observers only after switching to active mode", async () => {
     const { observers } = runOutlookBadgeScript(`
       <nav aria-label="Folders">
         <div role="treeitem">
@@ -204,6 +218,7 @@ describe("Outlook badge engine script", () => {
         </div>
       </nav>
     `);
+    await flushAsync();
 
     const nav = document.querySelector("nav");
     expect(nav).not.toBeNull();
@@ -214,6 +229,7 @@ describe("Outlook badge engine script", () => {
     ).toBe(false);
 
     window.__ferxSetBadgeMonitoringMode?.("active", true);
+    await flushAsync();
 
     expect(
       observers.some((observer) =>

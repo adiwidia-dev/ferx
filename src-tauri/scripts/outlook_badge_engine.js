@@ -1,29 +1,19 @@
 
     (() => {
-        if (!window.__TAURI_INTERNALS__) return;
+        const normalizeTitle = (title) => (title || '').replace(/[‎‏​-‍]/g, '').trim();
 
-        if (window.__ferx_badge_observers_active) return;
-        window.__ferx_badge_observers_active = true;
+        const safeParseInt = (text) => {
+            const n = parseInt((text || '').trim(), 10);
+            return Number.isFinite(n) && n > 0 ? n : 0;
+        };
 
-        window.__ferx_badge_strategy = '__FERX_STRATEGY__';
-        window.__ferx_last_badge_state = '__ferx:init__';
-        window.__ferx_badge_dom_timer = window.__ferx_badge_dom_timer || null;
-        window.__ferx_badge_monitoring_enabled = window.__ferx_badge_monitoring_enabled ?? true;
-        window.__ferx_badge_monitoring_mode = window.__ferx_badge_monitoring_mode || 'background';
-        let observer = null;
-        let evaluationTimer = null;
-        let observationRetryTimer = null;
-        let safetyPollTimer = null;
-        const BADGE_EVALUATION_DELAY_MS = 300;
-        const BADGE_OBSERVATION_RETRY_MS = 1000;
-        const BADGE_SAFETY_POLL_MS = 15000;
-
-        const observeOptions = {
-            childList: true,
-            subtree: true,
-            characterData: true,
-            attributes: true,
-            attributeFilter: ['aria-label', 'title', 'data-testid', 'class']
+        const uniqueElements = (elements) => {
+            const seen = new Set();
+            return elements.filter((element) => {
+                if (!element || seen.has(element)) return false;
+                seen.add(element);
+                return true;
+            });
         };
 
         const observationSelectors = [
@@ -36,42 +26,24 @@
             '[data-app-section="Mail"]'
         ];
 
-        const uniqueElements = (elements) => {
-            const seen = new Set();
-            return elements.filter((element) => {
-                if (!element || seen.has(element)) {
-                    return false;
-                }
-                seen.add(element);
-                return true;
-            });
-        };
-
         const resolveObservationTargets = () => uniqueElements(
             observationSelectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)))
         );
 
-        const normalizeTitle = (title) => (title || '').replace(/[\u200E\u200F\u200B-\u200D]/g, '').trim();
         const titleCountState = (title) => {
             const normalized = normalizeTitle(title);
             const match = normalized.match(/\((\d+)\)/) || normalized.match(/\[(\d+)\]/) || normalized.match(/^(\d+)\s*(?:unread|baru|new|messages?)/i);
             if (!match) return null;
-
             const count = parseInt(match[1], 10);
             return Number.isFinite(count) && count > 0 ? 'count:' + count : null;
         };
 
-        const safeParseInt = (text) => {
-            const n = parseInt((text || '').trim(), 10);
-            return Number.isFinite(n) && n > 0 ? n : 0;
-        };
-
         const parseOutlookInboxCount = (text) => {
-            const normalized = (text || '').replace(/[\u200E\u200F\u200B-\u200D]/g, ' ').replace(/\s+/g, ' ').trim();
+            const normalized = (text || '').replace(/[‎‏​-‍]/g, ' ').replace(/\s+/g, ' ').trim();
             if (!normalized) return null;
             if (!/(?:\bInbox\b|\bKotak Masuk\b)/i.test(normalized)) return null;
 
-            const separator = String.raw`(?:[\s:·•\-\u2013\u2014|/\\()]*)`;
+            const separator = String.raw`(?:[\s:·•\-–—|/\\()]*)`;
             const afterFolder = normalized.match(new RegExp(String.raw`(?:\bInbox\b|\bKotak Masuk\b)${separator}(\d{1,5})\b`, 'i'));
             const beforeFolder = normalized.match(new RegExp(String.raw`\b(\d{1,5})${separator}(?:\bInbox\b|\bKotak Masuk\b)`, 'i'));
             const match = afterFolder || beforeFolder;
@@ -153,6 +125,35 @@
             return null;
         };
 
+        const outlookVisibleFolderRowState = () => {
+            const roots = resolveObservationTargets();
+            if (roots.length === 0) return null;
+
+            const candidates = uniqueElements(roots.flatMap((root) =>
+                Array.from(root.querySelectorAll('div, span, a, button, li, [tabindex]'))
+            ));
+            let bestCount = null;
+            let sawInboxFolder = false;
+
+            for (const candidate of candidates) {
+                const text = (candidate.innerText || candidate.textContent || '').trim();
+                if (!isCompactVisibleElement(candidate, text)) continue;
+                if (!isLikelyFolderRow(candidate)) continue;
+                if (hasSmallerInboxCandidate(candidate, text)) continue;
+                if (/(?:\bInbox\b|\bKotak Masuk\b)/i.test(text)) {
+                    sawInboxFolder = true;
+                }
+
+                const count = parseOutlookInboxCount(text);
+                if (count !== null) {
+                    bestCount = Math.max(bestCount || 0, count);
+                }
+            }
+
+            if (bestCount !== null) return 'count:' + bestCount;
+            return sawInboxFolder ? 'clear' : null;
+        };
+
         const outlookFolderState = () => {
             const items = document.querySelectorAll([
                 '[role="treeitem"]',
@@ -189,50 +190,6 @@
             return bestCount !== null ? 'count:' + bestCount : null;
         };
 
-        const outlookVisibleFolderRowState = () => {
-            const roots = resolveObservationTargets();
-            if (roots.length === 0) return null;
-
-            const candidates = uniqueElements(roots.flatMap((root) =>
-                Array.from(root.querySelectorAll('div, span, a, button, li, [tabindex]'))
-            ));
-            let bestCount = null;
-            let sawInboxFolder = false;
-
-            for (const candidate of candidates) {
-                const text = (candidate.innerText || candidate.textContent || '').trim();
-                if (!isCompactVisibleElement(candidate, text)) continue;
-                if (!isLikelyFolderRow(candidate)) continue;
-                if (hasSmallerInboxCandidate(candidate, text)) continue;
-                if (/(?:\bInbox\b|\bKotak Masuk\b)/i.test(text)) {
-                    sawInboxFolder = true;
-                }
-
-                const count = parseOutlookInboxCount(text);
-                if (count !== null) {
-                    bestCount = Math.max(bestCount || 0, count);
-                }
-            }
-
-            if (bestCount !== null) return 'count:' + bestCount;
-            return sawInboxFolder ? 'clear' : null;
-        };
-
-        const emitBadgeState = (nextState) => {
-            let payload;
-            if (nextState === 'unknown') {
-                payload = 'unknown';
-            } else if (typeof nextState === 'string' && nextState.startsWith('count:')) {
-                payload = nextState;
-            } else {
-                payload = 'clear';
-            }
-
-            if (payload === window.__ferx_last_badge_state) return;
-            window.__ferx_last_badge_state = payload;
-            window.location.href = 'https://ferx.notify/' + payload;
-        };
-
         const detectors = [
             outlookScreenReaderState,
             outlookVisibleFolderRowState,
@@ -240,194 +197,25 @@
             () => titleCountState(document.title),
         ];
 
-        const evaluateBadgeState = () => {
-            if (!window.__ferx_badge_monitoring_enabled) return;
-            let nextState = 'clear';
-            try {
-                for (const detect of detectors) {
-                    const result = detect();
-                    if (result !== null) { nextState = result; break; }
-                }
-            } catch (_error) {
-                nextState = 'clear';
+        const readState = () => {
+            for (const detect of detectors) {
+                const result = detect();
+                if (result !== null) return result;
             }
-
-            emitBadgeState(nextState);
+            return 'clear';
         };
 
-        const runBadgeEvaluation = () => {
-            if (!window.__ferx_badge_monitoring_enabled) return;
-            evaluateBadgeState();
-        };
-
-        const scheduleBadgeEvaluation = () => {
-            if (!window.__ferx_badge_monitoring_enabled) return;
-
-            if (evaluationTimer !== null) {
-                clearTimeout(evaluationTimer);
-            }
-
-            evaluationTimer = setTimeout(() => {
-                evaluationTimer = null;
-                window.__ferx_badge_dom_timer = null;
-                runBadgeEvaluation();
-            }, BADGE_EVALUATION_DELAY_MS);
-            window.__ferx_badge_dom_timer = evaluationTimer;
-        };
-
-        const startSafetyPoll = () => {
-            if (safetyPollTimer !== null) {
-                clearInterval(safetyPollTimer);
-            }
-
-            safetyPollTimer = setInterval(() => {
-                runBadgeEvaluation();
-            }, BADGE_SAFETY_POLL_MS);
-        };
-
-        const stopSafetyPoll = () => {
-            if (safetyPollTimer !== null) {
-                clearInterval(safetyPollTimer);
-                safetyPollTimer = null;
-            }
-        };
-
-        const isActiveMonitoringMode = () => window.__ferx_badge_monitoring_mode === 'active';
-
-        const clearObservationRetry = () => {
-            if (observationRetryTimer !== null) {
-                clearTimeout(observationRetryTimer);
-                observationRetryTimer = null;
-            }
-        };
-
-        const disconnectDomObserver = () => {
-            if (observer) {
-                observer.disconnect();
-                observer = null;
-            }
-            clearObservationRetry();
-        };
-
-        const scheduleObservationRetry = () => {
-            if (!window.__ferx_badge_monitoring_enabled || !isActiveMonitoringMode()) return;
-            if (observationRetryTimer !== null) return;
-
-            observationRetryTimer = setTimeout(() => {
-                observationRetryTimer = null;
-                observeDom();
-            }, BADGE_OBSERVATION_RETRY_MS);
-        };
-
-        const observeTitle = () => {
-            const bindTitleObserver = () => {
-                const titleEl = document.querySelector('title');
-                if (!titleEl || titleEl.__ferx_title_observer_bound) return false;
-
-                titleEl.__ferx_title_observer_bound = true;
-                new MutationObserver(() => {
-                    if (!window.__ferx_badge_monitoring_enabled) return;
-                    runBadgeEvaluation();
-                }).observe(titleEl, {
-                    childList: true,
-                    subtree: true,
-                    characterData: true
-                });
-                return true;
-            };
-
-            bindTitleObserver();
-
-            const head = document.head || document.documentElement;
-            if (!head) return;
-
-            new MutationObserver(() => {
-                const didBind = bindTitleObserver();
-                if (!didBind) return;
-                if (!window.__ferx_badge_monitoring_enabled) return;
-                runBadgeEvaluation();
-            }).observe(head, {
-                childList: true
-            });
-        };
-
-        const observeDom = () => {
-            disconnectDomObserver();
-
-            if (!window.__ferx_badge_monitoring_enabled || !isActiveMonitoringMode()) return;
-
-            const targets = resolveObservationTargets();
-            if (targets.length === 0) {
-                scheduleObservationRetry();
-                return;
-            }
-
-            observer = new MutationObserver(() => {
-                scheduleBadgeEvaluation();
-            });
-
-            for (const target of targets) {
-                observer.observe(target, observeOptions);
-            }
-        };
-
-        window.__ferxSetBadgeMonitoringMode = (mode, enabled = true) => {
-            window.__ferx_badge_monitoring_mode = mode === 'active' ? 'active' : 'background';
-            window.__ferx_badge_monitoring_enabled = enabled === true;
-            if (!window.__ferx_badge_monitoring_enabled) {
-                disconnectDomObserver();
-
-                if (evaluationTimer !== null) {
-                    clearTimeout(evaluationTimer);
-                    evaluationTimer = null;
-                    window.__ferx_badge_dom_timer = null;
-                }
-
-                stopSafetyPoll();
-                return;
-            }
-
-            startSafetyPoll();
-            if (isActiveMonitoringMode()) {
-                observeDom();
-            } else {
-                disconnectDomObserver();
-            }
-            runBadgeEvaluation();
-        };
-
-        window.__ferxSetBadgeMonitoring = (enabled) => {
-            window.__ferxSetBadgeMonitoringMode(
-                window.__ferx_badge_monitoring_mode,
-                enabled === true
-            );
-        };
-
-        const start = () => {
-            observeTitle();
-            startSafetyPoll();
-            if (isActiveMonitoringMode()) {
-                observeDom();
-            }
-            runBadgeEvaluation();
-        };
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', start, { once: true });
-        } else {
-            start();
-        }
-
-        window.addEventListener('focus', () => {
-            if (!window.__ferx_badge_monitoring_enabled) return;
-            runBadgeEvaluation();
-        });
-        window.addEventListener('hashchange', () => {
-            if (!window.__ferx_badge_monitoring_enabled) return;
-            runBadgeEvaluation();
-        });
-        window.addEventListener('popstate', () => {
-            if (!window.__ferx_badge_monitoring_enabled) return;
-            runBadgeEvaluation();
+        window.__ferxInitBadgeMonitor({
+            readState,
+            resolveObservationTargets,
+            observeOptions: {
+                childList: true,
+                subtree: true,
+                characterData: true,
+                attributes: true,
+                attributeFilter: ['aria-label', 'title', 'data-testid', 'class'],
+            },
+            titleBindingFlag: '__ferx_outlook_title_bound',
+            tauriGuard: true,
         });
     })();
