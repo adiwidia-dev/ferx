@@ -13,3 +13,7 @@ pub(crate) fn teams_badge_engine_script() -> String {
 pub(crate) fn telegram_badge_engine_script() -> String {
     include_str!("../scripts/telegram_badge_engine.js").to_owned()
 }
+
+pub(crate) fn google_chat_badge_engine_script() -> String {
+    include_str!("../scripts/google_chat_badge_engine.js").to_owned()
+}

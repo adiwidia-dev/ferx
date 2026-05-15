@@ -3,8 +3,8 @@ use crate::service_runtime::{
     microsoft_service_kind,
 };
 use crate::service_webview_badge_scripts::{
-    badge_engine_script, outlook_badge_engine_script, teams_badge_engine_script,
-    telegram_badge_engine_script,
+    badge_engine_script, google_chat_badge_engine_script, outlook_badge_engine_script,
+    teams_badge_engine_script, telegram_badge_engine_script,
 };
 use crate::service_webview_resource_usage::resource_usage_monitor_script;
 use crate::service_webview_runtime_scripts::{
@@ -48,6 +48,7 @@ fn is_google_auth_sensitive_service(url: &str) -> bool {
     hostname_matches(&hostname, "gmail.com")
         || hostname_matches(&hostname, "googlemail.com")
         || hostname_matches(&hostname, "mail.google.com")
+        || hostname_matches(&hostname, "chat.google.com")
         || hostname_matches(&hostname, "accounts.google.com")
 }
 
@@ -111,6 +112,7 @@ fn injected_js_for_url(
             Some(MicrosoftServiceKind::Outlook) => outlook_badge_engine_script(strategy_name),
             Some(MicrosoftServiceKind::Teams) => teams_badge_engine_script(),
             None if strategy_name == "telegram-dom" => telegram_badge_engine_script(),
+            None if strategy_name == "google-chat-dom" => google_chat_badge_engine_script(),
             None => badge_engine_script(strategy_name),
         }
     )

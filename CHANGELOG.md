@@ -10,6 +10,8 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ### Fixed
 
+- Let Google Chat use the same Google sign-in compatibility path as Gmail to avoid unsupported-browser sign-in failures.
+- Fixed Google Chat unread badges with an isolated badge monitor for direct-message and space unread indicators.
 - Fixed Telegram unread badges on `web.telegram.org` with an isolated badge monitor that follows Ferx's active/background tray-update lifecycle.
 - Fixed Microsoft Teams badges on `teams.cloud.microsoft` by reporting badge updates through the navigation bridge when remote-webview IPC is unavailable.
 - Fixed Microsoft Teams badge counts being doubled when Teams renders duplicate badge nodes for one navigation item.

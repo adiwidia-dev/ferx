@@ -2,6 +2,7 @@ export type BadgeStrategyName =
   | "title-numeric"
   | "whatsapp-title"
   | "telegram-dom"
+  | "google-chat-dom"
   | "teams-dom"
   | "outlook-folder-dom"
   | "unsupported";
@@ -58,6 +59,10 @@ export function resolveBadgeStrategy(url: string): BadgeStrategyName {
     return "telegram-dom";
   }
 
+  if (matchesHostname(hostname, "chat.google.com")) {
+    return "google-chat-dom";
+  }
+
   return "unsupported";
 }
 
@@ -87,6 +92,7 @@ export function getBadgeCapability(
         usesFallbackPolling: false,
       };
     case "telegram-dom":
+    case "google-chat-dom":
       return {
         kind: "custom-script",
         usesMutationObserver: true,

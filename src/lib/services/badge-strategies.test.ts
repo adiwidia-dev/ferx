@@ -55,6 +55,12 @@ describe("resolveBadgeStrategy", () => {
     );
   });
 
+  it("resolves Google Chat URLs to the Google Chat DOM strategy", () => {
+    expect(resolveBadgeStrategy("https://chat.google.com/app")).toBe(
+      "google-chat-dom",
+    );
+  });
+
   it("falls back conservatively for unknown services", () => {
     expect(resolveBadgeStrategy("https://example.com/app")).toBe("unsupported");
   });
@@ -112,6 +118,15 @@ describe("getBadgeCapability", () => {
 
   it("marks Telegram as an isolated custom DOM script", () => {
     expect(getBadgeCapability("telegram-dom")).toEqual({
+      kind: "custom-script" satisfies BadgeStrategyKind,
+      usesMutationObserver: true,
+      usesTitleObserver: true,
+      usesFallbackPolling: true,
+    });
+  });
+
+  it("marks Google Chat as an isolated custom DOM script", () => {
+    expect(getBadgeCapability("google-chat-dom")).toEqual({
       kind: "custom-script" satisfies BadgeStrategyKind,
       usesMutationObserver: true,
       usesTitleObserver: true,

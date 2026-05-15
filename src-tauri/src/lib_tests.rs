@@ -414,6 +414,10 @@ fn badge_strategy_uses_explicit_hostname_mapping() {
         badge_strategy_for_url("https://web.telegram.org/k/"),
         "telegram-dom"
     );
+    assert_eq!(
+        badge_strategy_for_url("https://chat.google.com/app"),
+        "google-chat-dom"
+    );
     assert_eq!(badge_strategy_for_url("https://example.com"), "unsupported");
     assert_eq!(
         badge_strategy_for_url("https://notwhatsapp.com"),
@@ -829,6 +833,10 @@ fn gmail_services_use_chromeless_google_auth_user_agent() {
         user_agent_for_url("https://mail.google.com/mail/u/0/"),
         expected
     );
+    assert_eq!(
+        user_agent_for_url("https://chat.google.com/app"),
+        expected
+    );
     assert_eq!(user_agent_for_url("https://accounts.google.com/"), expected);
 }
 
@@ -836,6 +844,17 @@ fn gmail_services_use_chromeless_google_auth_user_agent() {
 fn gmail_setup_omits_chrome_google_auth_compat() {
     let Some((_, script)) = service_webview_setup("https://gmail.com/", false) else {
         panic!("expected valid gmail setup");
+    };
+
+    assert!(!script.contains("messageHandlers"));
+    assert!(!script.contains("navigator.userAgentData"));
+    assert!(!script.contains("Google Chrome"));
+}
+
+#[test]
+fn google_chat_setup_omits_chrome_google_auth_compat() {
+    let Some((_, script)) = service_webview_setup("https://chat.google.com/app", false) else {
+        panic!("expected valid google chat setup");
     };
 
     assert!(!script.contains("messageHandlers"));

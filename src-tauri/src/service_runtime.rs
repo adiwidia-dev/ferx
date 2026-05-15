@@ -42,6 +42,13 @@ pub(crate) fn badge_strategy_for_url(url: &str) -> &'static str {
         &extract_hostname(url)
             .unwrap_or_default()
             .to_ascii_lowercase(),
+        "chat.google.com",
+    ) {
+        "google-chat-dom"
+    } else if hostname_matches(
+        &extract_hostname(url)
+            .unwrap_or_default()
+            .to_ascii_lowercase(),
         "web.whatsapp.com",
     ) {
         "whatsapp-title"
