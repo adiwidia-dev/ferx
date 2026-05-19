@@ -10,6 +10,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ### Fixed
 
+- Improved service switching responsiveness by skipping redundant active webview re-activation, reducing overlay hide work to the active webview, and preserving the previous active webview state if a switch fails.
 - Fixed service webviews opening to a blank page during sign-in or app startup by preventing unread badge monitoring from emitting navigation-based clear events before the service app is ready.
 
 ---

@@ -17,8 +17,8 @@ use crate::service_webview_runtime_scripts::{
     notification_script, spellcheck_script,
 };
 use crate::webview_commands::{
-    badge_monitoring_eval_script, close_all_service_webviews, previous_active_webview_to_hide,
-    safe_export_file_name,
+    badge_monitoring_eval_script, close_all_service_webviews, hide_all_webviews_target,
+    open_service_state_transition, previous_active_webview_to_hide, safe_export_file_name,
     save_workspace_config_export, AudioMutedPayload, BadgeMonitoringMode, DeleteWebviewPayload,
     RightPanelWidthPayload, ServiceWebviewCommandPayload, WebviewIdPayload,
 };
@@ -47,6 +47,35 @@ fn previous_active_webview_to_hide_skips_empty_and_same_service() {
         previous_active_webview_to_hide("teams", "outlook"),
         Some("teams".to_string())
     );
+}
+
+#[test]
+fn open_service_state_transition_only_commits_after_activation_success() {
+    assert_eq!(
+        open_service_state_transition("teams", "outlook", false),
+        None
+    );
+
+    let transition = open_service_state_transition("teams", "outlook", true)
+        .expect("successful activation should produce a state transition");
+    assert_eq!(transition.active_webview_id, "outlook");
+    assert_eq!(
+        transition.previous_active_to_hide,
+        Some("teams".to_string())
+    );
+}
+
+#[test]
+fn open_service_state_transition_does_not_hide_same_or_empty_previous_service() {
+    let same_service = open_service_state_transition("outlook", "outlook", true)
+        .expect("successful activation should produce a state transition");
+    assert_eq!(same_service.active_webview_id, "outlook");
+    assert_eq!(same_service.previous_active_to_hide, None);
+
+    let no_previous = open_service_state_transition("", "outlook", true)
+        .expect("successful activation should produce a state transition");
+    assert_eq!(no_previous.active_webview_id, "outlook");
+    assert_eq!(no_previous.previous_active_to_hide, None);
 }
 
 #[test]
@@ -264,27 +293,11 @@ fn hide_all_webviews_moves_child_webviews_offscreen_without_storage_deletion() {
 }
 
 #[test]
-fn hide_all_webviews_only_repositions_the_active_webview() {
-    let source = include_str!("webview_commands.rs");
-    let hide_start = source
-        .find("pub async fn hide_all_webviews")
-        .expect("expected hide_all_webviews command");
-    let next_command = source[hide_start + 1..]
-        .find("#[tauri::command]")
-        .map(|offset| hide_start + 1 + offset)
-        .unwrap_or(source.len());
-    let hide_command = &source[hide_start..next_command];
-
-    // O(1): resolve the single active webview instead of iterating every
-    // child webview. Background webviews are already parked offscreen, so
-    // re-parking all of them on every overlay open is the #3 stall.
-    assert!(
-        hide_command.contains("get_active_webview"),
-        "hide_all_webviews must resolve the active webview"
-    );
-    assert!(
-        !hide_command.contains("for (name, webview) in app.webviews()"),
-        "hide_all_webviews must not iterate every webview (O(N) stall #3 fixes)"
+fn hide_all_webviews_target_is_only_the_active_webview() {
+    assert_eq!(hide_all_webviews_target(""), None);
+    assert_eq!(
+        hide_all_webviews_target("outlook"),
+        Some("outlook".to_string())
     );
 }
 

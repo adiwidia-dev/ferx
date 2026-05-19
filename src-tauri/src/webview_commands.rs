@@ -262,6 +262,38 @@ pub(crate) fn previous_active_webview_to_hide(
     Some(previous_active_id.to_string())
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct OpenServiceStateTransition {
+    pub(crate) active_webview_id: String,
+    pub(crate) previous_active_to_hide: Option<String>,
+}
+
+pub(crate) fn open_service_state_transition(
+    previous_active_id: &str,
+    next_active_id: &str,
+    activated: bool,
+) -> Option<OpenServiceStateTransition> {
+    if !activated {
+        return None;
+    }
+
+    Some(OpenServiceStateTransition {
+        active_webview_id: next_active_id.to_string(),
+        previous_active_to_hide: previous_active_webview_to_hide(
+            previous_active_id,
+            next_active_id,
+        ),
+    })
+}
+
+pub(crate) fn hide_all_webviews_target(active_webview_id: &str) -> Option<String> {
+    if active_webview_id.is_empty() {
+        return None;
+    }
+
+    Some(active_webview_id.to_string())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn hide_all_webviews(app: AppHandle) {
@@ -276,12 +308,12 @@ pub async fn hide_all_webviews(app: AppHandle) {
     clear_active_webview(&app);
     set_active_resource_usage_monitoring(&app, false);
 
-    if previous_active_id.is_empty() {
+    let Some(active_to_hide) = hide_all_webviews_target(&previous_active_id) else {
         return;
-    }
+    };
 
     if let Some(window) = app.get_window("main") {
-        let Some(webview) = app.get_webview(&previous_active_id) else {
+        let Some(webview) = app.get_webview(&active_to_hide) else {
             return;
         };
 
@@ -295,7 +327,7 @@ pub async fn hide_all_webviews(app: AppHandle) {
 
         set_badge_monitoring_mode(
             &webview,
-            badge_monitoring_pref(&app, &previous_active_id),
+            badge_monitoring_pref(&app, &active_to_hide),
             BadgeMonitoringMode::Background,
         );
         let _ = webview.set_bounds(tauri::Rect {
@@ -472,10 +504,6 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
     };
 
     let previous_active_id = get_active_webview(&app);
-    let previous_active_to_hide = previous_active_webview_to_hide(&previous_active_id, &id);
-    set_active_webview(&app, id.clone());
-    set_badge_monitoring_pref(&app, &id, badge_monitoring_enabled);
-    set_active_resource_usage_monitoring(&app, resource_usage_monitoring_enabled);
 
     if let Some(window) = app.get_window("main") {
         let scale_factor = window.scale_factor().unwrap_or(1.0);
@@ -496,6 +524,8 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
         let offscreen_pos = PhysicalPosition::new(-10000, -10000);
 
         if let Some(active_webview) = app.get_webview(&id) {
+            set_badge_monitoring_pref(&app, &id, badge_monitoring_enabled);
+            set_active_resource_usage_monitoring(&app, resource_usage_monitoring_enabled);
             activate_service_webview(
                 &app,
                 &active_webview,
@@ -504,18 +534,24 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
                 active_size,
                 resource_usage_monitoring_enabled,
             );
-            move_previous_active_webview_to_background(
-                &app,
-                previous_active_to_hide.as_deref(),
-                offscreen_pos,
-                active_size,
-            );
+            if let Some(transition) = open_service_state_transition(&previous_active_id, &id, true)
+            {
+                set_active_webview(&app, transition.active_webview_id);
+                move_previous_active_webview_to_background(
+                    &app,
+                    transition.previous_active_to_hide.as_deref(),
+                    offscreen_pos,
+                    active_size,
+                );
+            }
             return;
         }
 
         match window.add_child(builder, active_pos, active_size) {
             Ok(webview) => {
                 register_file_drop_handler(&webview);
+                set_badge_monitoring_pref(&app, &id, badge_monitoring_enabled);
+                set_active_resource_usage_monitoring(&app, resource_usage_monitoring_enabled);
                 activate_service_webview(
                     &app,
                     &webview,
@@ -524,12 +560,17 @@ pub async fn open_service(app: tauri::AppHandle, payload: ServiceWebviewCommandP
                     active_size,
                     resource_usage_monitoring_enabled,
                 );
-                move_previous_active_webview_to_background(
-                    &app,
-                    previous_active_to_hide.as_deref(),
-                    offscreen_pos,
-                    active_size,
-                );
+                if let Some(transition) =
+                    open_service_state_transition(&previous_active_id, &id, true)
+                {
+                    set_active_webview(&app, transition.active_webview_id);
+                    move_previous_active_webview_to_background(
+                        &app,
+                        transition.previous_active_to_hide.as_deref(),
+                        offscreen_pos,
+                        active_size,
+                    );
+                }
             }
             Err(error) => {
                 eprintln!("open_service: webview creation failed for {id}: {error}");
