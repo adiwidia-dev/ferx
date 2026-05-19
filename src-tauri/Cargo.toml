@@ -50,7 +50,10 @@ panic = "abort"
 lto = "fat"
 codegen-units = 1
 strip = "symbols"
-opt-level = "s"
+# The ferx crate itself is small relative to its deps; optimise it for speed
+# (hot paths: webview command handling, badge parsing, layout math). Transitive
+# deps stay at "s" via [profile.release.package."*"] so the binary stays lean.
+opt-level = 2
 debug = false
 incremental = false
 overflow-checks = false
