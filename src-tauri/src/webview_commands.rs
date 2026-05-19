@@ -89,7 +89,7 @@ pub(crate) fn badge_monitoring_eval_script(enabled: bool, mode: BadgeMonitoringM
 }
 
 fn set_badge_monitoring_mode(webview: &tauri::Webview, enabled: bool, mode: BadgeMonitoringMode) {
-    if let Err(e) = webview.eval(format!("{}", badge_monitoring_eval_script(enabled, mode))) {
+    if let Err(e) = webview.eval(badge_monitoring_eval_script(enabled, mode)) {
         eprintln!("badge monitoring eval failed for {}: {e}", webview.label());
     }
 }
@@ -163,6 +163,9 @@ fn move_previous_active_webview_to_background(
     }
 }
 
+// Builder inputs map 1:1 to the service webview command payload fields; a
+// params struct here would just mirror that payload without adding clarity.
+#[allow(clippy::too_many_arguments)]
 fn service_webview_builder(
     app: &AppHandle,
     command_name: &str,
