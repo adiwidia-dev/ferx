@@ -13,11 +13,14 @@ import {
 import WorkspacePage from "./+page.svelte";
 
 const invoke = vi.hoisted(() => vi.fn());
-const listen = vi.hoisted(() =>
-  vi.fn((_event: string, _callback: (event: { payload: unknown }) => void) =>
-    Promise.resolve(() => {}),
-  ),
-);
+const listen = vi.hoisted(() => {
+  const handlers: Record<string, (event: { payload: unknown }) => void> = {};
+  const fn = vi.fn((event: string, callback: (event: { payload: unknown }) => void) => {
+    handlers[event] = callback;
+    return Promise.resolve(() => {});
+  });
+  return Object.assign(fn, { handlers });
+});
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke,
@@ -507,6 +510,63 @@ describe("workspace switching webview commands", () => {
     await settle();
 
     expect(document.querySelector('[title="Turn Off Do Not Disturb"]')).toBeTruthy();
+
+    await unmountPage(component);
+  });
+});
+
+describe("switching effect re-activation guard (#2)", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    localStorage.clear();
+    invoke.mockReset();
+    // Other suites call listen.mockImplementation(); mockClear() does NOT
+    // restore the original capturing impl, so re-establish it here.
+    listen.mockReset();
+    for (const key of Object.keys(listen.handlers)) delete listen.handlers[key];
+    listen.mockImplementation((event: string, callback: (event: { payload: unknown }) => void) => {
+      listen.handlers[event] = callback;
+      return Promise.resolve(() => {});
+    });
+    clearDndState();
+    clearRuntimeBadges();
+  });
+
+  it("does not re-invoke open_service when a notification pref of the active service is toggled", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+    invoke.mockResolvedValue(undefined);
+
+    const component = mount(WorkspacePage, { target: document.body });
+    await settle();
+
+    const openCallsBefore = invoke.mock.calls.filter((c) => c[0] === "open_service").length;
+    expect(openCallsBefore).toBeGreaterThan(0); // initial activation happened
+
+    // Simulate the context-menu "toggle-badge" on the active service.
+    listen.handlers["menu-action"]({ payload: "toggle-badge:youtube" });
+    await settle();
+
+    const openCallsAfter = invoke.mock.calls.filter((c) => c[0] === "open_service").length;
+    expect(openCallsAfter).toBe(openCallsBefore); // NO spurious re-activation
+
+    await unmountPage(component);
+  });
+
+  it("still re-invokes open_service when switching to a different service", async () => {
+    const state = createWorkspaceState();
+    state.workspaces[0].serviceIds = ["youtube", "gemini"];
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(state));
+    invoke.mockResolvedValue(undefined);
+
+    const component = mount(WorkspacePage, { target: document.body });
+    await settle();
+    const before = invoke.mock.calls.filter((c) => c[0] === "open_service").length;
+
+    document.querySelector<HTMLButtonElement>('button[title^="Gemini"]')?.click();
+    await settle();
+
+    const after = invoke.mock.calls.filter((c) => c[0] === "open_service").length;
+    expect(after).toBe(before + 1);
 
     await unmountPage(component);
   });

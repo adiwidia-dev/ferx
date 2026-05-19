@@ -39,6 +39,7 @@
     runtimeBadges,
   } from "$lib/services/runtime-badges.svelte";
   import {
+    computeActivationKey,
     consumeOpenServiceParam,
     createDebouncedStorageWriter,
     MAX_BACKGROUND_PRELOADS,
@@ -153,6 +154,7 @@
   );
   let lastTrayUnreadState: boolean | null = null;
   let lastAppliedDndAudioState: boolean | null = null;
+  let lastActivationKey: string | null = null;
 
   // ---------------------------------------------------------------------------
   // Effects
@@ -193,15 +195,31 @@
   });
 
   $effect(() => {
-    if (
+    const shouldHide =
       serviceEditor.isOpen ||
       isWorkspaceSwitcherOpen ||
       isCurrentWorkspaceDisabled ||
-      (activeService && activeService.disabled)
-    ) {
+      (activeService != null && activeService.disabled === true);
+
+    const showService =
+      !shouldHide && activeService && !activeService.disabled ? activeService : null;
+
+    const activationKey = computeActivationKey({
+      shouldHide,
+      activeServiceId: showService?.id ?? "",
+      activeServiceUrl: showService?.url ?? "",
+      activeServiceStorageKey: showService?.storageKey ?? "",
+      spellCheckEnabled,
+      resourceUsageMonitoringEnabled,
+    });
+
+    if (activationKey === lastActivationKey) return;
+    lastActivationKey = activationKey;
+
+    if (shouldHide) {
       webviewCommands.run(hideAllWebviews);
-    } else if (activeService && !activeService.disabled) {
-      const service = activeService;
+    } else if (showService) {
+      const service = showService;
       webviewCommands.run(
         () => openServiceWebview(service, spellCheckEnabled, resourceUsageMonitoringEnabled),
         { interruptible: true },
