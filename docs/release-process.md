@@ -74,12 +74,15 @@ cargo check --manifest-path src-tauri/Cargo.toml --lib
 
 ### Step 4 — Verify the checks still pass
 
-Same three commands the CI runs:
+Run the same checks CI runs:
 
 ```bash
 yarn run check
 yarn test --run
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo test --manifest-path src-tauri/Cargo.toml --lib
+cargo test --manifest-path src-tauri/Cargo.toml --lib tauri_commands_typescript_is_up_to_date
+git diff --exit-code src/lib/tauri-commands.ts
 ```
 
 If any of these fail, fix them before proceeding.
@@ -237,7 +240,12 @@ yarn bump-version X.Y.Z
 git checkout main && git pull --ff-only
 git checkout -b release/vX.Y.Z
 yarn bump-version X.Y.Z
-yarn run check && yarn test --run && cargo test --manifest-path src-tauri/Cargo.toml --lib
+yarn run check
+yarn test --run
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+cargo test --manifest-path src-tauri/Cargo.toml --lib
+cargo test --manifest-path src-tauri/Cargo.toml --lib tauri_commands_typescript_is_up_to_date
+git diff --exit-code src/lib/tauri-commands.ts
 git commit -am "chore(release): X.Y.Z"
 git push -u origin release/vX.Y.Z
 # ...open PR, merge to main...
@@ -248,6 +256,6 @@ git push origin vX.Y.Z
 
 ## Related docs
 
-- [Architecture Notes](./architecture.md) — section 6 describes the updater internals.
+- [Architecture Notes](./architecture.md) — section 7 describes the updater internals.
 - [`.github/workflows/release.yml`](../.github/workflows/release.yml) — the actual release workflow.
 - [`scripts/bump-version.mjs`](../scripts/bump-version.mjs) — the version bump script.

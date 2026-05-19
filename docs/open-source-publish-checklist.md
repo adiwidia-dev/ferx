@@ -8,16 +8,18 @@
 
 ## Manual Validation
 
-- Run the local manual smoke-test pass for the current macOS-focused app behavior.
+- Run the local manual smoke-test pass for the current app behavior on the platforms you intend to announce for the release.
 - Confirm the invalid service URL path fails safely.
 - Confirm editing a service URL updates the live service behavior.
 - Confirm disabling a service unloads it rather than leaving it live in the background.
+- Confirm opening overlays such as the service editor, workspace switcher, and todos panel moves the active service webview offscreen without closing or reloading it.
+- Confirm switching between already-loaded services does not steal focus or re-activate the current service when unrelated workspace preferences change.
 - Confirm persisted service state still recovers correctly after restart.
 
 ## CI Expectations
 
 - Confirm `.github/workflows/ci.yml` exists and targets `main` on `push` and `pull_request`.
-- Confirm the CI workflow runs `yarn run check`, `yarn test --run`, and `cargo test --manifest-path src-tauri/Cargo.toml --lib`.
+- Confirm the CI workflow runs `yarn run check`, `yarn test --run`, `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check`, `cargo test --manifest-path src-tauri/Cargo.toml --lib`, and the generated Tauri command freshness check.
 - If CI is already enabled on GitHub, confirm the latest run is green before announcing the repo push as ready.
 
 ## GitHub Settings
