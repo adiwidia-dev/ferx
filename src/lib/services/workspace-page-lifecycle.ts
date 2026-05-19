@@ -15,6 +15,7 @@ import {
   setWorkspaceActiveService,
   type WorkspaceGroupsState,
 } from "$lib/services/workspace-groups";
+import type { PageService } from "$lib/services/workspace-state";
 
 export const WORKSPACE_SAVE_DEBOUNCE_MS = 1200;
 export const PRELOAD_START_MS = 2000;
@@ -213,4 +214,58 @@ export function computeActivationKey(inputs: ActivationInputs): string {
     inputs.spellCheckEnabled ? "1" : "0",
     inputs.resourceUsageMonitoringEnabled ? "1" : "0",
   ].join(" ");
+}
+
+export type DisplayService = PageService & {
+  disabled: boolean | undefined;
+  badge: number | undefined;
+};
+
+/**
+ * Projects services into the sidebar view-model while preserving object
+ * references for services whose source object, effective-disabled state and
+ * badge are all unchanged. A single badge tick mutates one entry of the
+ * `runtimeBadges` map; without this cache, `$derived` would rebuild the whole
+ * array and every keyed sidebar item would re-render. With it, only the
+ * changed service gets a new object so only that item re-renders.
+ */
+export function createDisplayServicesProjector() {
+  type Entry = {
+    src: PageService;
+    disabled: boolean | undefined;
+    badge: number | undefined;
+    out: DisplayService;
+  };
+  let cache = new Map<string, Entry>();
+
+  return (
+    services: PageService[],
+    isWorkspaceDisabled: boolean,
+    badges: Record<string, number | undefined>,
+  ): DisplayService[] => {
+    const next = new Map<string, Entry>();
+
+    const result = services.map((service) => {
+      const disabled = isWorkspaceDisabled || service.disabled;
+      const badge = badges[service.id];
+      const prev = cache.get(service.id);
+
+      if (prev && prev.src === service && prev.disabled === disabled && prev.badge === badge) {
+        next.set(service.id, prev);
+        return prev.out;
+      }
+
+      const entry: Entry = {
+        src: service,
+        disabled,
+        badge,
+        out: { ...service, disabled, badge },
+      };
+      next.set(service.id, entry);
+      return entry.out;
+    });
+
+    cache = next;
+    return result;
+  };
 }

@@ -42,6 +42,7 @@
     computeActivationKey,
     consumeOpenServiceParam,
     createDebouncedStorageWriter,
+    createDisplayServicesProjector,
     MAX_BACKGROUND_PRELOADS,
     PRELOAD_GAP_MS,
     PRELOAD_START_MS,
@@ -133,12 +134,9 @@
   let services = $derived(getWorkspaceServices(workspaceState));
   let activeId = $derived(currentWorkspace?.activeServiceId ?? "");
   let isCurrentWorkspaceDisabled = $derived(currentWorkspace?.disabled === true);
+  const projectDisplayServices = createDisplayServicesProjector();
   let displayServices = $derived(
-    services.map((service) => ({
-      ...service,
-      disabled: isCurrentWorkspaceDisabled || service.disabled,
-      badge: runtimeBadges[service.id],
-    })),
+    projectDisplayServices(services, isCurrentWorkspaceDisabled, runtimeBadges),
   );
   let resourceUsageSnapshots = $state<Record<string, ResourceUsageSnapshot | undefined>>({});
   let activeService = $derived.by(() => {
@@ -337,7 +335,7 @@
       if (!targetId || !services.some((service) => service.id === targetId)) return;
       const snapshot = parseResourceUsagePayload(targetId, payload);
       if (!snapshot) return;
-      resourceUsageSnapshots = { ...resourceUsageSnapshots, [targetId]: snapshot };
+      resourceUsageSnapshots[targetId] = snapshot;
     });
 
     const unlistenShortcutPromise = listen("switch-shortcut", (event) => {
