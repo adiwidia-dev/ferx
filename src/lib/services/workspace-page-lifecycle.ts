@@ -181,3 +181,36 @@ export const WORKSPACE_PAGE_STORAGE_KEYS = {
   appSettings: APP_SETTINGS_STORAGE_KEY,
   todoNotes: TODO_NOTES_STORAGE_KEY,
 } as const;
+
+export type ActivationInputs = {
+  shouldHide: boolean;
+  activeServiceId: string;
+  activeServiceUrl: string;
+  activeServiceStorageKey: string;
+  spellCheckEnabled: boolean;
+  resourceUsageMonitoringEnabled: boolean;
+};
+
+/**
+ * Stable key describing what the switching effect would do. Equal keys mean
+ * the effect's action would be identical, so it can be skipped — this removes
+ * the spurious re-activation (focus steal + stutter) on unrelated workspace
+ * mutations. url + storageKey are included so an edit to the *active* service
+ * (which deletes+recreates its webview) still re-activates it.
+ */
+export function computeActivationKey(inputs: ActivationInputs): string {
+  if (inputs.shouldHide) {
+    return "hide";
+  }
+  if (!inputs.activeServiceId) {
+    return "none";
+  }
+  return [
+    "show",
+    inputs.activeServiceId,
+    inputs.activeServiceUrl,
+    inputs.activeServiceStorageKey,
+    inputs.spellCheckEnabled ? "1" : "0",
+    inputs.resourceUsageMonitoringEnabled ? "1" : "0",
+  ].join(" ");
+}

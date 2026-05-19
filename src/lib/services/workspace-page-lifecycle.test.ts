@@ -11,6 +11,7 @@ import {
 } from "$lib/services/workspace-groups";
 
 import {
+  computeActivationKey,
   consumeOpenServiceParam,
   createDebouncedStorageWriter,
   MAX_BACKGROUND_PRELOADS,
@@ -184,5 +185,63 @@ describe("startup storage keys", () => {
     expect(WORKSPACES_STATE_KEY).toBe("ferx-workspaces-state");
     expect(APP_SETTINGS_STORAGE_KEY).toBe("ferx-app-settings");
     expect(TODO_NOTES_STORAGE_KEY).toBe("ferx-todo-notes");
+  });
+});
+
+describe("computeActivationKey", () => {
+  const base = {
+    shouldHide: false,
+    activeServiceId: "slack",
+    activeServiceUrl: "https://app.slack.com/client",
+    activeServiceStorageKey: "storage-slack",
+    spellCheckEnabled: true,
+    resourceUsageMonitoringEnabled: false,
+  };
+
+  it("returns a stable 'hide' key whenever shouldHide is set, ignoring other fields", () => {
+    expect(computeActivationKey({ ...base, shouldHide: true })).toBe("hide");
+    expect(
+      computeActivationKey({
+        ...base,
+        shouldHide: true,
+        activeServiceId: "other",
+        activeServiceUrl: "https://x.test/",
+      }),
+    ).toBe("hide");
+  });
+
+  it("returns 'none' when not hiding and there is no active service", () => {
+    expect(computeActivationKey({ ...base, activeServiceId: "" })).toBe("none");
+  });
+
+  it("changes when the active service id changes", () => {
+    expect(computeActivationKey(base)).not.toBe(
+      computeActivationKey({ ...base, activeServiceId: "youtube" }),
+    );
+  });
+
+  it("changes when the active service URL changes (active-service edit case)", () => {
+    expect(computeActivationKey(base)).not.toBe(
+      computeActivationKey({ ...base, activeServiceUrl: "https://app.slack.com/client/T2" }),
+    );
+  });
+
+  it("changes when the active service storageKey changes", () => {
+    expect(computeActivationKey(base)).not.toBe(
+      computeActivationKey({ ...base, activeServiceStorageKey: "storage-slack-2" }),
+    );
+  });
+
+  it("changes when spellCheckEnabled or resourceUsageMonitoringEnabled changes", () => {
+    expect(computeActivationKey(base)).not.toBe(
+      computeActivationKey({ ...base, spellCheckEnabled: false }),
+    );
+    expect(computeActivationKey(base)).not.toBe(
+      computeActivationKey({ ...base, resourceUsageMonitoringEnabled: true }),
+    );
+  });
+
+  it("is stable when only notification-pref-like fields (not in inputs) would change", () => {
+    expect(computeActivationKey(base)).toBe(computeActivationKey({ ...base }));
   });
 });
