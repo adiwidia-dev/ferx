@@ -276,6 +276,31 @@ fn hide_all_webviews_moves_child_webviews_offscreen_without_storage_deletion() {
 }
 
 #[test]
+fn hide_all_webviews_only_repositions_the_active_webview() {
+    let source = include_str!("webview_commands.rs");
+    let hide_start = source
+        .find("pub async fn hide_all_webviews")
+        .expect("expected hide_all_webviews command");
+    let next_command = source[hide_start + 1..]
+        .find("#[tauri::command]")
+        .map(|offset| hide_start + 1 + offset)
+        .unwrap_or(source.len());
+    let hide_command = &source[hide_start..next_command];
+
+    // O(1): resolve the single active webview instead of iterating every
+    // child webview. Background webviews are already parked offscreen, so
+    // re-parking all of them on every overlay open is the #3 stall.
+    assert!(
+        hide_command.contains("get_active_webview"),
+        "hide_all_webviews must resolve the active webview"
+    );
+    assert!(
+        !hide_command.contains("for (name, webview) in app.webviews()"),
+        "hide_all_webviews must not iterate every webview (O(N) stall #3 fixes)"
+    );
+}
+
+#[test]
 fn service_webview_command_payload_deserializes_from_camel_case() {
     let payload: ServiceWebviewCommandPayload = serde_json::from_value(json!({
         "id": "chat",

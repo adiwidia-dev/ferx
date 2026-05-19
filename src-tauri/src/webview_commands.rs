@@ -265,10 +265,24 @@ pub(crate) fn previous_active_webview_to_hide(
 pub async fn hide_all_webviews(app: AppHandle) {
     use tauri::PhysicalPosition;
 
+    // Only the active webview is ever on-screen / in active badge mode — every
+    // other child webview is already parked offscreen in background mode (see
+    // `move_service_webview_to_background` / `load_service`). So hiding all
+    // webviews only needs to touch the single active one. This keeps overlay
+    // open (workspace switcher / editor / todos) O(1) instead of O(N).
+    let previous_active_id = get_active_webview(&app);
     clear_active_webview(&app);
     set_active_resource_usage_monitoring(&app, false);
 
+    if previous_active_id.is_empty() {
+        return;
+    }
+
     if let Some(window) = app.get_window("main") {
+        let Some(webview) = app.get_webview(&previous_active_id) else {
+            return;
+        };
+
         let scale_factor = window.scale_factor().unwrap_or(1.0);
         let physical_size = window.inner_size().unwrap_or_default();
         let sidebar_width = sidebar_physical_width(scale_factor);
@@ -277,19 +291,15 @@ pub async fn hide_all_webviews(app: AppHandle) {
         let offscreen_size =
             effective_service_content_size(physical_size, sidebar_width, 0, right_panel_width);
 
-        for (name, webview) in app.webviews() {
-            if name != "main" {
-                set_badge_monitoring_mode(
-                    &webview,
-                    badge_monitoring_pref(&app, &name),
-                    BadgeMonitoringMode::Background,
-                );
-                let _ = webview.set_bounds(tauri::Rect {
-                    position: tauri::Position::Physical(PhysicalPosition::new(-10000, -10000)),
-                    size: tauri::Size::Physical(offscreen_size),
-                });
-            }
-        }
+        set_badge_monitoring_mode(
+            &webview,
+            badge_monitoring_pref(&app, &previous_active_id),
+            BadgeMonitoringMode::Background,
+        );
+        let _ = webview.set_bounds(tauri::Rect {
+            position: tauri::Position::Physical(PhysicalPosition::new(-10000, -10000)),
+            size: tauri::Size::Physical(offscreen_size),
+        });
     }
 }
 
