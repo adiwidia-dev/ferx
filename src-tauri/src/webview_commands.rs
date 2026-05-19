@@ -6,7 +6,6 @@ use crate::app_state::{
 };
 use crate::download_dialog::handle_service_webview_download;
 use crate::file_drop::register_file_drop_handler;
-use crate::navigation_bridge::emit_badge_update;
 use crate::navigation_bridge::handle_special_navigation;
 use crate::service_storage::{data_store_identifier_for_storage_key, session_dir_for_storage_key};
 use crate::service_webview::{
@@ -389,29 +388,6 @@ pub async fn reload_webview(app: AppHandle, payload: WebviewIdPayload) {
 
     if let Some(webview) = app.get_webview(&id) {
         let _ = webview.reload();
-    }
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn report_outlook_badge(app: AppHandle, webview: tauri::Webview, payload: String) {
-    emit_badge_update(&app, webview.label(), &payload);
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn report_teams_badge(app: AppHandle, webview: tauri::Webview, payload: String) {
-    emit_badge_update(&app, webview.label(), &payload);
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn report_resource_usage(app: AppHandle, webview: tauri::Webview, payload: String) {
-    if let Err(e) = app.emit(
-        "resource-usage-update",
-        format!("{}:{payload}", webview.label()),
-    ) {
-        eprintln!("resource-usage-update emit failed: {e}");
     }
 }
 

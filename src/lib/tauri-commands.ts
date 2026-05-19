@@ -43,15 +43,6 @@ async restartApp() : Promise<Result<null, string>> {
 async reloadWebview(payload: WebviewIdPayload) : Promise<void> {
     await TAURI_INVOKE("reload_webview", { payload });
 },
-async reportOutlookBadge(payload: string) : Promise<void> {
-    await TAURI_INVOKE("report_outlook_badge", { payload });
-},
-async reportTeamsBadge(payload: string) : Promise<void> {
-    await TAURI_INVOKE("report_teams_badge", { payload });
-},
-async reportResourceUsage(payload: string) : Promise<void> {
-    await TAURI_INVOKE("report_resource_usage", { payload });
-},
 async closeWebview(payload: WebviewIdPayload) : Promise<void> {
     await TAURI_INVOKE("close_webview", { payload });
 },

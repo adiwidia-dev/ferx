@@ -18,7 +18,7 @@ use crate::service_webview_runtime_scripts::{
 };
 use crate::webview_commands::{
     badge_monitoring_eval_script, close_all_service_webviews, previous_active_webview_to_hide,
-    report_outlook_badge, report_resource_usage, report_teams_badge, safe_export_file_name,
+    safe_export_file_name,
     save_workspace_config_export, AudioMutedPayload, BadgeMonitoringMode, DeleteWebviewPayload,
     RightPanelWidthPayload, ServiceWebviewCommandPayload, WebviewIdPayload,
 };
@@ -107,16 +107,6 @@ fn outlook_badge_script_uses_navigation_bridge_payloads() {
     assert!(!script.contains("invoke('report_outlook_badge'"));
     assert!(!script.contains("console.info"));
     assert!(!script.contains("console.warn"));
-}
-
-#[test]
-fn report_outlook_badge_uses_child_webview_context_type() {
-    let _: fn(tauri::AppHandle, tauri::Webview, String) = report_outlook_badge;
-}
-
-#[test]
-fn report_teams_badge_uses_child_webview_context_type() {
-    let _: fn(tauri::AppHandle, tauri::Webview, String) = report_teams_badge;
 }
 
 #[test]
@@ -218,8 +208,6 @@ fn assert_command_signatures() {
     let _: fn() = || {
         let _ = save_workspace_config_export;
     };
-    // report_resource_usage: (AppHandle, Webview, String) → ()
-    let _: fn(tauri::AppHandle, tauri::Webview, String) = report_resource_usage;
 }
 
 #[test]
