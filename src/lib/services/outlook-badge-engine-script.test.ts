@@ -4,15 +4,21 @@ import outlookBadgeEngineScript from "../../../src-tauri/scripts/outlook_badge_e
 import {
   cleanupBadgeTestGlobals,
   flushBadgeAsync,
+  reconfigureJsdomUrl,
   runBadgeEngineScript,
 } from "./badge-engine-test-utils";
 
-function runOutlookBadgeScript(bodyMarkup: string, title = "Outlook") {
+function runOutlookBadgeScript(
+  bodyMarkup: string,
+  title = "Outlook",
+  url = "https://outlook.office.com/mail/",
+) {
   return runBadgeEngineScript({
     bodyMarkup,
     title,
     engineScript: outlookBadgeEngineScript,
     beforeEvaluate: () => {
+      reconfigureJsdomUrl(url);
       Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
         configurable: true,
         value: () => ({ width: 120, height: 24 }),
@@ -24,6 +30,34 @@ function runOutlookBadgeScript(bodyMarkup: string, title = "Outlook") {
 afterEach(cleanupBadgeTestGlobals);
 
 describe("Outlook badge engine script", () => {
+  it("does not initialize on Microsoft sign-in pages", async () => {
+    const { reports, observers } = runOutlookBadgeScript(
+      `
+        <main>
+          <input type="email" autocomplete="username" />
+        </main>
+      `,
+      "Sign in to your account",
+      "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    );
+    await flushBadgeAsync();
+
+    expect(reports).toHaveLength(0);
+    expect(observers).toHaveLength(0);
+    expect(window.__ferx_badge_observers_active).toBeUndefined();
+  });
+
+  it("does not emit an initial clear while Outlook is still loading", async () => {
+    const { reports } = runOutlookBadgeScript(`
+      <main>
+        <div id="app-loading"></div>
+      </main>
+    `);
+    await flushBadgeAsync();
+
+    expect(reports).toHaveLength(0);
+  });
+
   it("reports unread mail counts from structured Inbox folder rows", async () => {
     const { reports } = runOutlookBadgeScript(`
       <div role="tree">

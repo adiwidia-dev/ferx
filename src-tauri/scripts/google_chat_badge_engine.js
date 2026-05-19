@@ -1,5 +1,11 @@
 
     (() => {
+        const hostnameMatches = (hostname, expectedHost) => {
+            const host = (hostname || '').toLowerCase();
+            return host === expectedHost || host.endsWith('.' + expectedHost);
+        };
+        if (!hostnameMatches(window.location.hostname, 'chat.google.com')) return;
+
         const {
             normalizeText,
             safePositiveInt: safeParseInt,
@@ -25,6 +31,9 @@
 
         const rowSelector = '[role="listitem"], [role="treeitem"], [role="link"], [data-item-id], [data-conversation-id], [data-space-id]';
         const sectionSelector = '[aria-label*="Direct messages" i], [aria-label*="Spaces" i]';
+        const shellSelector = 'aside[aria-label*="Chat" i], [role="navigation"], nav, ' + sectionSelector;
+
+        const hasGoogleChatAppShell = () => Boolean(document.querySelector(shellSelector));
 
         const unreadCountFromElementLabels = (root) => {
             let maxNumericCount = 0;
@@ -156,11 +165,12 @@
                 const legacyTotal = legacyFerdiumUnreadCount();
                 if (legacyTotal > 0) return 'count:' + legacyTotal;
                 const titleTotal = titleCount();
-                return titleTotal > 0 ? 'count:' + titleTotal : 'clear';
+                if (titleTotal > 0) return 'count:' + titleTotal;
+                return hasGoogleChatAppShell() ? 'clear' : 'pending';
             },
             resolveObservationTargets: () => {
                 const targets = Array.from(document.querySelectorAll(
-                    'aside[aria-label*="Chat" i], [role="navigation"], nav, [aria-label*="Direct messages" i], [aria-label*="Spaces" i]'
+                    shellSelector
                 ));
                 if (targets.length > 0) return targets;
                 const fallback = document.body || document.documentElement;

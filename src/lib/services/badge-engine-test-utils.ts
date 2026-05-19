@@ -55,6 +55,14 @@ export function installMutationObserverMock() {
   return observers;
 }
 
+export function reconfigureJsdomUrl(url: string) {
+  (
+    globalThis as typeof globalThis & {
+      jsdom?: { reconfigure: (options: { url: string }) => void };
+    }
+  ).jsdom?.reconfigure({ url });
+}
+
 export function runBadgeEngineScript({
   bodyMarkup,
   engineScript,

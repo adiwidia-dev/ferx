@@ -4,20 +4,52 @@ import telegramBadgeEngineScript from "../../../src-tauri/scripts/telegram_badge
 import {
   cleanupBadgeTestGlobals,
   flushBadgeAsync,
+  reconfigureJsdomUrl,
   runBadgeEngineScript,
 } from "./badge-engine-test-utils";
 
-function runTelegramBadgeScript(bodyMarkup: string, initialTitle = "Telegram") {
+function runTelegramBadgeScript(
+  bodyMarkup: string,
+  initialTitle = "Telegram",
+  url = "https://web.telegram.org/",
+) {
   return runBadgeEngineScript({
     bodyMarkup,
     title: initialTitle,
     engineScript: telegramBadgeEngineScript,
+    beforeEvaluate: () => reconfigureJsdomUrl(url),
   });
 }
 
 afterEach(cleanupBadgeTestGlobals);
 
 describe("Telegram badge engine script", () => {
+  it("does not initialize outside Telegram Web hosts", async () => {
+    const { reports, observers } = runTelegramBadgeScript(
+      `
+        <main>
+          <div id="loading"></div>
+        </main>
+      `,
+      "Telegram",
+      "https://oauth.telegram.org/auth",
+    );
+
+    await flushBadgeAsync();
+
+    expect(reports).toHaveLength(0);
+    expect(observers).toHaveLength(0);
+    expect(window.__ferx_badge_observers_active).toBeUndefined();
+  });
+
+  it("does not emit an initial clear while Telegram is still loading", async () => {
+    const { reports } = runTelegramBadgeScript(`<div id="initial-loading"></div>`);
+
+    await flushBadgeAsync();
+
+    expect(reports).toHaveLength(0);
+  });
+
   it("reports Telegram Web K unread badges without requiring the Tauri invoke bridge", async () => {
     const { reports } = runTelegramBadgeScript(`
       <ul class="chatlist">
@@ -138,7 +170,7 @@ describe("Telegram badge engine script", () => {
     const { reports } = runTelegramBadgeScript(`<div id="initial-loading"></div>`);
 
     await flushBadgeAsync();
-    expect(reports.at(-1)).toBe("clear");
+    expect(reports).toHaveLength(0);
 
     // Telegram updates the title with a new unread count after the SPA has initialised.
     document.title = "(5) Telegram Web";

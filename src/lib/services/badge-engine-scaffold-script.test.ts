@@ -80,6 +80,17 @@ describe("badge_engine_scaffold", () => {
     expect(reports.at(-1)).toBe("count:5");
   });
 
+  it("does not emit a badge payload while state is pending", async () => {
+    const { reports } = runScaffold({
+      readState: () => "pending",
+      resolveObservationTargets: () => [],
+      observeOptions: {},
+      titleBindingFlag: "__ferx_test_title_bound",
+    });
+    await flushBadgeAsync();
+    expect(reports).toHaveLength(0);
+  });
+
   it("dedups consecutive identical states", async () => {
     const { reports } = runScaffold({
       readState: () => "count:5",

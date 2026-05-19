@@ -4,20 +4,56 @@ import googleChatBadgeEngineScript from "../../../src-tauri/scripts/google_chat_
 import {
   cleanupBadgeTestGlobals,
   flushBadgeAsync,
+  reconfigureJsdomUrl,
   runBadgeEngineScript,
 } from "./badge-engine-test-utils";
 
-function runGoogleChatBadgeScript(bodyMarkup: string, initialTitle = "Chat") {
+function runGoogleChatBadgeScript(
+  bodyMarkup: string,
+  initialTitle = "Chat",
+  url = "https://chat.google.com/",
+) {
   return runBadgeEngineScript({
     bodyMarkup,
     title: initialTitle,
     engineScript: googleChatBadgeEngineScript,
+    beforeEvaluate: () => reconfigureJsdomUrl(url),
   });
 }
 
 afterEach(cleanupBadgeTestGlobals);
 
 describe("Google Chat badge engine script", () => {
+  it("does not initialize on Google sign-in pages", async () => {
+    const { reports, observers } = runGoogleChatBadgeScript(
+      `
+        <main>
+          <input type="email" autocomplete="username" />
+        </main>
+      `,
+      "Sign in - Google Accounts",
+      "https://accounts.google.com/signin/v2/identifier",
+    );
+
+    await flushBadgeAsync();
+
+    expect(reports).toHaveLength(0);
+    expect(observers).toHaveLength(0);
+    expect(window.__ferx_badge_observers_active).toBeUndefined();
+  });
+
+  it("does not emit an initial clear while Google Chat is still loading", async () => {
+    const { reports } = runGoogleChatBadgeScript(`
+      <main>
+        <div id="loading"></div>
+      </main>
+    `);
+
+    await flushBadgeAsync();
+
+    expect(reports).toHaveLength(0);
+  });
+
   it("reports unread direct messages and unread spaces from the Google Chat side nav", async () => {
     const { reports } = runGoogleChatBadgeScript(`
       <aside aria-label="Chat navigation">

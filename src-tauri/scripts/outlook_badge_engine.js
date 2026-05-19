@@ -1,5 +1,21 @@
 
     (() => {
+        const hostnameMatches = (hostname, expectedHost) => {
+            const host = (hostname || '').toLowerCase();
+            return host === expectedHost || host.endsWith('.' + expectedHost);
+        };
+        const isOutlookHost = (hostname) => {
+            const host = (hostname || '').toLowerCase();
+            return [
+                'outlook.office.com',
+                'outlook.office365.com',
+                'outlook.live.com',
+                'office.com',
+                'www.office.com'
+            ].includes(host) || hostnameMatches(host, 'outlook.cloud.microsoft');
+        };
+        if (!isOutlookHost(window.location.hostname)) return;
+
         const { normalizeText, safePositiveInt: safeParseInt, uniqueElements } = window.__ferxBadgeUtils;
         const normalizeTitle = normalizeText;
 
@@ -16,6 +32,7 @@
         const resolveObservationTargets = () => uniqueElements(
             observationSelectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)))
         );
+        const hasOutlookAppShell = () => resolveObservationTargets().length > 0;
 
         const titleCountState = (title) => {
             const normalized = normalizeTitle(title);
@@ -189,6 +206,7 @@
                 const result = detect();
                 if (result !== null) return result;
             }
+            if (!hasOutlookAppShell()) return 'pending';
             return 'clear';
         };
 

@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed service webviews opening to a blank page during sign-in or app startup by preventing unread badge monitoring from emitting navigation-based clear events before the service app is ready.
+
 ---
 
 ## [0.6.0] — 2026-05-15

@@ -25,6 +25,7 @@
         const readState = config.readState;
 
         const emitBadgeState = (nextState) => {
+            if (nextState === 'pending') return;
             const payload = (typeof nextState === 'string' && nextState.startsWith('count:'))
                 ? nextState
                 : 'clear';

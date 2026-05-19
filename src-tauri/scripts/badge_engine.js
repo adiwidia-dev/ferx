@@ -10,6 +10,8 @@
         window.__ferx_last_badge_state = '__ferx:init__';
         window.__ferx_badge_dom_timer = window.__ferx_badge_dom_timer || null;
         window.__ferx_badge_monitoring_enabled = window.__ferx_badge_monitoring_enabled ?? true;
+        let initialClearTimer = null;
+        const INITIAL_CLEAR_DELAY_MS = 1000;
 
         const normalizeTitle = (title) => (title || '').replace(/[\u200E\u200F\u200B-\u200D]/g, '').trim();
         const unsupportedTitleState = (title) => {
@@ -46,6 +48,29 @@
         };
 
         const strategy = strategies[window.__ferx_badge_strategy] || strategies['unsupported'];
+        const emitBadgePayload = (payload) => {
+            if (payload === window.__ferx_last_badge_state) return;
+
+            window.__ferx_last_badge_state = payload;
+            window.location.href = 'https://ferx.notify/' + payload;
+        };
+        const scheduleInitialClear = () => {
+            if (initialClearTimer !== null) return;
+            const schedule = () => {
+                initialClearTimer = window.setTimeout(() => {
+                    initialClearTimer = null;
+                    if (window.__ferx_last_badge_state === '__ferx:init__') {
+                        emitBadgePayload('clear');
+                    }
+                }, INITIAL_CLEAR_DELAY_MS);
+            };
+
+            if (document.readyState === 'loading') {
+                window.addEventListener('load', schedule, { once: true });
+            } else {
+                schedule();
+            }
+        };
         const emitBadgeState = (nextState) => {
             let payload = nextState;
             if (payload === 'unknown') {
@@ -58,9 +83,16 @@
             }
 
             if (payload === window.__ferx_last_badge_state) return;
+            if (payload === 'clear' && window.__ferx_last_badge_state === '__ferx:init__') {
+                scheduleInitialClear();
+                return;
+            }
 
-            window.__ferx_last_badge_state = payload;
-            window.location.href = 'https://ferx.notify/' + payload;
+            if (initialClearTimer !== null) {
+                clearTimeout(initialClearTimer);
+                initialClearTimer = null;
+            }
+            emitBadgePayload(payload);
         };
 
         const evaluateBadgeState = () => {
@@ -134,6 +166,10 @@
             if (window.__ferx_badge_dom_timer) {
                 clearTimeout(window.__ferx_badge_dom_timer);
                 window.__ferx_badge_dom_timer = null;
+            }
+            if (initialClearTimer !== null) {
+                clearTimeout(initialClearTimer);
+                initialClearTimer = null;
             }
 
             if (!enabled) return;

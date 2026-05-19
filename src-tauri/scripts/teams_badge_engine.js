@@ -1,5 +1,14 @@
 
     (() => {
+        const isTeamsHost = (hostname) => {
+            const host = (hostname || '').toLowerCase();
+            return [
+                'teams.microsoft.com',
+                'teams.cloud.microsoft'
+            ].some((teamsHost) => host === teamsHost || host.endsWith('.' + teamsHost));
+        };
+        if (!isTeamsHost(window.location.hostname)) return;
+
         const { normalizeText, safePositiveInt: safeParseInt, uniqueElements } = window.__ferxBadgeUtils;
         const normalizeTitle = normalizeText;
 
@@ -27,6 +36,8 @@
         const queryUnique = (selectors) => uniqueElements(
             selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)))
         );
+
+        const hasTeamsAppShell = () => queryUnique(observationSelectors).length > 0;
 
         const titleCountState = (title) => {
             const normalized = normalizeTitle(title);
@@ -109,6 +120,7 @@
                 if (domState) return domState;
                 const titleState = titleCountState(document.title);
                 if (titleState) return 'count:' + titleState;
+                if (!hasTeamsAppShell()) return 'pending';
                 return 'clear';
             },
             resolveObservationTargets: () => uniqueElements(

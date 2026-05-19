@@ -1,5 +1,11 @@
 
     (() => {
+        const hostnameMatches = (hostname, expectedHost) => {
+            const host = (hostname || '').toLowerCase();
+            return host === expectedHost || host.endsWith('.' + expectedHost);
+        };
+        if (!hostnameMatches(window.location.hostname, 'web.telegram.org')) return;
+
         const { safePositiveInt: safeParseInt, uniqueElements, normalizeText } = window.__ferxBadgeUtils;
 
         const isMutedElement = (element) => Boolean(
@@ -15,6 +21,12 @@
             '.dialogs-list',
             '.sidebar-left',
         ];
+        const appShellSelectors = [
+            ...observationSelectors,
+            '#root',
+            '.unread-count',
+        ];
+        const hasTelegramAppShell = () => appShellSelectors.some((selector) => document.querySelector(selector));
 
         const webKCount = () => {
             let total = 0;
@@ -72,7 +84,8 @@
                 const total = webKCount() + webAReactCount() + webZCount() + webogramCount();
                 if (total > 0) return 'count:' + total;
                 const titleTotal = titleCount();
-                return titleTotal > 0 ? 'count:' + titleTotal : 'clear';
+                if (titleTotal > 0) return 'count:' + titleTotal;
+                return hasTelegramAppShell() ? 'clear' : 'pending';
             },
             resolveObservationTargets: () => uniqueElements(
                 observationSelectors.flatMap((selector) => Array.from(document.querySelectorAll(selector))),

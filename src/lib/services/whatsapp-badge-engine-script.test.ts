@@ -4,6 +4,7 @@ import whatsappBadgeEngineScript from "../../../src-tauri/scripts/whatsapp_badge
 import {
   cleanupBadgeTestGlobals,
   flushBadgeAsync,
+  reconfigureJsdomUrl,
   runBadgeEngineScript,
 } from "./badge-engine-test-utils";
 
@@ -17,6 +18,7 @@ function runWhatsAppBadgeScript(
     bodyMarkup,
     title: options.title ?? "WhatsApp",
     engineScript: whatsappBadgeEngineScript,
+    beforeEvaluate: () => reconfigureJsdomUrl("https://web.whatsapp.com/"),
     dispatchDOMContentLoaded: true,
   });
 }
@@ -24,6 +26,22 @@ function runWhatsAppBadgeScript(
 afterEach(cleanupBadgeTestGlobals);
 
 describe("WhatsApp badge engine script", () => {
+  it("does not initialize outside WhatsApp Web hosts", async () => {
+    const { reports, observers } = runBadgeEngineScript({
+      bodyMarkup: "<main></main>",
+      title: "WhatsApp",
+      engineScript: whatsappBadgeEngineScript,
+      beforeEvaluate: () => reconfigureJsdomUrl("https://example.com/"),
+      dispatchDOMContentLoaded: true,
+    });
+
+    await flushBadgeAsync();
+
+    expect(reports).toHaveLength(0);
+    expect(observers).toHaveLength(0);
+    expect(window.__ferx_badge_observers_active).toBeUndefined();
+  });
+
   it("sums visible unread message badges from the chat list", async () => {
     const { reports } = runWhatsAppBadgeScript(
       `
@@ -44,14 +62,14 @@ describe("WhatsApp badge engine script", () => {
     expect(reports.at(-1)).toBe("count:5");
   });
 
-  it("emits clear while chat list has not loaded yet", async () => {
+  it("does not emit an initial clear while chat list has not loaded yet", async () => {
     const { reports } = runWhatsAppBadgeScript("", {
       title: "(2) WhatsApp",
     });
 
     await flushBadgeAsync();
 
-    expect(reports.at(-1)).toBe("clear");
+    expect(reports).toHaveLength(0);
   });
 
   it("does not double-count nested row and cell-frame elements", async () => {

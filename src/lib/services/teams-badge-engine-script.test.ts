@@ -4,20 +4,60 @@ import teamsBadgeEngineScript from "../../../src-tauri/scripts/teams_badge_engin
 import {
   cleanupBadgeTestGlobals,
   flushBadgeAsync,
+  reconfigureJsdomUrl,
   runBadgeEngineScript,
 } from "./badge-engine-test-utils";
 
-function runTeamsBadgeScript(bodyMarkup: string, title = "Teams") {
+function runTeamsBadgeScript(
+  bodyMarkup: string,
+  title = "Teams",
+  url = "https://teams.cloud.microsoft/",
+) {
   return runBadgeEngineScript({
     bodyMarkup,
     title,
     engineScript: teamsBadgeEngineScript,
+    beforeEvaluate: () => reconfigureJsdomUrl(url),
   });
 }
 
 afterEach(cleanupBadgeTestGlobals);
 
 describe("Teams badge engine script", () => {
+  it("does not initialize on Microsoft sign-in pages", async () => {
+    const { reports, observers } = runTeamsBadgeScript(
+      `
+        <main>
+          <input type="email" autocomplete="username" />
+        </main>
+      `,
+      "Sign in to your account",
+      "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    );
+
+    await flushBadgeAsync();
+
+    expect(reports).toHaveLength(0);
+    expect(observers).toHaveLength(0);
+    expect(window.__ferx_badge_observers_active).toBeUndefined();
+  });
+
+  it("does not emit an initial clear while Teams is still loading", async () => {
+    const { reports } = runTeamsBadgeScript(
+      `
+        <main>
+          <div id="app-loading"></div>
+        </main>
+      `,
+      "Microsoft Teams",
+      "https://teams.cloud.microsoft/",
+    );
+
+    await flushBadgeAsync();
+
+    expect(reports).toHaveLength(0);
+  });
+
   it("reports Teams badges without requiring the Tauri invoke bridge", async () => {
     const { reports } = runTeamsBadgeScript(`
       <main>

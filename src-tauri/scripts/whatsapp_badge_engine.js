@@ -1,10 +1,19 @@
 
     (() => {
+        const hostnameMatches = (hostname, expectedHost) => {
+            const host = (hostname || '').toLowerCase();
+            return host === expectedHost || host.endsWith('.' + expectedHost);
+        };
+        if (!hostnameMatches(window.location.hostname, 'web.whatsapp.com')) return;
+
         const {
             normalizeText,
             safePositiveInt: safeParseInt,
             isTimestampLikeElement
         } = window.__ferxBadgeUtils;
+
+        const sidePaneSelector = '#pane-side, [aria-label*="Chat list" i], [aria-label*="chat list" i]';
+        const sidePane = () => document.querySelector(sidePaneSelector);
 
         const unreadLabelCount = (label, fallbackText) => {
             const normalized = normalizeText(label);
@@ -17,12 +26,12 @@
         };
 
         const domUnreadTotal = () => {
-            const sidePane = document.querySelector('#pane-side, [aria-label*="Chat list" i], [aria-label*="chat list" i]');
-            if (!sidePane) return 0;
+            const pane = sidePane();
+            if (!pane) return 0;
             let total = 0;
             const countedRows = new Set();
             const rowSelector = '[role="row"], [role="listitem"], [data-testid="cell-frame-container"]';
-            const rows = Array.from(sidePane.querySelectorAll(rowSelector))
+            const rows = Array.from(pane.querySelectorAll(rowSelector))
                 .filter((row) => !row.parentElement?.closest(rowSelector));
             for (const row of rows) {
                 if (countedRows.has(row)) continue;
@@ -49,11 +58,12 @@
 
         window.__ferxInitBadgeMonitor({
             readState: () => {
+                if (!sidePane()) return 'pending';
                 const domTotal = domUnreadTotal();
                 return domTotal > 0 ? 'count:' + domTotal : 'clear';
             },
             resolveObservationTargets: () => {
-                const target = document.querySelector('#pane-side, [aria-label*="Chat list" i], [aria-label*="chat list" i]')
+                const target = sidePane()
                     || document.body
                     || document.documentElement;
                 return target ? [target] : [];
