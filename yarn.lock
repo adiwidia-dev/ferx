@@ -453,17 +453,17 @@
   resolved "https://registry.npmmirror.com/@sveltejs/adapter-static/-/adapter-static-3.0.10.tgz"
   integrity sha512-7D9lYFWJmB7zxZyTE/qxjksvMqzMuYrrsyh1f4AlZqeZeACPRySjbC3aFiY55wb1tWUaKOQG9PVbm74JcN2Iew==
 
-"@sveltejs/kit@^2.57.1":
-  version "2.57.1"
-  resolved "https://registry.npmmirror.com/@sveltejs/kit/-/kit-2.57.1.tgz"
-  integrity sha512-VRdSbB96cI1EnRh09CqmnQqP/YJvET5buj8S6k7CxaJqBJD4bw4fRKDjcarAj/eX9k2eHifQfDH8NtOh+ZxxPw==
+"@sveltejs/kit@^2.60.1":
+  version "2.60.1"
+  resolved "https://registry.yarnpkg.com/@sveltejs/kit/-/kit-2.60.1.tgz#41e73108f66588784e4bd3c32ac8500ee92e6b59"
+  integrity sha512-mQjlkNo+rJvpln7V2IGY2j99BqhcFbS4UN0AQNKNYfhBAFZTuCDAdW3a1sgf330mvtNvsBXn3HpAhcmvdJTcIQ==
   dependencies:
     "@standard-schema/spec" "^1.0.0"
     "@sveltejs/acorn-typescript" "^1.0.5"
     "@types/cookie" "^0.6.0"
     acorn "^8.14.1"
     cookie "^0.6.0"
-    devalue "^5.6.4"
+    devalue "^5.8.1"
     esm-env "^1.2.2"
     kleur "^4.1.5"
     magic-string "^0.30.5"
@@ -929,11 +929,6 @@ detect-libc@^2.0.3:
   version "2.1.2"
   resolved "https://registry.npmmirror.com/detect-libc/-/detect-libc-2.1.2.tgz"
   integrity sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==
-
-devalue@^5.6.4:
-  version "5.7.0"
-  resolved "https://registry.npmmirror.com/devalue/-/devalue-5.7.0.tgz"
-  integrity sha512-qCvc8m7cImp1QDCsiY+C2EdSBWSj7Ucfoq87scSdYboDiIKdvMtFbH1U2VReBls6WMhMaUOoK3ZJEDNG/7zm3w==
 
 devalue@^5.8.1:
   version "5.8.1"
