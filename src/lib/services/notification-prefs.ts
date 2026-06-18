@@ -20,6 +20,7 @@ type ServiceWithOptionalNotificationPrefs = {
   url: string;
   storageKey: string;
   disabled?: boolean;
+  hibernated?: boolean;
   badge?: number;
   notificationPrefs?: LegacyNotificationPrefs;
 };
@@ -93,6 +94,7 @@ export function countTrayRelevantUnreadServices(
   return services.filter(
     (service) =>
       !service.disabled &&
+      !service.hibernated &&
       service.notificationPrefs.affectTray &&
       !!service.badge &&
       service.badge !== 0,

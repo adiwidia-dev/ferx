@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { moveItemToTarget } from "$lib/services/reorder";
   import ServiceEditorDialog, {
     type ServiceEditorInput,
@@ -82,6 +83,7 @@
   import type { WorkspaceIconKey } from "$lib/services/workspace-icons";
   import { dndState, toggleDndEnabled } from "$lib/services/dnd-state.svelte";
   import { createDragDropState } from "$lib/services/drag-drop.svelte";
+  import { createServiceHibernationStore } from "$lib/services/service-hibernation.svelte";
   import { createTodoPanelStore, TODOS_PANEL_WIDTH } from "$lib/services/todo-panel.svelte";
   import { createServiceEditorStore } from "$lib/services/service-editor.svelte";
   import { onMount } from "svelte";
@@ -99,8 +101,11 @@
     DEFAULT_APP_SETTINGS.resourceUsageMonitoringEnabled,
   );
   let isWorkspaceSwitcherOpen = $state(false);
+  let isAppInactive = $state(false);
 
   const webviewCommands = createWebviewCommandQueue();
+  const serviceHibernation = createServiceHibernationStore();
+  let lastVisibleHibernationServiceId: string | null = null;
 
   const workspaceStorage = createDebouncedStorageWriter({
     storageKey: WORKSPACE_PAGE_STORAGE_KEYS.workspaceState,
@@ -136,7 +141,12 @@
   let isCurrentWorkspaceDisabled = $derived(currentWorkspace?.disabled === true);
   const projectDisplayServices = createDisplayServicesProjector();
   let displayServices = $derived(
-    projectDisplayServices(services, isCurrentWorkspaceDisabled, runtimeBadges),
+    projectDisplayServices(
+      services,
+      isCurrentWorkspaceDisabled,
+      runtimeBadges,
+      serviceHibernation.hibernatedServices,
+    ),
   );
   let resourceUsageSnapshots = $state<Record<string, ResourceUsageSnapshot | undefined>>({});
   let activeService = $derived.by(() => {
@@ -207,6 +217,9 @@
       activeServiceId: showService?.id ?? "",
       activeServiceUrl: showService?.url ?? "",
       activeServiceStorageKey: showService?.storageKey ?? "",
+      activeServiceWakeGeneration: showService
+        ? serviceHibernation.wakeGenerationFor(showService.id)
+        : 0,
       spellCheckEnabled,
       resourceUsageMonitoringEnabled,
     });
@@ -228,14 +241,77 @@
     }
   });
 
+  $effect(() => {
+    if (!isInitialized) return;
+
+    const overlayOpen = serviceEditor.isOpen || isWorkspaceSwitcherOpen;
+    if (overlayOpen) return;
+
+    const currentServiceId =
+      activeService && !activeService.disabled && !isCurrentWorkspaceDisabled
+        ? activeService.id
+        : "";
+    const visibleServiceId = !isAppInactive ? currentServiceId : "";
+
+    if (
+      lastVisibleHibernationServiceId &&
+      lastVisibleHibernationServiceId !== visibleServiceId
+    ) {
+      scheduleServiceHibernation(lastVisibleHibernationServiceId);
+    }
+
+    if (visibleServiceId) {
+      serviceHibernation.cancel(visibleServiceId);
+      serviceHibernation.clearHibernated(visibleServiceId);
+    }
+
+    lastVisibleHibernationServiceId = visibleServiceId || null;
+  });
+
   // ---------------------------------------------------------------------------
   // Lifecycle
   // ---------------------------------------------------------------------------
 
   onMount(() => {
+    let appWindow: ReturnType<typeof getCurrentWindow> | null = null;
+    try {
+      appWindow = getCurrentWindow();
+    } catch {
+      appWindow = null;
+    }
     const unlistenToastPromise = listen("show-toast", (event) => {
       showToast(event.payload as string);
     });
+    const refreshAppInactiveState = async () => {
+      const documentHidden =
+        typeof document !== "undefined" && document.visibilityState === "hidden";
+
+      try {
+        if (!appWindow) {
+          isAppInactive = documentHidden;
+          return;
+        }
+
+        const [visible, minimized] = await Promise.all([
+          appWindow.isVisible(),
+          appWindow.isMinimized(),
+        ]);
+        isAppInactive = documentHidden || !visible || minimized;
+      } catch {
+        isAppInactive = documentHidden;
+      }
+    };
+    const handleVisibilityChange = () => {
+      void refreshAppInactiveState();
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
+    const unlistenWindowFocusPromise =
+      appWindow?.onFocusChanged(() => {
+        void refreshAppInactiveState();
+      }) ?? Promise.resolve(() => undefined);
+    void refreshAppInactiveState();
 
     const { openServiceId, nextSearch } =
       typeof window === "undefined"
@@ -350,6 +426,11 @@
 
     return () => {
       cancelPreload();
+      serviceHibernation.cancelAll();
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      }
+      void unlistenWindowFocusPromise.then((unlisten) => unlisten());
       cleanupFlushOnExit();
       workspaceStorage.flush(workspaceState);
       todos.flush();
@@ -417,6 +498,29 @@
     await webviewCommands.interrupt(hideAllWebviews);
   }
 
+  function scheduleServiceHibernation(serviceId: string) {
+    const service = workspaceState.servicesById[serviceId];
+    if (!service?.hibernateWhenInactive || service.disabled) {
+      serviceHibernation.cancel(serviceId);
+      return;
+    }
+
+    serviceHibernation.schedule(serviceId, async (targetId) => {
+      const currentService = workspaceState.servicesById[targetId];
+      if (!currentService?.hibernateWhenInactive || currentService.disabled) {
+        return false;
+      }
+
+      await webviewCommands.run(() => closeServiceWebview(targetId));
+      return true;
+    });
+  }
+
+  function clearServiceHibernation(serviceId: string) {
+    serviceHibernation.cancel(serviceId);
+    serviceHibernation.clearHibernated(serviceId);
+  }
+
   // ---------------------------------------------------------------------------
   // Service switching / workspace
   // ---------------------------------------------------------------------------
@@ -443,6 +547,7 @@
   }
 
   function toggleDisable(id: string) {
+    clearServiceHibernation(id);
     const nextState = toggleWorkspaceServiceDisabled(workspaceState, id);
     workspaceState = nextState.state;
     if (nextState.closeWebviewId) {
@@ -458,6 +563,7 @@
   }
 
   function deleteService(id: string) {
+    clearServiceHibernation(id);
     const nextState = deleteServiceFromWorkspaceState(workspaceState, runtimeBadges, id);
     workspaceState = nextState.state;
     replaceRuntimeBadges(nextState.badges);
@@ -496,6 +602,7 @@
     const nextState = setWorkspaceDisabledWithEffects(workspaceState, input);
     workspaceState = nextState.state;
     for (const serviceId of nextState.closeWebviewIds) {
+      clearServiceHibernation(serviceId);
       void webviewCommands.run(() => closeServiceWebview(serviceId));
     }
     if (nextState.shouldHideWebviews) void webviewCommands.run(hideAllWebviews);
@@ -505,6 +612,7 @@
     const nextState = deleteWorkspaceWithEffects(workspaceState, workspaceId);
     workspaceState = nextState.state;
     for (const serviceId of nextState.closeWebviewIds) {
+      clearServiceHibernation(serviceId);
       void webviewCommands.run(() => closeServiceWebview(serviceId));
     }
   }

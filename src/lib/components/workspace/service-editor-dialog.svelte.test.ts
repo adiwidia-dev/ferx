@@ -46,6 +46,7 @@ describe("ServiceEditorDialog", () => {
           name: "Slack",
           url: "https://slack.com/app",
           iconBgColor: "#3B82F6",
+          hibernateWhenInactive: true,
         },
         onSave: vi.fn(),
       },
@@ -59,6 +60,9 @@ describe("ServiceEditorDialog", () => {
     expect((document.querySelector("#url") as HTMLInputElement | null)?.value).toBe(
       "https://slack.com/app",
     );
+    expect(
+      document.querySelector<HTMLInputElement>('input[name="hibernate-when-inactive"]')?.checked,
+    ).toBe(true);
 
     await unmountDialog(editComponent);
   });
@@ -80,6 +84,9 @@ describe("ServiceEditorDialog", () => {
       button.textContent?.includes("Add Service"),
     ) as HTMLButtonElement;
     expect(saveButton.disabled).toBe(true);
+    expect(
+      document.querySelector<HTMLInputElement>('input[name="hibernate-when-inactive"]')?.checked,
+    ).toBe(false);
 
     const nameInput = document.querySelector("#name") as HTMLInputElement;
     const urlInput = document.querySelector("#url") as HTMLInputElement;
@@ -100,6 +107,49 @@ describe("ServiceEditorDialog", () => {
       name: "Discord",
       url: "discord.com/app",
       iconBgColor: "#A855F7",
+      hibernateWhenInactive: false,
+    });
+
+    await unmountDialog(component);
+  });
+
+  it("saves the hibernation checkbox value", async () => {
+    const onSave = vi.fn();
+    const component = mount(ServiceEditorDialog, {
+      target: document.body,
+      props: {
+        open: true,
+        editingService: null,
+        onSave,
+      },
+    });
+
+    flushSync();
+
+    const nameInput = document.querySelector("#name") as HTMLInputElement;
+    const urlInput = document.querySelector("#url") as HTMLInputElement;
+    const hibernationInput = document.querySelector<HTMLInputElement>(
+      'input[name="hibernate-when-inactive"]',
+    );
+    nameInput.value = "Discord";
+    nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+    urlInput.value = "discord.com/app";
+    urlInput.dispatchEvent(new Event("input", { bubbles: true }));
+    hibernationInput!.checked = true;
+    hibernationInput!.dispatchEvent(new Event("change", { bubbles: true }));
+    flushSync();
+
+    const saveButton = Array.from(document.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Add Service"),
+    ) as HTMLButtonElement;
+    saveButton.click();
+    flushSync();
+
+    expect(onSave).toHaveBeenCalledWith({
+      name: "Discord",
+      url: "discord.com/app",
+      iconBgColor: undefined,
+      hibernateWhenInactive: true,
     });
 
     await unmountDialog(component);

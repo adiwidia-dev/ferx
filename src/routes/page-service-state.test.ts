@@ -22,6 +22,9 @@ function createService(overrides: Partial<PageService> = {}): PageService {
     },
     disabled: overrides.disabled,
     badge: overrides.badge,
+    hibernateWhenInactive: (
+      overrides as Partial<PageService> & { hibernateWhenInactive?: boolean }
+    ).hibernateWhenInactive,
   };
 }
 
@@ -133,6 +136,45 @@ describe("saveServiceState", () => {
     });
   });
 
+  it("stores the hibernation setting on new services when enabled", () => {
+    const services = [createService()];
+
+    const result = saveServiceState({
+      services,
+      activeId: services[0].id,
+      editingServiceId: null,
+      newServiceName: "Docs",
+      newServiceUrl: "docs.example.com",
+      newHibernateWhenInactive: true,
+      createServiceId: () => "docs",
+    });
+
+    expect(result.services[1]).toMatchObject({
+      id: "docs",
+      hibernateWhenInactive: true,
+    });
+    expect(result.loadService).toMatchObject({
+      id: "docs",
+      hibernateWhenInactive: true,
+    });
+  });
+
+  it("omits the hibernation setting on new services when disabled", () => {
+    const services = [createService()];
+
+    const result = saveServiceState({
+      services,
+      activeId: services[0].id,
+      editingServiceId: null,
+      newServiceName: "Docs",
+      newServiceUrl: "docs.example.com",
+      newHibernateWhenInactive: false,
+      createServiceId: () => "docs",
+    });
+
+    expect(result.services[1]).not.toHaveProperty("hibernateWhenInactive");
+  });
+
   it("preserves storage keys and unloads the old webview when an edited URL changes", () => {
     const services = [
       createService({
@@ -168,6 +210,39 @@ describe("saveServiceState", () => {
         storageKey: "storage-service-1",
       },
     });
+  });
+
+  it("updates the hibernation setting when editing a service", () => {
+    const services = [
+      createService({
+        id: "service-1",
+        hibernateWhenInactive: true,
+      }),
+    ];
+
+    const enabled = saveServiceState({
+      services,
+      activeId: "service-1",
+      editingServiceId: "service-1",
+      newServiceName: "Slack",
+      newServiceUrl: "https://slack.com/app",
+      newHibernateWhenInactive: true,
+      createServiceId: () => "unused",
+    });
+
+    expect(enabled.services[0].hibernateWhenInactive).toBe(true);
+
+    const disabled = saveServiceState({
+      services,
+      activeId: "service-1",
+      editingServiceId: "service-1",
+      newServiceName: "Slack",
+      newServiceUrl: "https://slack.com/app",
+      newHibernateWhenInactive: false,
+      createServiceId: () => "unused",
+    });
+
+    expect(disabled.services[0]).not.toHaveProperty("hibernateWhenInactive");
   });
 
   it("does not unload when a legacy stored URL normalizes to the same effective URL", () => {
@@ -331,6 +406,49 @@ describe("saveServiceState", () => {
       "delete:inactive",
       "load:inactive:https://chat.example.com/inbox",
     ]);
+  });
+
+  it("does not preload an inactive hibernation-enabled service after deleting the old webview", async () => {
+    const services = [
+      createService({
+        id: "active",
+        url: "https://mail.example.com",
+        storageKey: "storage-active",
+      }),
+      createService({
+        id: "inactive",
+        url: "https://chat.example.com",
+        storageKey: "storage-inactive",
+        hibernateWhenInactive: true,
+      }),
+    ];
+    const nextState = saveServiceState({
+      services,
+      activeId: "active",
+      editingServiceId: "inactive",
+      newServiceName: "Chat",
+      newServiceUrl: "https://chat.example.com/inbox",
+      newHibernateWhenInactive: true,
+      createServiceId: () => "unused",
+    });
+
+    const events: string[] = [];
+
+    await applySaveServiceResult({
+      nextState,
+      editingServiceId: "inactive",
+      currentActiveId: "active",
+      showToast: () => undefined,
+      setState: () => undefined,
+      deleteWebview: async ({ id }: { id: string; storageKey: string }) => {
+        events.push(`delete:${id}`);
+      },
+      loadService: async (service: PageService) => {
+        events.push(`load:${service.id}:${service.url}`);
+      },
+    });
+
+    expect(events).toEqual(["delete:inactive"]);
   });
 
   it("does not reload a disabled edited service after deleting the old webview", async () => {

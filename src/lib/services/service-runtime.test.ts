@@ -13,6 +13,7 @@ function createService(overrides: {
   url?: string;
   storageKey?: string;
   disabled?: boolean;
+  hibernateWhenInactive?: boolean;
   showBadge?: boolean;
   affectTray?: boolean;
   muteAudio?: boolean;
@@ -22,6 +23,7 @@ function createService(overrides: {
     url: overrides.url ?? "https://example.com/app",
     storageKey: overrides.storageKey ?? "storage-service-1",
     disabled: overrides.disabled,
+    hibernateWhenInactive: overrides.hibernateWhenInactive,
     notificationPrefs: {
       showBadge: overrides.showBadge ?? true,
       affectTray: overrides.affectTray ?? true,
@@ -107,6 +109,15 @@ describe("shouldPreloadService", () => {
     expect(shouldPreloadService(createService({ id: "disabled", disabled: true }), "other")).toBe(
       false,
     );
+  });
+
+  it("skips hibernation-enabled services", () => {
+    expect(
+      shouldPreloadService(
+        createService({ id: "hibernating", hibernateWhenInactive: true }),
+        "active",
+      ),
+    ).toBe(false);
   });
 
   it("preloads enabled inactive services", () => {

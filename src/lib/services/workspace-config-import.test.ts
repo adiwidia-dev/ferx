@@ -25,6 +25,7 @@ const validFile = {
       name: "  Mail  ",
       url: "mail.example.com",
       storageKey: "storage-mail",
+      hibernateWhenInactive: true,
       badge: 99,
       notificationPrefs: {
         showBadge: false,
@@ -61,6 +62,7 @@ describe("workspace config import", () => {
       name: "Mail",
       url: "https://mail.example.com/",
       storageKey: "storage-mail",
+      hibernateWhenInactive: true,
       notificationPrefs: {
         showBadge: false,
         affectTray: true,
@@ -142,6 +144,25 @@ describe("workspace config import", () => {
     expect(result).toEqual({
       ok: false,
       message: 'Service "Mail" has an invalid URL.',
+    });
+  });
+
+  it("rejects invalid service hibernation flags", () => {
+    const result = parseWorkspaceConfigImport(
+      JSON.stringify({
+        ...validFile,
+        services: [
+          {
+            ...validFile.services[0],
+            hibernateWhenInactive: "yes",
+          },
+        ],
+      }),
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'Service "Mail" has an invalid hibernation flag.',
     });
   });
 
@@ -241,6 +262,7 @@ describe("workspace config import", () => {
               name: "Mail",
               url: "mail.example.com",
               storageKey: "storage-mail",
+              hibernateWhenInactive: true,
             },
           },
         },
@@ -260,6 +282,7 @@ describe("workspace config import", () => {
       ["mail"],
     ]);
     expect(result.value.workspaceState.servicesById.mail.url).toBe("https://mail.example.com/");
+    expect(result.value.workspaceState.servicesById.mail.hibernateWhenInactive).toBe(true);
   });
 
   it("writes validated import data transactionally to localStorage", () => {

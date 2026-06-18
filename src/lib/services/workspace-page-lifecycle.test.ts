@@ -267,6 +267,17 @@ describe("createDisplayServicesProjector", () => {
     expect(out[1]).toMatchObject({ id: "a", disabled: true, badge: undefined });
   });
 
+  it("merges runtime hibernation state while preserving badge values", () => {
+    const project = createDisplayServicesProjector();
+    const out = project([svc("a")], false, { a: 5 }, { a: true });
+
+    expect(out[0]).toMatchObject({
+      id: "a",
+      badge: 5,
+      hibernated: true,
+    });
+  });
+
   it("applies workspace-disabled to every service", () => {
     const project = createDisplayServicesProjector();
     const out = project([svc("a")], true, {});
@@ -305,6 +316,16 @@ describe("createDisplayServicesProjector", () => {
     const second = project([a], true, {});
     expect(second[0]).not.toBe(first[0]);
     expect(second[0].disabled).toBe(true);
+  });
+
+  it("rebuilds when runtime hibernation changes", () => {
+    const project = createDisplayServicesProjector();
+    const a = svc("a");
+    const first = project([a], false, {}, {});
+    const second = project([a], false, {}, { a: true });
+
+    expect(second[0]).not.toBe(first[0]);
+    expect(second[0].hibernated).toBe(true);
   });
 
   it("rebuilds when the source service object identity changes", () => {

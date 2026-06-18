@@ -13,6 +13,7 @@
     name: string;
     url: string;
     iconBgColor?: string;
+    hibernateWhenInactive?: boolean;
   };
 
   export type ServiceEditorService = ServiceEditorInput & {
@@ -45,6 +46,7 @@
   let iconBgColor = $state("");
   let customHexInput = $state("");
   let previewIconFailed = $state(false);
+  let hibernateWhenInactive = $state(false);
 
   let canSave = $derived(name.trim().length > 0 && url.trim().length > 0);
   let dialogTitle = $derived(editingService ? "Edit Service" : "Add New Service");
@@ -66,6 +68,7 @@
 
     const color = service?.iconBgColor ?? "";
     iconBgColor = color;
+    hibernateWhenInactive = service?.hibernateWhenInactive === true;
 
     const isCustomColor = color && !PRESET_COLORS.some((preset) => preset.value === color);
     customHexInput = isCustomColor ? color : "";
@@ -96,6 +99,7 @@
       name: name.trim(),
       url: url.trim(),
       iconBgColor: iconBgColor || undefined,
+      hibernateWhenInactive,
     });
   }
 </script>
@@ -218,6 +222,21 @@
             {/if}
           </div>
         </div>
+
+        <label class="flex items-start gap-3 border-t pt-4">
+          <input
+            type="checkbox"
+            name="hibernate-when-inactive"
+            class="mt-0.5 h-4 w-4 rounded border-input accent-primary"
+            bind:checked={hibernateWhenInactive}
+          />
+          <span class="min-w-0">
+            <span class="block text-sm font-medium leading-none">Hibernate when inactive</span>
+            <span class="mt-1.5 block text-xs leading-relaxed text-muted-foreground">
+              Closes this service after 60 seconds in the background. Saves resources, but background badges and tray unread pause until the service is opened again.
+            </span>
+          </span>
+        </label>
       </div>
     </div>
 

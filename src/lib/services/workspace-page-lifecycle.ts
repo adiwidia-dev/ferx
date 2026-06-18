@@ -188,6 +188,7 @@ export type ActivationInputs = {
   activeServiceId: string;
   activeServiceUrl: string;
   activeServiceStorageKey: string;
+  activeServiceWakeGeneration?: number;
   spellCheckEnabled: boolean;
   resourceUsageMonitoringEnabled: boolean;
 };
@@ -211,6 +212,7 @@ export function computeActivationKey(inputs: ActivationInputs): string {
     inputs.activeServiceId,
     inputs.activeServiceUrl,
     inputs.activeServiceStorageKey,
+    String(inputs.activeServiceWakeGeneration ?? 0),
     inputs.spellCheckEnabled ? "1" : "0",
     inputs.resourceUsageMonitoringEnabled ? "1" : "0",
   ].join(" ");
@@ -219,6 +221,7 @@ export function computeActivationKey(inputs: ActivationInputs): string {
 export type DisplayService = PageService & {
   disabled: boolean | undefined;
   badge: number | undefined;
+  hibernated: boolean | undefined;
 };
 
 /**
@@ -234,6 +237,7 @@ export function createDisplayServicesProjector() {
     src: PageService;
     disabled: boolean | undefined;
     badge: number | undefined;
+    hibernated: boolean | undefined;
     out: DisplayService;
   };
   let cache = new Map<string, Entry>();
@@ -242,15 +246,23 @@ export function createDisplayServicesProjector() {
     services: PageService[],
     isWorkspaceDisabled: boolean,
     badges: Record<string, number | undefined>,
+    hibernatedServices: Record<string, true | undefined> = {},
   ): DisplayService[] => {
     const next = new Map<string, Entry>();
 
     const result = services.map((service) => {
       const disabled = isWorkspaceDisabled || service.disabled;
       const badge = badges[service.id];
+      const hibernated = hibernatedServices[service.id];
       const prev = cache.get(service.id);
 
-      if (prev && prev.src === service && prev.disabled === disabled && prev.badge === badge) {
+      if (
+        prev &&
+        prev.src === service &&
+        prev.disabled === disabled &&
+        prev.badge === badge &&
+        prev.hibernated === hibernated
+      ) {
         next.set(service.id, prev);
         return prev.out;
       }
@@ -259,7 +271,8 @@ export function createDisplayServicesProjector() {
         src: service,
         disabled,
         badge,
-        out: { ...service, disabled, badge },
+        hibernated,
+        out: { ...service, disabled, badge, hibernated },
       };
       next.set(service.id, entry);
       return entry.out;

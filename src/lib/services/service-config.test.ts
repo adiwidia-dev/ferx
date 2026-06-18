@@ -138,6 +138,12 @@ describe("readStoredServices", () => {
           notificationPrefs: [false],
         },
         {
+          id: "bad-hibernation",
+          name: "Basecamp",
+          url: "https://basecamp.com",
+          hibernateWhenInactive: "yes",
+        },
+        {
           id: "one",
           name: "Slack",
           url: "https://slack.com",
@@ -224,6 +230,7 @@ describe("readStoredServices", () => {
         url: "https://slack.com",
         storageKey: "storage-one",
         disabled: true,
+        hibernateWhenInactive: true,
         badge: 5,
         notificationPrefs: {
           showBadge: false,
@@ -241,6 +248,7 @@ describe("readStoredServices", () => {
           url: "https://slack.com",
           storageKey: "storage-one",
           disabled: true,
+          hibernateWhenInactive: true,
           badge: 5,
           notificationPrefs: {
             showBadge: false,

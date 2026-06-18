@@ -7,6 +7,7 @@ type StoredService = {
   url: string;
   storageKey?: string;
   disabled?: boolean;
+  hibernateWhenInactive?: boolean;
   badge?: number;
   iconBgColor?: string;
   notificationPrefs?: {
@@ -50,6 +51,8 @@ function parseStoredService(value: unknown): StoredService | null {
     typeof candidate.name !== "string" ||
     typeof candidate.url !== "string" ||
     (candidate.disabled !== undefined && typeof candidate.disabled !== "boolean") ||
+    (candidate.hibernateWhenInactive !== undefined &&
+      typeof candidate.hibernateWhenInactive !== "boolean") ||
     (candidate.badge !== undefined && typeof candidate.badge !== "number") ||
     (candidate.iconBgColor !== undefined && typeof candidate.iconBgColor !== "string") ||
     (candidate.notificationPrefs !== undefined &&
@@ -69,6 +72,7 @@ function parseStoredService(value: unknown): StoredService | null {
         name: candidate.name,
         url: candidate.url,
         disabled: candidate.disabled,
+        ...(candidate.hibernateWhenInactive === true ? { hibernateWhenInactive: true } : {}),
         badge: candidate.badge,
         iconBgColor: candidate.iconBgColor,
         notificationPrefs: candidate.notificationPrefs,
@@ -82,6 +86,7 @@ function parseStoredService(value: unknown): StoredService | null {
     url: candidate.url,
     storageKey: candidate.storageKey,
     disabled: candidate.disabled,
+    ...(candidate.hibernateWhenInactive === true ? { hibernateWhenInactive: true } : {}),
     badge: candidate.badge,
     iconBgColor: candidate.iconBgColor,
     notificationPrefs: candidate.notificationPrefs,

@@ -48,6 +48,7 @@ type ImportedServiceDraft = {
   url: string;
   storageKey?: string;
   disabled?: boolean;
+  hibernateWhenInactive?: boolean;
   iconBgColor?: string;
   notificationPrefs?: Partial<NotificationPrefs>;
 };
@@ -99,6 +100,13 @@ function parseImportedService(value: unknown): ImportedServiceDraft | string {
     return `Service "${name}" has an invalid disabled flag.`;
   }
 
+  if (
+    value.hibernateWhenInactive !== undefined &&
+    typeof value.hibernateWhenInactive !== "boolean"
+  ) {
+    return `Service "${name}" has an invalid hibernation flag.`;
+  }
+
   if (value.iconBgColor !== undefined && typeof value.iconBgColor !== "string") {
     return `Service "${name}" has an invalid icon color.`;
   }
@@ -119,6 +127,7 @@ function parseImportedService(value: unknown): ImportedServiceDraft | string {
     url: normalized.url,
     ...(isValidStorageKey(value.storageKey) ? { storageKey: value.storageKey } : {}),
     ...(value.disabled === undefined ? {} : { disabled: value.disabled }),
+    ...(value.hibernateWhenInactive === true ? { hibernateWhenInactive: true } : {}),
     ...(value.iconBgColor === undefined ? {} : { iconBgColor: value.iconBgColor }),
     ...(notificationPrefs === undefined ? {} : { notificationPrefs }),
   };
@@ -168,6 +177,7 @@ function normalizeImportedServices(
     url: service.url,
     storageKey: service.storageKey,
     ...(service.disabled === undefined ? {} : { disabled: service.disabled }),
+    ...(service.hibernateWhenInactive === true ? { hibernateWhenInactive: true } : {}),
     ...(service.iconBgColor === undefined ? {} : { iconBgColor: service.iconBgColor }),
     notificationPrefs: { ...service.notificationPrefs },
   }));

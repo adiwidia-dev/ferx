@@ -41,6 +41,7 @@ export interface PageService {
   storageKey: string;
   notificationPrefs: NotificationPrefs;
   disabled?: boolean;
+  hibernateWhenInactive?: boolean;
   badge?: number;
   iconBgColor?: string;
 }
@@ -89,6 +90,7 @@ export function saveServiceState({
   newServiceName,
   newServiceUrl,
   newIconBgColor,
+  newHibernateWhenInactive = false,
   createServiceId,
 }: {
   services: PageService[];
@@ -97,6 +99,7 @@ export function saveServiceState({
   newServiceName: string;
   newServiceUrl: string;
   newIconBgColor?: string;
+  newHibernateWhenInactive?: boolean;
   createServiceId: () => string;
 }): {
   services: PageService[];
@@ -138,11 +141,14 @@ export function saveServiceState({
       };
     }
 
+    const { hibernateWhenInactive: _oldHibernateWhenInactive, ...existingServiceBase } =
+      existingService;
     const updatedService = {
-      ...existingService,
+      ...existingServiceBase,
       name: newServiceName,
       url: normalized.url,
       iconBgColor: newIconBgColor || undefined,
+      ...(newHibernateWhenInactive ? { hibernateWhenInactive: true } : {}),
     };
     const existingNormalized = normalizeServiceUrl(existingService.url);
     const effectiveUrlChanged = !existingNormalized.ok || existingNormalized.url !== normalized.url;
@@ -170,6 +176,7 @@ export function saveServiceState({
     storageKey: createStorageKey(),
     notificationPrefs: { ...DEFAULT_NOTIFICATION_PREFS },
     iconBgColor: newIconBgColor || undefined,
+    ...(newHibernateWhenInactive ? { hibernateWhenInactive: true } : {}),
   };
 
   return {
@@ -230,7 +237,12 @@ export async function applySaveServiceResult({
       ? nextState.services.find((service) => service.id === editingServiceId)
       : undefined;
 
-    if (editedService && editedService.id !== currentActiveId && !editedService.disabled) {
+    if (
+      editedService &&
+      editedService.id !== currentActiveId &&
+      !editedService.disabled &&
+      !editedService.hibernateWhenInactive
+    ) {
       await loadService(editedService);
     }
   }

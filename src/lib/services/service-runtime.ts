@@ -21,6 +21,7 @@ export type ServiceWebviewService = {
   url: string;
   storageKey: string;
   disabled?: boolean;
+  hibernateWhenInactive?: boolean;
   notificationPrefs: {
     showBadge?: boolean;
     affectTray?: boolean;
@@ -70,8 +71,8 @@ export function createAudioMutedPayload(muted: boolean): AudioMutedPayload {
 }
 
 export function shouldPreloadService(
-  service: Pick<ServiceWebviewService, "id" | "disabled">,
+  service: Pick<ServiceWebviewService, "id" | "disabled" | "hibernateWhenInactive">,
   activeId: string,
 ) {
-  return !service.disabled && service.id !== activeId;
+  return !service.disabled && !service.hibernateWhenInactive && service.id !== activeId;
 }

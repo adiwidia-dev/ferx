@@ -15,6 +15,7 @@ export interface ExportedWorkspaceServiceV1 {
   url: string;
   storageKey: string;
   disabled?: boolean;
+  hibernateWhenInactive?: boolean;
   iconBgColor?: string;
   notificationPrefs: NotificationPrefs;
 }

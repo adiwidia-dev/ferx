@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ## [Unreleased]
 
+### Added
+
+- Added an optional per-service hibernation setting that closes inactive service webviews after 60 seconds to reduce background resource usage while preserving service storage.
+
 ### Fixed
 
 - Improved service switching responsiveness by skipping redundant active webview re-activation, reducing overlay hide work to the active webview, and preserving the previous active webview state if a switch fails.

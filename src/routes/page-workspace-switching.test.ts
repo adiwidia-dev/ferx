@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { flushSync, mount, unmount } from "svelte";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_NOTIFICATION_PREFS } from "$lib/services/notification-prefs";
 import { clearDndState } from "$lib/services/dnd-state.svelte";
@@ -21,6 +21,24 @@ const listen = vi.hoisted(() => {
   });
   return Object.assign(fn, { handlers });
 });
+const tauriWindow = vi.hoisted(() => {
+  const state = {
+    visible: true,
+    minimized: false,
+    focusHandler: null as ((event: { payload: boolean }) => void) | null,
+  };
+  return {
+    state,
+    isVisible: vi.fn(() => Promise.resolve(state.visible)),
+    isMinimized: vi.fn(() => Promise.resolve(state.minimized)),
+    onFocusChanged: vi.fn((handler: (event: { payload: boolean }) => void) => {
+      state.focusHandler = handler;
+      return Promise.resolve(() => {
+        state.focusHandler = null;
+      });
+    }),
+  };
+});
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke,
@@ -28,6 +46,14 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen,
+}));
+
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({
+    isVisible: tauriWindow.isVisible,
+    isMinimized: tauriWindow.isMinimized,
+    onFocusChanged: tauriWindow.onFocusChanged,
+  }),
 }));
 
 function createWorkspaceState(): WorkspaceGroupsState {
@@ -81,20 +107,52 @@ async function waitFor(ms: number) {
   flushSync();
 }
 
+async function settleFakeTimers(ms = 2) {
+  flushSync();
+  await Promise.resolve();
+  await vi.advanceTimersByTimeAsync(ms);
+  flushSync();
+}
+
+function setDocumentVisibility(value: DocumentVisibilityState) {
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    value,
+  });
+}
+
 async function unmountPage(component: ReturnType<typeof mount>) {
   await settle();
   unmount(component);
   await settle();
 }
 
+async function unmountPageFakeTimers(component: ReturnType<typeof mount>) {
+  await settleFakeTimers();
+  unmount(component);
+  await settleFakeTimers();
+}
+
 describe("workspace switching webview commands", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
+    setDocumentVisibility("visible");
+    tauriWindow.state.visible = true;
+    tauriWindow.state.minimized = false;
+    tauriWindow.state.focusHandler = null;
+    tauriWindow.isVisible.mockClear();
+    tauriWindow.isMinimized.mockClear();
+    tauriWindow.onFocusChanged.mockClear();
     localStorage.clear();
     invoke.mockReset();
     listen.mockClear();
     clearDndState();
     clearRuntimeBadges();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    setDocumentVisibility("visible");
   });
 
   it("waits for picker webviews to hide before opening the selected workspace service", async () => {
@@ -382,6 +440,115 @@ describe("workspace switching webview commands", () => {
     );
 
     await unmountPage(component);
+  });
+
+  it("hibernates an inactive service after switching away for 60 seconds", async () => {
+    vi.useFakeTimers();
+    const state = createWorkspaceState();
+    state.workspaces[0].serviceIds = ["youtube", "gemini"];
+    state.servicesById.youtube.hibernateWhenInactive = true;
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(state));
+    invoke.mockResolvedValue(undefined);
+
+    const component = mount(WorkspacePage, { target: document.body });
+    await settleFakeTimers();
+    invoke.mockClear();
+
+    document.querySelector<HTMLButtonElement>('button[title^="Gemini"]')?.click();
+    await settleFakeTimers();
+    await vi.advanceTimersByTimeAsync(59997);
+    expect(invoke).not.toHaveBeenCalledWith("close_webview", { payload: { id: "youtube" } });
+
+    await vi.advanceTimersByTimeAsync(1);
+    await Promise.resolve();
+
+    expect(invoke).toHaveBeenCalledWith("close_webview", { payload: { id: "youtube" } });
+    expect(invoke).not.toHaveBeenCalledWith(
+      "delete_webview",
+      expect.objectContaining({ payload: expect.objectContaining({ id: "youtube" }) }),
+    );
+
+    await unmountPageFakeTimers(component);
+  });
+
+  it("cancels pending hibernation when switching back before the delay", async () => {
+    vi.useFakeTimers();
+    const state = createWorkspaceState();
+    state.workspaces[0].serviceIds = ["youtube", "gemini"];
+    state.servicesById.youtube.hibernateWhenInactive = true;
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(state));
+    invoke.mockResolvedValue(undefined);
+
+    const component = mount(WorkspacePage, { target: document.body });
+    await settleFakeTimers();
+    invoke.mockClear();
+
+    document.querySelector<HTMLButtonElement>('button[title^="Gemini"]')?.click();
+    await settleFakeTimers();
+    document.querySelector<HTMLButtonElement>('button[title^="YouTube Music"]')?.click();
+    await settleFakeTimers();
+    await vi.advanceTimersByTimeAsync(60000);
+
+    expect(invoke).not.toHaveBeenCalledWith("close_webview", { payload: { id: "youtube" } });
+
+    await unmountPageFakeTimers(component);
+  });
+
+  it("hibernates the active service after Ferx is hidden for 60 seconds", async () => {
+    vi.useFakeTimers();
+    const state = createWorkspaceState();
+    state.servicesById.youtube.hibernateWhenInactive = true;
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(state));
+    invoke.mockResolvedValue(undefined);
+
+    const component = mount(WorkspacePage, { target: document.body });
+    await settleFakeTimers();
+    invoke.mockClear();
+
+    tauriWindow.state.visible = false;
+    setDocumentVisibility("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    await settleFakeTimers();
+    await vi.advanceTimersByTimeAsync(60000);
+    await Promise.resolve();
+
+    expect(invoke).toHaveBeenCalledWith("close_webview", { payload: { id: "youtube" } });
+
+    await unmountPageFakeTimers(component);
+  });
+
+  it("wakes a hibernated active service when Ferx becomes visible again", async () => {
+    vi.useFakeTimers();
+    const state = createWorkspaceState();
+    state.servicesById.youtube.hibernateWhenInactive = true;
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(state));
+    invoke.mockResolvedValue(undefined);
+
+    const component = mount(WorkspacePage, { target: document.body });
+    await settleFakeTimers();
+    invoke.mockClear();
+
+    tauriWindow.state.visible = false;
+    setDocumentVisibility("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    await settleFakeTimers();
+    await vi.advanceTimersByTimeAsync(60000);
+    await Promise.resolve();
+    invoke.mockClear();
+
+    tauriWindow.state.visible = true;
+    tauriWindow.state.minimized = false;
+    setDocumentVisibility("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+    await settleFakeTimers();
+    await settleFakeTimers();
+
+    expect(invoke).toHaveBeenCalledWith(
+      "open_service",
+      expect.objectContaining({ payload: expect.objectContaining({ id: "youtube" }) }),
+    );
+
+    await unmountPageFakeTimers(component);
   });
 
   it("closes only orphaned service webviews when deleting a workspace", async () => {

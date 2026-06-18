@@ -75,6 +75,7 @@ export function createServiceEditorStore() {
         name: service.name,
         url: service.url,
         iconBgColor: service.iconBgColor,
+        hibernateWhenInactive: service.hibernateWhenInactive,
       };
       isOpen = true;
     },
@@ -102,6 +103,7 @@ export function createServiceEditorStore() {
         newServiceName: input.name,
         newServiceUrl: input.url,
         newIconBgColor: input.iconBgColor,
+        newHibernateWhenInactive: input.hibernateWhenInactive === true,
         createServiceId: () => crypto.randomUUID().slice(0, 8),
       });
 

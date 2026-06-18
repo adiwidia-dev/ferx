@@ -38,7 +38,7 @@ describe("createServiceEditorStore", () => {
 
   it("openForEdit extracts id, name, url, iconBgColor from a PageService", () => {
     const editor = createServiceEditorStore();
-    const svc = makePageService({ iconBgColor: "#aabbcc" });
+    const svc = makePageService({ iconBgColor: "#aabbcc", hibernateWhenInactive: true });
     editor.openForEdit(svc);
     expect(editor.isOpen).toBe(true);
     expect(editor.editingService).toEqual({
@@ -46,6 +46,7 @@ describe("createServiceEditorStore", () => {
       name: "Slack",
       url: "https://app.slack.com",
       iconBgColor: "#aabbcc",
+      hibernateWhenInactive: true,
     });
   });
 
@@ -149,6 +150,27 @@ describe("createServiceEditorStore — save()", () => {
     expect(services).toHaveLength(1);
     expect(services[0].name).toBe("Slack");
     expect(activeId).toBe(services[0].id);
+  });
+
+  it("passes hibernation input through successful add", () => {
+    const editor = createServiceEditorStore();
+    const ctx = makeCtx();
+    editor.open(null);
+    editor.save(
+      {
+        name: "Slack",
+        url: "https://app.slack.com",
+        iconBgColor: undefined,
+        hibernateWhenInactive: true,
+      },
+      ctx,
+    );
+
+    const { services } = ctx.onWorkspaceUpdate.mock.calls[0][0] as {
+      services: PageService[];
+      activeId: string;
+    };
+    expect(services[0].hibernateWhenInactive).toBe(true);
   });
 
   it("does not preload a newly added active service", async () => {

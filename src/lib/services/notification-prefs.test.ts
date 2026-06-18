@@ -173,4 +173,24 @@ describe("countTrayRelevantUnreadServices", () => {
 
     expect(count).toBe(0);
   });
+
+  it("excludes hibernated services from the tray count", () => {
+    const count = countTrayRelevantUnreadServices([
+      {
+        id: "one",
+        name: "Slack",
+        url: "https://slack.com",
+        storageKey: "storage-one",
+        badge: 3,
+        hibernated: true,
+        notificationPrefs: {
+          showBadge: true,
+          affectTray: true,
+          muteAudio: false,
+        },
+      },
+    ]);
+
+    expect(count).toBe(0);
+  });
 });
