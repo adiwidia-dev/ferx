@@ -37,6 +37,9 @@ The current build intentionally targets direct distribution rather than the Mac 
 ## 5. Webview Lifecycle And Command Queue
 
 - Service webviews are long-lived native child windows. Overlay flows must move webviews offscreen; they must not close or hide service webviews unless the caller explicitly requested `close_webview`, `delete_webview`, or `close_all_service_webviews`.
+- Service hibernation is the only automatic close path for an enabled service webview. It uses `close_webview` after the service has been inactive for 60 seconds, preserves service storage, and must never use `delete_webview`.
+- Hibernation scheduling lives in `src/lib/services/service-hibernation.svelte.ts` and is orchestrated by `src/routes/+page.svelte`. The runtime hibernated flag is set only after `close_webview` succeeds; queued closes must re-check eligibility before and during the queued command so a service that was woken or edited is not marked hibernated incorrectly.
+- Hibernated services remain enabled and selectable. They are skipped by background preloading, excluded from tray unread counting while hibernated, and show an enabled hibernated state in the sidebar. Waking a service clears the runtime flag and bumps that service's wake generation so the normal `open_service` path runs even when the active service ID did not change.
 - `hide_all_webviews` only parks the active webview. Background webviews are already offscreen and in background badge mode, so re-parking every service creates avoidable O(N) latency.
 - All webview operations from `src/routes/+page.svelte` should go through `createWebviewCommandQueue` in `src/lib/services/webview-commands.ts`. Directly invoking hide/open helpers can race with queued service switches.
 - `open_service` should commit active-webview state only after the target child webview exists and has been activated. If a switch fails, the previous active state must remain valid so later overlay hides still target the visible webview.
@@ -55,6 +58,8 @@ The current build intentionally targets direct distribution rather than the Mac 
 - Release builds are ad-hoc signed during bundling via `bundle.macOS.signingIdentity = "-"` in `src-tauri/tauri.conf.json`. This keeps the shipped app identity stable across versions, but does not provide Developer ID trust or notarization.
 - First-run Gatekeeper friction is expected. Ferx intentionally does not target notarization or the Mac App Store (see the top-level note about distribution).
 - The updater download stage uses `bundle.createUpdaterArtifacts: true` in `tauri.conf.json` to emit `Ferx.app.tar.gz` + `.sig` alongside the DMG. The DMG is for first-time installs; the tarball is what the updater consumes.
+- GitHub release builds also publish an unsigned Windows NSIS installer and Linux x86_64 AppImage, Debian, and RPM packages. Tauri's Linux updater artifact is the AppImage plus its `.sig`; deb and rpm are first-install/native package artifacts.
+- The release workflow intentionally runs release matrix jobs one at a time because `tauri-action` merges every platform into the same `latest.json` asset. Expected updater platform keys include `darwin-aarch64`, `darwin-x86_64`, `windows-x86_64`, and `linux-x86_64`.
 - When changing the updater UI, mock `@tauri-apps/plugin-updater` and `@tauri-apps/plugin-process` in tests — both are wrapped in `src/lib/services/updater.ts` to keep the Svelte components free of direct plugin imports.
 
 ## 8. Config Import And Export

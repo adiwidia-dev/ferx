@@ -18,7 +18,15 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 - Fixed hibernation state accuracy so services are only marked hibernated after native webview close succeeds, queued hibernation closes are skipped if the service is woken first, and newly enabled inactive services are scheduled for hibernation.
 - Improved service switching responsiveness by skipping redundant active webview re-activation, reducing overlay hide work to the active webview, and preserving the previous active webview state if a switch fails.
-- Fixed service webviews opening to a blank page during sign-in or app startup by preventing unread badge monitoring from emitting navigation-based clear events before the service app is ready.
+
+---
+
+## [0.6.1] — 2026-05-19
+
+### Fixed
+
+- Fixed service webviews opening to a blank page during sign-in or app startup by delaying the first unread badge clear event until the page is ready, preventing the badge notification bridge from interrupting initial service navigation.
+- Kept unread badge monitoring quiet on loading and sign-in pages for WhatsApp, Telegram, Google Chat, Outlook, and Teams until each service's real app shell is detected, so startup pages no longer emit premature badge clear events.
 
 ---
 

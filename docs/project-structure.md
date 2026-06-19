@@ -23,9 +23,11 @@ Current high-traffic modules:
 | `webview-commands.ts` | Frontend wrappers for Tauri commands and the serialized webview command queue. |
 | `service-runtime.ts` | Payload builder helpers and re-exported Tauri command payload types. Do not redefine those payloads elsewhere. |
 | `service-editor.svelte.ts` | Add/edit dialog state and save flow. |
+| `service-hibernation.svelte.ts` | Runtime-only hibernation timers, hibernated service state, cancellation versions, and wake generations. |
 | `todo-panel.svelte.ts` | Todo notes state, mutations, panel open/close, and storage scheduling. |
 | `drag-drop.svelte.ts` | Pointer drag state and handlers. |
 | `runtime-badges.svelte.ts` | Runtime unread badge map and badge event application. |
+| `notification-prefs.ts` | Notification/audio preference helpers and tray-relevant unread counting, including runtime hibernation exclusion. |
 | `settings-page-state.ts` | Settings page startup and workspace color helpers. |
 | `updater.ts` | Wrapper around `@tauri-apps/plugin-updater` for settings UI tests and update flow. |
 

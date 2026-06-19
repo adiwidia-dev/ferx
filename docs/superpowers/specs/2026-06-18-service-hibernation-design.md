@@ -1,7 +1,7 @@
 # Service Hibernation Design
 
 Date: 2026-06-18
-Status: Written for user review
+Status: Implemented
 
 ## Goal
 
@@ -84,6 +84,8 @@ All native webview operations still go through `webviewCommands.run(...)`. Hiber
 
 The activation key must include the active service's hibernation wake generation. Clearing hibernation increments that generation, which forces exactly one `open_service` command even when the active service ID did not change.
 
+Queued hibernation close callbacks must be cancellation-safe. The implementation keeps a per-service version counter so a timer that fired before the user wakes the service cannot mark the service hibernated after a later cancellation. The page also re-checks service eligibility before entering the command queue and again inside the queued close command.
+
 ## App Visibility
 
 Ferx already hides the main window from Rust for tray toggle and close-request behavior. The frontend should treat the app as inactive when the main window is hidden or minimized.
@@ -112,7 +114,7 @@ When the user opens the service again, badge monitoring resumes through the norm
 
 ## Failure Handling
 
-If `close_webview` fails during hibernation, leave the service non-hibernated in runtime state and log the command failure through the existing webview command queue behavior. Do not show a user toast for this version; failure means Ferx simply keeps the service loaded.
+If `close_webview` fails during hibernation, leave the service non-hibernated in runtime state and log the command failure through the existing webview command queue behavior. Do not show a user toast for this version; failure means Ferx simply keeps the service loaded. The native `close_webview` command must propagate `webview.close()` errors so the frontend can avoid marking a still-live webview as hibernated.
 
 If `open_service` fails while waking a hibernated service, existing open-service failure behavior remains responsible for preserving or reporting state. The hibernated runtime flag should be cleared before or during the wake attempt so a retry can run through the normal activation path.
 

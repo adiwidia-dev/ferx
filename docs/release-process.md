@@ -119,7 +119,7 @@ Pushing the tag immediately triggers `.github/workflows/release.yml`.
 
 ### Step 7 — Watch the release workflow
 
-Open `https://github.com/adiwidia-dev/ferx/actions` and follow the `Release` run. It will take roughly 8–15 minutes on `macos-latest`.
+Open `https://github.com/adiwidia-dev/ferx/actions` and follow the `Release` run. The release matrix builds macOS, Windows, and Linux one at a time so `tauri-action` can safely merge platform entries into the same `latest.json` asset.
 
 If the workflow fails, the two common causes are:
 
@@ -133,8 +133,10 @@ On success, the workflow has:
 3. Produced `Ferx.app.tar.gz` + `Ferx.app.tar.gz.sig` (signed with the minisign key).
 4. Built an unsigned Windows NSIS setup `.exe`.
 5. Produced the Windows setup `.exe.sig` updater signature with the same minisign key.
-6. Generated `latest.json` with macOS and Windows platform entries.
-7. Created a **draft** GitHub Release and attached the DMG, macOS updater tarball, Windows setup `.exe`, `.sig` files, and `latest.json`.
+6. Built Linux x86_64 AppImage, Debian, and RPM packages on `ubuntu-22.04`.
+7. Produced the Linux AppImage `.sig` updater signature with the same minisign key. The AppImage is the Linux updater artifact; deb and rpm are first-install/native package artifacts.
+8. Generated `latest.json` with macOS, Windows, and Linux platform entries.
+9. Created a **draft** GitHub Release and attached the DMG, macOS updater tarball, Windows setup `.exe`, Linux AppImage/deb/rpm artifacts, `.sig` files, and `latest.json`.
 
 ### Step 8 — Fill in release notes and publish
 
@@ -173,10 +175,24 @@ Get-AuthenticodeSignature .\Ferx*.exe
 
 The expected status is `NotSigned`. This does not disable Tauri updater verification; the updater still requires the `.sig` generated from `TAURI_SIGNING_PRIVATE_KEY`.
 
+On a Linux x86_64 desktop or VM:
+
+1. Download the AppImage from the draft release, make it executable, and launch it:
+
+```bash
+chmod +x Ferx*.AppImage
+./Ferx*.AppImage
+```
+
+2. Confirm the app opens, service webviews load, and Settings shows version `X.Y.Z`.
+3. Install the `.deb` on an Ubuntu/Debian-family VM and confirm it launches from the app menu or command line.
+4. Install the `.rpm` on a Fedora/RHEL-family VM and confirm it launches from the app menu or command line.
+5. For in-app update testing, keep an older AppImage install available, publish the draft release, then use Settings → **Check for Updates**. The updater should download the new AppImage updater artifact, verify its minisign `.sig`, and relaunch to version `X.Y.Z`.
+
 If it doesn't work, debug in this order:
 
 1. `curl -L https://github.com/adiwidia-dev/ferx/releases/latest/download/latest.json` → must return the JSON you just published.
-2. Verify `latest.json` contains the current platform key: `darwin-aarch64`/`darwin-x86_64` for macOS or `windows-x86_64` for Windows.
+2. Verify `latest.json` contains the current platform key: `darwin-aarch64`/`darwin-x86_64` for macOS, `windows-x86_64` for Windows, or `linux-x86_64` for Linux.
 3. Verify `plugins.updater.pubkey` in `tauri.conf.json` matches the public half of `TAURI_SIGNING_PRIVATE_KEY` in Actions secrets.
 4. Re-check the running install's version against `tauri.conf.json` on that release — the updater compares semver, not file hashes.
 
@@ -209,6 +225,16 @@ Without Apple Developer ID + notarization, occasional prompts may still happen o
 Windows GitHub release builds are currently not Authenticode-signed. This keeps the release flow similar to Ferdium's current GitHub-only Windows releases and avoids paid certificate setup, but Microsoft Defender SmartScreen may warn that Ferx is unrecognized.
 
 This is separate from in-app updater verification. Do not remove `TAURI_SIGNING_PRIVATE_KEY` or `.sig` artifacts; those are still required for secure updates.
+
+### Linux package expectations
+
+Linux GitHub release builds currently target x86_64 and publish three formats:
+
+- AppImage: portable artifact for Arch-family distributions such as CachyOS and Manjaro, plus the artifact used by the Tauri updater.
+- deb: native package for Debian, Ubuntu, Linux Mint, Pop!_OS, and related distributions.
+- rpm: native package for Fedora, RHEL-family, Rocky, AlmaLinux, openSUSE, and CentOS Stream-style distributions.
+
+Ferx does not currently publish an AUR package, Flatpak, Snap, or Linux ARM artifacts. Add those only when there is a clear maintenance path and smoke-test coverage.
 
 ### Pulling a bad release back
 

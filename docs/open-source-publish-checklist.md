@@ -12,9 +12,13 @@
 - Confirm the invalid service URL path fails safely.
 - Confirm editing a service URL updates the live service behavior.
 - Confirm disabling a service unloads it rather than leaving it live in the background.
+- Confirm a service with **Hibernate when inactive** enabled closes after 60 seconds of inactivity, shows the hibernated sidebar state, and wakes when clicked without losing its saved session.
+- Confirm hibernated services are visually distinct from disabled services and do not use disabled opacity/grayscale styling.
 - Confirm opening overlays such as the service editor, workspace switcher, and todos panel moves the active service webview offscreen without closing or reloading it.
 - Confirm switching between already-loaded services does not steal focus or re-activate the current service when unrelated workspace preferences change.
+- Confirm hiding or minimizing Ferx starts the hibernation timer for the active hibernation-enabled service.
 - Confirm persisted service state still recovers correctly after restart.
+- Confirm release artifacts launch on each announced platform: macOS DMG, Windows NSIS installer, Linux AppImage, Linux deb, and Linux rpm.
 
 ## CI Expectations
 
