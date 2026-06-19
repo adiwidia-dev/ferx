@@ -51,6 +51,26 @@ describe("createServiceHibernationStore", () => {
     expect(hibernation.isHibernated("chat")).toBe(false);
   });
 
+  it("does not mark a service hibernated when cancelled while the callback is in flight", async () => {
+    let resolveHibernate: (value?: boolean | void) => void = () => {};
+    const hibernation = createServiceHibernationStore({ delayMs: 60000 });
+
+    hibernation.schedule(
+      "chat",
+      () =>
+        new Promise<boolean | void>((resolve) => {
+          resolveHibernate = resolve;
+        }),
+    );
+    await vi.advanceTimersByTimeAsync(60000);
+
+    hibernation.cancel("chat");
+    resolveHibernate();
+    await Promise.resolve();
+
+    expect(hibernation.isHibernated("chat")).toBe(false);
+  });
+
   it("clears hibernation and increments wake generation", () => {
     const hibernation = createServiceHibernationStore({ delayMs: 60000 });
 

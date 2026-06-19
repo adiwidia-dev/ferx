@@ -494,6 +494,48 @@ describe("workspace switching webview commands", () => {
     await unmountPageFakeTimers(component);
   });
 
+  it("does not close a service that is woken after the hibernation timer fires but before the close command runs", async () => {
+    vi.useFakeTimers();
+    const state = createWorkspaceState();
+    state.workspaces[0].serviceIds = ["youtube", "gemini"];
+    state.servicesById.youtube.hibernateWhenInactive = true;
+    state.servicesById.gemini.notificationPrefs = {
+      ...DEFAULT_NOTIFICATION_PREFS,
+      muteAudio: true,
+    };
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(state));
+
+    let resolveAudioMute: () => void = () => {};
+    invoke.mockImplementation((command: string) => {
+      if (command === "set_service_webview_audio_muted") {
+        return new Promise<void>((resolve) => {
+          resolveAudioMute = resolve;
+        });
+      }
+      return Promise.resolve();
+    });
+
+    const component = mount(WorkspacePage, { target: document.body });
+    await settleFakeTimers();
+    invoke.mockClear();
+
+    document.querySelector<HTMLButtonElement>('button[title^="Gemini"]')?.click();
+    await settleFakeTimers();
+    await vi.advanceTimersByTimeAsync(60000);
+    await Promise.resolve();
+
+    document.querySelector<HTMLButtonElement>('button[title^="YouTube Music"]')?.click();
+    await settleFakeTimers();
+
+    resolveAudioMute();
+    await settleFakeTimers();
+    await settleFakeTimers();
+
+    expect(invoke).not.toHaveBeenCalledWith("close_webview", { payload: { id: "youtube" } });
+
+    await unmountPageFakeTimers(component);
+  });
+
   it("hibernates the active service after Ferx is hidden for 60 seconds", async () => {
     vi.useFakeTimers();
     const state = createWorkspaceState();
@@ -540,6 +582,54 @@ describe("workspace switching webview commands", () => {
     tauriWindow.state.minimized = false;
     setDocumentVisibility("visible");
     document.dispatchEvent(new Event("visibilitychange"));
+    await settleFakeTimers();
+    await settleFakeTimers();
+
+    expect(invoke).toHaveBeenCalledWith(
+      "open_service",
+      expect.objectContaining({ payload: expect.objectContaining({ id: "youtube" }) }),
+    );
+
+    await unmountPageFakeTimers(component);
+  });
+
+  it("wakes the active service if Ferx becomes visible while hibernation close is still in flight", async () => {
+    vi.useFakeTimers();
+    const state = createWorkspaceState();
+    state.servicesById.youtube.hibernateWhenInactive = true;
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(state));
+
+    let resolveClose: () => void = () => {};
+    invoke.mockImplementation((command: string) => {
+      if (command === "close_webview") {
+        return new Promise<void>((resolve) => {
+          resolveClose = resolve;
+        });
+      }
+      return Promise.resolve();
+    });
+
+    const component = mount(WorkspacePage, { target: document.body });
+    await settleFakeTimers();
+    invoke.mockClear();
+
+    tauriWindow.state.visible = false;
+    setDocumentVisibility("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    await settleFakeTimers();
+    await vi.advanceTimersByTimeAsync(60000);
+    await Promise.resolve();
+
+    expect(invoke).toHaveBeenCalledWith("close_webview", { payload: { id: "youtube" } });
+    invoke.mockClear();
+
+    tauriWindow.state.visible = true;
+    tauriWindow.state.minimized = false;
+    setDocumentVisibility("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+    await settleFakeTimers();
+
+    resolveClose();
     await settleFakeTimers();
     await settleFakeTimers();
 

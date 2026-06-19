@@ -498,6 +498,20 @@
     await webviewCommands.interrupt(hideAllWebviews);
   }
 
+  function isServiceHibernationEligible(serviceId: string) {
+    const service = workspaceState.servicesById[serviceId];
+    if (!service?.hibernateWhenInactive || service.disabled) {
+      return false;
+    }
+
+    const activeVisibleServiceId =
+      !isAppInactive && activeService && !activeService.disabled && !isCurrentWorkspaceDisabled
+        ? activeService.id
+        : "";
+
+    return activeVisibleServiceId !== serviceId;
+  }
+
   function scheduleServiceHibernation(serviceId: string) {
     const service = workspaceState.servicesById[serviceId];
     if (!service?.hibernateWhenInactive || service.disabled) {
@@ -506,12 +520,24 @@
     }
 
     serviceHibernation.schedule(serviceId, async (targetId) => {
-      const currentService = workspaceState.servicesById[targetId];
-      if (!currentService?.hibernateWhenInactive || currentService.disabled) {
+      if (!isServiceHibernationEligible(targetId)) {
         return false;
       }
 
-      await webviewCommands.run(() => closeServiceWebview(targetId));
+      let closed = false;
+      await webviewCommands.run(async () => {
+        if (!isServiceHibernationEligible(targetId)) return;
+        await closeServiceWebview(targetId);
+        closed = true;
+      });
+
+      if (!closed) return false;
+      if (!isServiceHibernationEligible(targetId)) {
+        serviceHibernation.markHibernated(targetId);
+        serviceHibernation.clearHibernated(targetId);
+        return false;
+      }
+
       return true;
     });
   }
@@ -642,6 +668,7 @@
       deleteWebview: (payload) => webviewCommands.run(() => deleteServiceWebview(payload)),
       loadService: (service) =>
         webviewCommands.run(() => preloadServiceWebview(service, spellCheckEnabled)),
+      scheduleHibernation: scheduleServiceHibernation,
     });
   }
 </script>

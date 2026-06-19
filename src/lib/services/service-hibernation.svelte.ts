@@ -9,9 +9,16 @@ export function createServiceHibernationStore({
   delayMs?: number;
 } = {}) {
   const timers = new Map<string, Timer>();
+  const versions = new Map<string, number>();
   let pending = $state<Record<string, true | undefined>>({});
   let hibernated = $state<Record<string, true | undefined>>({});
   let wakeGenerations = $state<Record<string, number | undefined>>({});
+
+  function bumpVersion(serviceId: string) {
+    const next = (versions.get(serviceId) ?? 0) + 1;
+    versions.set(serviceId, next);
+    return next;
+  }
 
   function cancel(serviceId: string) {
     const timer = timers.get(serviceId);
@@ -20,6 +27,7 @@ export function createServiceHibernationStore({
       timers.delete(serviceId);
     }
     delete pending[serviceId];
+    bumpVersion(serviceId);
   }
 
   function markHibernated(serviceId: string) {
@@ -28,6 +36,7 @@ export function createServiceHibernationStore({
 
   function schedule(serviceId: string, onHibernate: HibernateCallback) {
     cancel(serviceId);
+    const version = bumpVersion(serviceId);
     pending[serviceId] = true;
 
     const timer = setTimeout(() => {
@@ -36,6 +45,7 @@ export function createServiceHibernationStore({
 
       void Promise.resolve(onHibernate(serviceId))
         .then((result) => {
+          if (versions.get(serviceId) !== version) return;
           if (result !== false) {
             markHibernated(serviceId);
           }
@@ -49,6 +59,7 @@ export function createServiceHibernationStore({
   }
 
   function clearHibernated(serviceId: string) {
+    bumpVersion(serviceId);
     if (!hibernated[serviceId]) return;
     delete hibernated[serviceId];
     wakeGenerations[serviceId] = (wakeGenerations[serviceId] ?? 0) + 1;
@@ -57,6 +68,9 @@ export function createServiceHibernationStore({
   function cancelAll() {
     for (const timer of timers.values()) {
       clearTimeout(timer);
+    }
+    for (const serviceId of versions.keys()) {
+      bumpVersion(serviceId);
     }
     timers.clear();
     pending = {};

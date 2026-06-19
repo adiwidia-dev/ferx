@@ -43,8 +43,13 @@ async restartApp() : Promise<Result<null, string>> {
 async reloadWebview(payload: WebviewIdPayload) : Promise<void> {
     await TAURI_INVOKE("reload_webview", { payload });
 },
-async closeWebview(payload: WebviewIdPayload) : Promise<void> {
-    await TAURI_INVOKE("close_webview", { payload });
+async closeWebview(payload: WebviewIdPayload) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("close_webview", { payload }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 },
 async deleteWebview(payload: DeleteWebviewPayload) : Promise<void> {
     await TAURI_INVOKE("delete_webview", { payload });

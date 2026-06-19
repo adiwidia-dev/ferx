@@ -425,11 +425,11 @@ pub async fn reload_webview(app: AppHandle, payload: WebviewIdPayload) {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn close_webview(app: AppHandle, payload: WebviewIdPayload) {
+pub async fn close_webview(app: AppHandle, payload: WebviewIdPayload) -> Result<(), String> {
     let WebviewIdPayload { id } = payload;
 
     if let Some(webview) = app.get_webview(&id) {
-        let _ = webview.close();
+        webview.close().map_err(|error| error.to_string())?;
     }
     remove_badge_monitoring_pref(&app, &id);
 
@@ -440,6 +440,8 @@ pub async fn close_webview(app: AppHandle, payload: WebviewIdPayload) {
             set_active_resource_usage_monitoring(&app, false);
         }
     };
+
+    Ok(())
 }
 
 #[tauri::command]

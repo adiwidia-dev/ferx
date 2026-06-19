@@ -245,6 +245,41 @@ describe("saveServiceState", () => {
     expect(disabled.services[0]).not.toHaveProperty("hibernateWhenInactive");
   });
 
+  it("requests hibernation scheduling when newly enabling hibernation for an inactive service", () => {
+    const services = [
+      createService({ id: "active", storageKey: "storage-active" }),
+      createService({ id: "inactive", storageKey: "storage-inactive" }),
+    ];
+
+    const result = saveServiceState({
+      services,
+      activeId: "active",
+      editingServiceId: "inactive",
+      newServiceName: "Slack",
+      newServiceUrl: "https://slack.com/app",
+      newHibernateWhenInactive: true,
+      createServiceId: () => "unused",
+    });
+
+    expect(result.hibernateInactiveServiceId).toBe("inactive");
+  });
+
+  it("does not request hibernation scheduling when enabling hibernation for the active service", () => {
+    const services = [createService({ id: "active", storageKey: "storage-active" })];
+
+    const result = saveServiceState({
+      services,
+      activeId: "active",
+      editingServiceId: "active",
+      newServiceName: "Slack",
+      newServiceUrl: "https://slack.com/app",
+      newHibernateWhenInactive: true,
+      createServiceId: () => "unused",
+    });
+
+    expect(result.hibernateInactiveServiceId).toBeUndefined();
+  });
+
   it("does not unload when a legacy stored URL normalizes to the same effective URL", () => {
     const services = [
       createService({
@@ -449,6 +484,53 @@ describe("saveServiceState", () => {
     });
 
     expect(events).toEqual(["delete:inactive"]);
+  });
+
+  it("schedules hibernation after newly enabling hibernation for an inactive service", async () => {
+    const services = [
+      createService({
+        id: "active",
+        url: "https://mail.example.com",
+        storageKey: "storage-active",
+      }),
+      createService({
+        id: "inactive",
+        url: "https://chat.example.com",
+        storageKey: "storage-inactive",
+      }),
+    ];
+    const nextState = saveServiceState({
+      services,
+      activeId: "active",
+      editingServiceId: "inactive",
+      newServiceName: "Chat",
+      newServiceUrl: "https://chat.example.com",
+      newHibernateWhenInactive: true,
+      createServiceId: () => "unused",
+    });
+
+    const events: string[] = [];
+
+    await applySaveServiceResult({
+      nextState,
+      editingServiceId: "inactive",
+      currentActiveId: "active",
+      showToast: () => undefined,
+      setState: () => undefined,
+      deleteWebview: async ({ id }: { id: string; storageKey: string }) => {
+        events.push(`delete:${id}`);
+      },
+      loadService: async (service: PageService) => {
+        events.push(`load:${service.id}`);
+      },
+      scheduleHibernation: (id: string) => {
+        events.push(`hibernate:${id}`);
+      },
+    } as Parameters<typeof applySaveServiceResult>[0] & {
+      scheduleHibernation: (id: string) => void;
+    });
+
+    expect(events).toEqual(["hibernate:inactive"]);
   });
 
   it("does not reload a disabled edited service after deleting the old webview", async () => {

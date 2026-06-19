@@ -16,8 +16,10 @@ use crate::service_webview_runtime_scripts::{
     audio_mute_controller_script, common_webview_script, google_auth_compat_script,
     notification_script, spellcheck_script,
 };
+use std::future::Future;
+
 use crate::webview_commands::{
-    badge_monitoring_eval_script, close_all_service_webviews, hide_all_webviews_target,
+    badge_monitoring_eval_script, close_all_service_webviews, close_webview, hide_all_webviews_target,
     open_service_state_transition, previous_active_webview_to_hide, safe_export_file_name,
     save_workspace_config_export, AudioMutedPayload, BadgeMonitoringMode, DeleteWebviewPayload,
     RightPanelWidthPayload, ServiceWebviewCommandPayload, WebviewIdPayload,
@@ -229,10 +231,19 @@ fn default_capability_grants_updater_and_process_restart() {
 /// no source-string sniffing needed.
 #[allow(dead_code)]
 fn assert_command_signatures() {
+    fn assert_close_webview_signature<F, Fut>(_f: F)
+    where
+        F: Fn(tauri::AppHandle, WebviewIdPayload) -> Fut,
+        Fut: Future<Output = Result<(), String>>,
+    {
+    }
+
     // close_all_service_webviews: AppHandle → ()
     let _: fn() = || {
         let _ = close_all_service_webviews;
     };
+    // close_webview: (AppHandle, WebviewIdPayload) → Result<(), String>
+    assert_close_webview_signature(close_webview);
     // save_workspace_config_export: (String, String) → Result<bool, String>
     let _: fn() = || {
         let _ = save_workspace_config_export;

@@ -108,6 +108,7 @@ export function saveServiceState({
   shouldCloseModal: boolean;
   loadService?: PageService;
   deleteWebview?: { id: string; storageKey: string };
+  hibernateInactiveServiceId?: string;
 } {
   if (!newServiceName || !newServiceUrl) {
     return {
@@ -152,6 +153,13 @@ export function saveServiceState({
     };
     const existingNormalized = normalizeServiceUrl(existingService.url);
     const effectiveUrlChanged = !existingNormalized.ok || existingNormalized.url !== normalized.url;
+    const hibernationNewlyEnabled =
+      newHibernateWhenInactive === true && existingService.hibernateWhenInactive !== true;
+    const shouldScheduleInactiveHibernation =
+      hibernationNewlyEnabled &&
+      existingService.id !== activeId &&
+      !existingService.disabled &&
+      !effectiveUrlChanged;
 
     return {
       services: services.map((service) =>
@@ -165,6 +173,9 @@ export function saveServiceState({
             id: existingService.id,
             storageKey: existingService.storageKey,
           }
+        : undefined,
+      hibernateInactiveServiceId: shouldScheduleInactiveHibernation
+        ? existingService.id
         : undefined,
     };
   }
@@ -196,6 +207,7 @@ export async function applySaveServiceResult({
   setState,
   deleteWebview,
   loadService,
+  scheduleHibernation,
 }: {
   nextState: ReturnType<typeof saveServiceState>;
   editingServiceId: string | null;
@@ -208,6 +220,7 @@ export async function applySaveServiceResult({
   }) => void;
   deleteWebview: (payload: { id: string; storageKey: string }) => Promise<unknown>;
   loadService: (service: PageService) => Promise<unknown>;
+  scheduleHibernation?: (id: string) => void;
 }) {
   if (nextState.toastMessage) {
     showToast(nextState.toastMessage);
@@ -249,6 +262,10 @@ export async function applySaveServiceResult({
 
   if (nextState.loadService && nextState.loadService.id !== nextState.activeId) {
     await loadService(nextState.loadService);
+  }
+
+  if (nextState.hibernateInactiveServiceId) {
+    scheduleHibernation?.(nextState.hibernateInactiveServiceId);
   }
 }
 

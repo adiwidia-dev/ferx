@@ -38,6 +38,8 @@ export type SaveServiceContext = {
   deleteWebview: (payload: { id: string; storageKey: string }) => Promise<unknown>;
   /** Preload a newly added or updated service webview. */
   loadService: (service: PageService) => Promise<unknown>;
+  /** Schedule an inactive service for hibernation after enabling the setting. */
+  scheduleHibernation?: (id: string) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -121,6 +123,7 @@ export function createServiceEditorStore() {
         },
         deleteWebview: ctx.deleteWebview,
         loadService: ctx.loadService,
+        scheduleHibernation: ctx.scheduleHibernation,
       }).catch((err: unknown) => {
         console.error("[ferx] service save failed:", err);
       });
