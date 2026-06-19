@@ -7,6 +7,8 @@ import { DEFAULT_NOTIFICATION_PREFS } from "$lib/services/notification-prefs";
 import type { PageService } from "$lib/services/workspace-state";
 import type { WorkspaceGroup } from "$lib/services/workspace-groups";
 
+type SidebarTestService = PageService & { hibernated?: boolean };
+
 const workspaces: WorkspaceGroup[] = [
   {
     id: "default",
@@ -18,21 +20,26 @@ const workspaces: WorkspaceGroup[] = [
   },
 ];
 
-function service(index: number): PageService {
+function service(index: number, overrides: Partial<SidebarTestService> = {}): SidebarTestService {
   return {
     id: `service-${index}`,
     name: `Service ${index}`,
     url: `https://service-${index}.example.com`,
     storageKey: `service-${index}`,
     notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+    ...overrides,
   };
 }
 
-function mountSidebar(serviceCount: number) {
+function mountSidebar(serviceCountOrServices: number | SidebarTestService[]) {
+  const services = Array.isArray(serviceCountOrServices)
+    ? serviceCountOrServices
+    : Array.from({ length: serviceCountOrServices }, (_, index) => service(index + 1));
+
   return mount(WorkspaceSidebar, {
     target: document.body,
     props: {
-      services: Array.from({ length: serviceCount }, (_, index) => service(index + 1)),
+      services,
       activeId: "service-1",
       workspaces,
       currentWorkspaceId: "default",
@@ -74,6 +81,39 @@ describe("WorkspaceSidebar", () => {
     expect(utilityControls?.className).toContain("shrink-0");
     expect(serviceList?.contains(utilityControls)).toBe(false);
     expect(utilityControls?.querySelector('[title="Settings"]')).toBeTruthy();
+
+    unmount(component);
+  });
+
+  it("shows enabled hibernated services without using disabled styling", () => {
+    const component = mountSidebar([
+      service(1),
+      service(2, { hibernated: true }),
+      service(3, { disabled: true, hibernated: true }),
+    ]);
+
+    flushSync();
+
+    const hibernatedButton = document.querySelector<HTMLButtonElement>(
+      '[title="Service 2 is hibernated. Click to wake."]',
+    );
+    const disabledButton = document.querySelector<HTMLButtonElement>('[title="Service 3 (Cmd+3)"]');
+
+    expect(hibernatedButton).toBeTruthy();
+    expect(hibernatedButton?.className).toContain("bg-sky-500/10");
+    expect(hibernatedButton?.className).toContain("ring-sky-400/40");
+    expect(hibernatedButton?.className).not.toContain("opacity-40");
+    expect(hibernatedButton?.className).not.toContain("grayscale");
+    expect(
+      hibernatedButton?.querySelector('[data-testid="service-hibernation-indicator"]'),
+    ).toBeTruthy();
+
+    expect(disabledButton?.className).toContain("opacity-40");
+    expect(disabledButton?.className).toContain("grayscale");
+    expect(disabledButton?.className).not.toContain("bg-sky-500/10");
+    expect(
+      disabledButton?.querySelector('[data-testid="service-hibernation-indicator"]'),
+    ).toBeFalsy();
 
     unmount(component);
   });

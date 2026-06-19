@@ -51,7 +51,7 @@ New services default to unchecked. Editing a service shows the current value and
 
 There is no separate hibernated placeholder screen. If the user selects a hibernated service, Ferx immediately opens the webview using the existing open-service path. The user may see the normal service load time, but no extra click is required.
 
-Ferx should not add a sidebar hibernation badge or status indicator in this version. The setting helper copy is enough for the initial release.
+When hibernation has actually completed, the service tile shows an enabled hibernated state in the sidebar. This state uses a subtle cool-tinted tile background/ring plus a small bottom-right cyan status dot. It must not use disabled styling: no heavy opacity, no grayscale, and no visual treatment that suggests the service cannot be selected. The service title/tooltip changes to "[Service] is hibernated. Click to wake." so hover/focus gives the exact state and action.
 
 ## Data Model
 
@@ -146,6 +146,5 @@ Update `CHANGELOG.md` under `[Unreleased]` with a new feature entry for optional
 
 - No global hibernation setting.
 - No configurable delay in this release.
-- No sidebar hibernation indicator.
 - No background badge polling for hibernated services.
 - No Rust-side hibernation scheduler.

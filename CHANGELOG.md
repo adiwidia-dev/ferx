@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 ### Added
 
 - Added an optional per-service hibernation setting that closes inactive service webviews after 60 seconds to reduce background resource usage while preserving service storage.
+- Added a visible enabled sidebar state for hibernated services, including a subtle status dot and hover/title text that says the service can be clicked to wake.
 
 ### Fixed
 

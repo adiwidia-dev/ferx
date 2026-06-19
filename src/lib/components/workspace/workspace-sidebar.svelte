@@ -7,8 +7,10 @@
   import type { WorkspaceGroup } from "$lib/services/workspace-groups";
   import type { WorkspaceIconKey } from "$lib/services/workspace-icons";
 
+  type SidebarService = PageService & { hibernated?: boolean };
+
   interface Props {
-    services: PageService[];
+    services: SidebarService[];
     activeId: string;
     workspaces: WorkspaceGroup[];
     currentWorkspaceId: string;
@@ -64,7 +66,15 @@
     onSelectService(id);
   }
 
-  function openServiceContextMenu(event: MouseEvent, service: PageService) {
+  function serviceButtonTitle(service: SidebarService, index: number) {
+    if (service.hibernated && !service.disabled) {
+      return `${service.name} is hibernated. Click to wake.`;
+    }
+
+    return `${service.name} (Cmd+${index + 1})`;
+  }
+
+  function openServiceContextMenu(event: MouseEvent, service: SidebarService) {
     event.preventDefault();
     onOpenServiceContextMenu({
       id: service.id,
@@ -103,6 +113,7 @@
     data-testid="workspace-service-list"
   >
     {#each services as service, index (service.id)}
+      {@const isHibernated = service.hibernated && !service.disabled}
       <div
         role="listitem"
         data-service-drop-target={service.id}
@@ -119,10 +130,10 @@
           oncontextmenu={(event) => openServiceContextMenu(event, service)}
         >
           <Button
-            title={`${service.name} (Cmd+${index + 1})`}
+            title={serviceButtonTitle(service, index)}
             variant="ghost"
             class="h-14 w-16 rounded-2xl p-2 transition-all relative overflow-visible
-                   {activeId === service.id ? 'bg-muted ring-1 ring-border shadow-sm' : 'hover:bg-foreground/5'}
+                   {isHibernated ? 'bg-sky-500/10 ring-1 ring-sky-400/40 shadow-sm hover:bg-sky-500/15' : activeId === service.id ? 'bg-muted ring-1 ring-border shadow-sm' : 'hover:bg-foreground/5'}
                    {service.disabled ? 'opacity-40 grayscale' : ''}"
             style={service.iconBgColor ? `box-shadow: inset 0 0 0 2.5px ${service.iconBgColor};` : ""}
             onclick={() => selectService(service.id)}
@@ -130,7 +141,7 @@
             <div
               aria-hidden="true"
               class="flex h-full w-full items-center justify-center rounded-xl text-sm font-semibold tracking-wide text-foreground/80 pointer-events-none
-                     {activeId === service.id ? 'bg-background/85' : 'bg-muted/60'}"
+                     {isHibernated ? 'bg-sky-950/20 ring-1 ring-inset ring-sky-300/15' : activeId === service.id ? 'bg-background/85' : 'bg-muted/60'}"
             >
               {#if !failedIcons[service.id]}
                 <img
@@ -158,6 +169,14 @@
               >
                 {service.badge === -1 ? "" : service.badge > 99 ? "99+" : service.badge}
               </div>
+            {/if}
+
+            {#if isHibernated}
+              <div
+                aria-hidden="true"
+                data-testid="service-hibernation-indicator"
+                class="absolute -bottom-1 -right-1 z-40 h-3.5 w-3.5 rounded-full bg-sky-300 shadow-sm ring-[3px] ring-background"
+              ></div>
             {/if}
           </Button>
         </div>
