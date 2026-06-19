@@ -12,7 +12,7 @@
         let evaluationTimer = null;
         let evaluationInFlight = false;
         let evaluationQueued = false;
-        const BADGE_EVALUATION_DELAY_MS = 300;
+        const BADGE_EVALUATION_DELAY_MS = 1000;
         const BADGE_SAFETY_POLL_MS = 15000;
         const BADGE_OBSERVATION_RETRY_MS = 1000;
         let safetyPollTimer = null;

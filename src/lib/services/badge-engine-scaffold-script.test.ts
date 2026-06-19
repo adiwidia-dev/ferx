@@ -10,7 +10,7 @@ import {
 function runScaffold(config: Record<string, unknown>) {
   vi.useFakeTimers();
   document.body.innerHTML = "";
-  installMutationObserverMock();
+  const observers = installMutationObserverMock();
   const reports: string[] = [];
   window.__ferxBadgeReports = reports;
 
@@ -21,7 +21,7 @@ function runScaffold(config: Record<string, unknown>) {
   window.eval(patched);
   (window as Window & { __ferxInitBadgeMonitor?: (c: unknown) => void }).__ferxInitBadgeMonitor?.(config);
   document.dispatchEvent(new Event("DOMContentLoaded"));
-  return { reports };
+  return { observers, reports };
 }
 
 afterEach(cleanupBadgeTestGlobals);
@@ -207,6 +207,33 @@ describe("badge_engine_scaffold", () => {
     window.__ferxSetBadgeMonitoringMode?.("active", true);
     await flushBadgeAsync();
     expect(observed).toBe(target);
+  });
+
+  it("coalesces active DOM mutation evaluations for one second", async () => {
+    let callCount = 0;
+    const { observers } = runScaffold({
+      readState: () => { callCount += 1; return "clear"; },
+      resolveObservationTargets: () => [document.body],
+      observeOptions: { childList: true },
+      titleBindingFlag: "__ferx_test_title_bound",
+    });
+    window.__ferxSetBadgeMonitoringMode?.("active", true);
+    await flushBadgeAsync();
+    const baseline = callCount;
+
+    const domObserver = observers.find((observer) =>
+      observer.observations.some((observation) => observation.target === document.body),
+    );
+    expect(domObserver).toBeTruthy();
+
+    domObserver?.trigger();
+    await vi.advanceTimersByTimeAsync(999);
+    await flushBadgeAsync();
+    expect(callCount).toBe(baseline);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await flushBadgeAsync();
+    expect(callCount).toBeGreaterThan(baseline);
   });
 
   it("retries observation when targets are not yet available", async () => {

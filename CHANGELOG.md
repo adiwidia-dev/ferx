@@ -16,6 +16,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ### Fixed
 
+- Reduced active-service badge monitoring work during heavy DOM churn in services such as Outlook, Teams, and WhatsApp by coalescing mutation-triggered badge scans for longer.
 - Fixed hibernation state accuracy so services are only marked hibernated after native webview close succeeds, queued hibernation closes are skipped if the service is woken first, and newly enabled inactive services are scheduled for hibernation.
 - Improved service switching responsiveness by skipping redundant active webview re-activation, reducing overlay hide work to the active webview, and preserving the previous active webview state if a switch fails.
 
