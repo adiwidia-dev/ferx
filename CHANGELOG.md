@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 ### Changed
 
 - Updated Svelte, SvelteKit, Tauri, Vitest, Lucide, serde_json, and the Tauri MCP bridge dependency versions from Dependabot maintenance updates.
+- Updated transitive Undici and Rust tar dependencies to patched versions for Dependabot security advisories.
 
 ---
 
