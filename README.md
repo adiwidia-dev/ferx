@@ -15,6 +15,7 @@ Ferx is a lightweight desktop application for running services like WhatsApp, Sl
 
 - Native webview-based service hosting
 - Background preloading for fast switching
+- Optional per-service hibernation that closes inactive services after 60 seconds to reduce background resource usage
 - Per-service enable and disable states
 - Custom unread badge handling
 - Native context menus for sidebar actions
@@ -35,7 +36,7 @@ Configuration exports contain workspace service names, URLs, and app settings on
 
 ## Installation
 
-Download the latest release from the [GitHub Releases page](https://github.com/adiwidia-dev/ferx/releases). Choose the `.dmg` file for macOS or the Windows setup `.exe` for Windows.
+Download the latest release from the [GitHub Releases page](https://github.com/adiwidia-dev/ferx/releases). Choose the `.dmg` file for macOS, the Windows setup `.exe` for Windows, or one of the Linux artifacts for Linux.
 
 ### macOS
 
@@ -51,15 +52,25 @@ Download the latest release from the [GitHub Releases page](https://github.com/a
 2. Run the installer.
 3. Microsoft Defender SmartScreen may warn that the app is unrecognized because Ferx Windows builds are not code signed yet. Only install Ferx from the official GitHub Releases page.
 
+### Linux
+
+Ferx publishes Linux x86_64 builds in three formats:
+
+- AppImage for portable use, including Arch-family distributions such as CachyOS and Manjaro.
+- `.deb` for Debian, Ubuntu, Linux Mint, Pop!_OS, and related distributions.
+- `.rpm` for Fedora, RHEL-family, Rocky, AlmaLinux, openSUSE, and CentOS Stream-style distributions.
+
+The AppImage is also the Linux artifact used by the in-app updater.
+
 ### In-app updates
 
 Once installed, Ferx checks GitHub Releases for new versions automatically. When an update is available you will be notified inside the app. The updater verifies the download with a minisign signature before applying it. The update is applied on the next relaunch.
 
 ## Platform Support
 
-Current development and support are focused on macOS and Windows GitHub releases. Windows builds are unsigned and may show Microsoft Defender SmartScreen warnings on first install.
+Current development and support are focused on macOS, Windows, and Linux x86_64 GitHub releases. Windows builds are unsigned and may show Microsoft Defender SmartScreen warnings on first install.
 
-The current desktop implementation relies on Tauri multiwebview support. The macOS build also uses private APIs for the intended UX. App Store and Microsoft Store distribution are not targets for the current build.
+The current desktop implementation relies on Tauri multiwebview support. The macOS build also uses private APIs for the intended UX. App Store, Microsoft Store, Snap, Flatpak, AUR, and Linux ARM distribution are not targets for the current build.
 
 ## Prerequisites
 

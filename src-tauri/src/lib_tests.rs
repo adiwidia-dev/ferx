@@ -19,10 +19,10 @@ use crate::service_webview_runtime_scripts::{
 use std::future::Future;
 
 use crate::webview_commands::{
-    badge_monitoring_eval_script, close_all_service_webviews, close_webview, hide_all_webviews_target,
-    open_service_state_transition, previous_active_webview_to_hide, safe_export_file_name,
-    save_workspace_config_export, AudioMutedPayload, BadgeMonitoringMode, DeleteWebviewPayload,
-    RightPanelWidthPayload, ServiceWebviewCommandPayload, WebviewIdPayload,
+    badge_monitoring_eval_script, close_all_service_webviews, close_webview,
+    hide_all_webviews_target, open_service_state_transition, previous_active_webview_to_hide,
+    safe_export_file_name, save_workspace_config_export, AudioMutedPayload, BadgeMonitoringMode,
+    DeleteWebviewPayload, RightPanelWidthPayload, ServiceWebviewCommandPayload, WebviewIdPayload,
 };
 use crate::window_layout::effective_service_content_size;
 use serde_json::json;

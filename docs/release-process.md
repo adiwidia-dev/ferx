@@ -74,6 +74,12 @@ cargo check --manifest-path src-tauri/Cargo.toml --lib
 
 ### Step 4 — Verify the checks still pass
 
+Before running checks, make sure release-facing docs are updated:
+
+- Move `[Unreleased]` changelog entries into a dated `X.Y.Z` section.
+- Add the release link reference at the bottom of `CHANGELOG.md`.
+- Re-read `README.md` for platform-support and installation accuracy.
+
 Run the same checks CI runs:
 
 ```bash
@@ -90,7 +96,7 @@ If any of these fail, fix them before proceeding.
 ### Step 5 — Commit, open PR, merge
 
 ```bash
-git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
+git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json CHANGELOG.md README.md docs/release-process.md
 git commit -m "chore(release): X.Y.Z"
 git push -u origin release/vX.Y.Z
 ```
@@ -272,7 +278,8 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo test --manifest-path src-tauri/Cargo.toml --lib
 cargo test --manifest-path src-tauri/Cargo.toml --lib tauri_commands_typescript_is_up_to_date
 git diff --exit-code src/lib/tauri-commands.ts
-git commit -am "chore(release): X.Y.Z"
+git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json CHANGELOG.md README.md docs/release-process.md
+git commit -m "chore(release): X.Y.Z"
 git push -u origin release/vX.Y.Z
 # ...open PR, merge to main...
 git checkout main && git pull --ff-only
