@@ -1,5 +1,6 @@
 <script lang="ts">
   import BellIcon from "@lucide/svelte/icons/bell";
+  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
   import ListChecksIcon from "@lucide/svelte/icons/list-checks";
   import SearchIcon from "@lucide/svelte/icons/search";
@@ -100,12 +101,12 @@
         />
       </label>
 
-      <label class="block">
+      <label class="relative block">
         <span class="sr-only">Filter services by workspace</span>
         <select
           data-testid="service-management-workspace-filter"
           value={workspaceFilter}
-          class="h-9 w-full rounded-lg border bg-background px-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+          class="h-9 w-full appearance-none rounded-lg border bg-background px-3 pr-9 text-sm text-foreground shadow-none outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
           onchange={onWorkspaceSelect}
         >
           <option value="all">All workspaces</option>
@@ -113,6 +114,7 @@
             <option value={workspace.id}>{workspace.name}</option>
           {/each}
         </select>
+        <ChevronDownIcon class="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
       </label>
     </div>
   </div>

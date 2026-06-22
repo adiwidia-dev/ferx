@@ -11,6 +11,7 @@ import {
   applyCurrentWorkspaceServices,
   deleteServiceFromWorkspaceState,
   deleteWorkspaceWithEffects,
+  pruneOrphanedServicesFromWorkspaceState,
   setWorkspaceDisabledWithEffects,
   toggleManagedServiceDisabled,
   toggleWorkspaceServiceDisabled,
@@ -173,13 +174,13 @@ describe("workspace actions", () => {
     expect(nextState.shouldHideWebviews).toBe(true);
   });
 
-  it("closes only orphaned services when deleting a workspace", () => {
+  it("deletes only orphaned services when deleting a workspace", () => {
     const state = createWorkspaceState();
 
     const nextState = deleteWorkspaceWithEffects(state, "personal");
 
     expect(nextState.state.workspaces).toHaveLength(1);
-    expect(nextState.closeWebviewIds).toEqual([]);
+    expect(nextState.deletedServices).toEqual([]);
 
     const orphanState = {
       ...state,
@@ -195,8 +196,32 @@ describe("workspace actions", () => {
       ],
     };
 
-    expect(deleteWorkspaceWithEffects(orphanState, "personal").closeWebviewIds).toEqual([
-      "shared",
-    ]);
+    const deleted = deleteWorkspaceWithEffects(orphanState, "personal");
+
+    expect(deleted.deletedServices.map((service) => service.id)).toEqual(["shared"]);
+    expect(deleted.state.servicesById.shared).toBeUndefined();
+    expect(deleted.state.servicesById.youtube).toBe(orphanState.servicesById.youtube);
+  });
+
+  it("prunes orphaned services from workspace state", () => {
+    const baseState = createWorkspaceState();
+    const state: WorkspaceGroupsState = {
+      ...baseState,
+      servicesById: {
+        ...baseState.servicesById,
+        orphan: createService({
+          id: "orphan",
+          name: "Orphan",
+          url: "https://orphan.example.com/",
+          storageKey: "storage-orphan",
+        }),
+      },
+    };
+
+    const nextState = pruneOrphanedServicesFromWorkspaceState(state);
+
+    expect(nextState.deletedServices.map((service) => service.id)).toEqual(["orphan"]);
+    expect(nextState.state.servicesById.orphan).toBeUndefined();
+    expect(nextState.state.servicesById.shared).toBe(state.servicesById.shared);
   });
 });

@@ -198,18 +198,76 @@ export function deleteWorkspaceWithEffects(
   workspaceId: string,
 ): {
   state: WorkspaceGroupsState;
-  closeWebviewIds: string[];
+  deletedServices: PageService[];
 } {
   const deletedWorkspaceServices = getWorkspaceServices(state, workspaceId);
   const nextState = deleteWorkspaceGroup(state, workspaceId);
+  if (nextState === state) {
+    return {
+      state,
+      deletedServices: [],
+    };
+  }
+
+  const deletedServices = deletedWorkspaceServices.filter(
+    (service) =>
+      !nextState.workspaces.some((workspace) => workspace.serviceIds.includes(service.id)),
+  );
+  if (deletedServices.length === 0) {
+    return {
+      state: nextState,
+      deletedServices,
+    };
+  }
+
+  const deletedServiceIds = new Set(deletedServices.map((service) => service.id));
+  const servicesById = Object.fromEntries(
+    Object.entries(nextState.servicesById).filter(
+      ([serviceId]) => !deletedServiceIds.has(serviceId),
+    ),
+  );
 
   return {
-    state: nextState,
-    closeWebviewIds: deletedWorkspaceServices
-      .filter(
-        (service) =>
-          !nextState.workspaces.some((workspace) => workspace.serviceIds.includes(service.id)),
-      )
-      .map((service) => service.id),
+    state: normalizeWorkspaceGroupsState({
+      ...nextState,
+      servicesById,
+    }),
+    deletedServices,
+  };
+}
+
+export function pruneOrphanedServicesFromWorkspaceState(
+  state: WorkspaceGroupsState,
+): {
+  state: WorkspaceGroupsState;
+  deletedServices: PageService[];
+} {
+  const referencedServiceIds = new Set(
+    state.workspaces.flatMap((workspace) => workspace.serviceIds),
+  );
+  const deletedServices = Object.values(state.servicesById).filter(
+    (service) => !referencedServiceIds.has(service.id),
+  );
+
+  if (deletedServices.length === 0) {
+    return {
+      state,
+      deletedServices,
+    };
+  }
+
+  const deletedServiceIds = new Set(deletedServices.map((service) => service.id));
+  const servicesById = Object.fromEntries(
+    Object.entries(state.servicesById).filter(
+      ([serviceId]) => !deletedServiceIds.has(serviceId),
+    ),
+  );
+
+  return {
+    state: normalizeWorkspaceGroupsState({
+      ...state,
+      servicesById,
+    }),
+    deletedServices,
   };
 }

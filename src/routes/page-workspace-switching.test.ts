@@ -683,7 +683,7 @@ describe("workspace switching webview commands", () => {
     await unmountPageFakeTimers(component);
   });
 
-  it("closes only orphaned service webviews when deleting a workspace", async () => {
+  it("deletes only orphaned service webviews when deleting a workspace", async () => {
     const state = createWorkspaceState();
     state.workspaces[0].serviceIds.push("shared");
     state.workspaces[1].serviceIds.push("shared");
@@ -716,12 +716,14 @@ describe("workspace switching webview commands", () => {
     )?.click();
     await settle();
 
-    expect(invoke).toHaveBeenCalledWith("close_webview", { payload: { id: "gemini" } });
-    expect(invoke).not.toHaveBeenCalledWith("close_webview", { payload: { id: "shared" } });
-    expect(invoke).not.toHaveBeenCalledWith(
+    expect(invoke).toHaveBeenCalledWith(
       "delete_webview",
       expect.objectContaining({ payload: expect.objectContaining({ id: "gemini" }) }),
     );
+    expect(invoke).not.toHaveBeenCalledWith("delete_webview", {
+      payload: expect.objectContaining({ id: "shared" }),
+    });
+    expect(invoke).not.toHaveBeenCalledWith("close_webview", { payload: { id: "gemini" } });
 
     unmount(component);
   });

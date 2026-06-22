@@ -66,6 +66,7 @@
     applyCurrentWorkspaceServices,
     deleteServiceFromWorkspaceState,
     deleteWorkspaceWithEffects,
+    pruneOrphanedServicesFromWorkspaceState,
     setWorkspaceDisabledWithEffects,
     toggleWorkspaceServiceDisabled,
     updateServiceNotificationPrefs as updateWorkspaceServiceNotificationPrefs,
@@ -343,7 +344,16 @@
     resourceUsageMonitoringEnabled = startupState.resourceUsageMonitoringEnabled;
     cleanupThemeMode?.();
     cleanupThemeMode = installThemeMode(startupState.themeMode);
-    workspaceState = startupState.workspaceState;
+    const prunedStartupState = pruneOrphanedServicesFromWorkspaceState(
+      startupState.workspaceState,
+    );
+    workspaceState = prunedStartupState.state;
+    if (prunedStartupState.deletedServices.length > 0) {
+      workspaceStorage.flush(prunedStartupState.state);
+      for (const service of prunedStartupState.deletedServices) {
+        void webviewCommands.run(() => deleteServiceWebview(service));
+      }
+    }
     todos.notes = startupState.todoNotes;
 
     if (typeof window !== "undefined" && openServiceId) {
@@ -713,9 +723,16 @@
   function deleteWorkspace(workspaceId: string) {
     const nextState = deleteWorkspaceWithEffects(workspaceState, workspaceId);
     workspaceState = nextState.state;
-    for (const serviceId of nextState.closeWebviewIds) {
-      clearServiceHibernation(serviceId);
-      void webviewCommands.run(() => closeServiceWebview(serviceId));
+    if (nextState.deletedServices.length > 0) {
+      const nextBadges = { ...runtimeBadges };
+      for (const service of nextState.deletedServices) {
+        delete nextBadges[service.id];
+      }
+      replaceRuntimeBadges(nextBadges);
+    }
+    for (const service of nextState.deletedServices) {
+      clearServiceHibernation(service.id);
+      void webviewCommands.run(() => deleteServiceWebview(service));
     }
   }
 

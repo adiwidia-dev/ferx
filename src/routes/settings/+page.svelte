@@ -54,7 +54,6 @@
   import {
     createDefaultWorkspaceGroupsState,
     createNewWorkspace,
-    deleteWorkspaceGroup,
     getWorkspaceServices,
     renameWorkspaceGroup,
     setCurrentWorkspaceId,
@@ -64,6 +63,8 @@
   } from "$lib/services/workspace-groups";
   import {
     deleteServiceFromWorkspaceState,
+    deleteWorkspaceWithEffects,
+    pruneOrphanedServicesFromWorkspaceState,
     toggleManagedServiceDisabled,
     updateServiceNotificationPrefs as updateWorkspaceServiceNotificationPrefs,
   } from "$lib/services/workspace-actions";
@@ -149,7 +150,14 @@
     void invoke("hide_all_webviews");
 
     const startup = readSettingsPageStartupState(localStorage);
-    workspaceState = startup.workspaceState;
+    const prunedStartupState = pruneOrphanedServicesFromWorkspaceState(startup.workspaceState);
+    workspaceState = prunedStartupState.state;
+    if (prunedStartupState.deletedServices.length > 0) {
+      commitSettingsWorkspaceState(localStorage, prunedStartupState.state);
+      for (const service of prunedStartupState.deletedServices) {
+        void deleteServiceWebview(service);
+      }
+    }
     spellCheckEnabled = startup.spellCheckEnabled;
     resourceUsageMonitoringEnabled = startup.resourceUsageMonitoringEnabled;
     themeMode = startup.themeMode;
@@ -498,7 +506,17 @@
   }
 
   function deleteWorkspace(workspaceId: string) {
-    commitWorkspaceState(deleteWorkspaceGroup(workspaceState, workspaceId));
+    const nextState = deleteWorkspaceWithEffects(workspaceState, workspaceId);
+    commitWorkspaceState(nextState.state);
+
+    if (nextState.deletedServices.length > 0) {
+      const nextBadges = { ...runtimeBadges };
+      for (const service of nextState.deletedServices) {
+        delete nextBadges[service.id];
+        void deleteServiceWebview(service);
+      }
+      replaceRuntimeBadges(nextBadges);
+    }
   }
 
   function openServiceContextMenu(input: {

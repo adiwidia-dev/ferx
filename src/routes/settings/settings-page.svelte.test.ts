@@ -611,6 +611,78 @@ describe("settings page", () => {
     unmount(component);
   });
 
+  it("deletes orphaned services when a workspace is deleted from settings", () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createServiceManagementState()));
+
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+    invoke.mockClear();
+
+    document.querySelector<HTMLButtonElement>(
+      '[data-testid="workspace-switcher-trigger"]',
+    )?.click();
+    flushSync();
+    document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Delete Work workspace"]',
+    )?.click();
+    flushSync();
+    document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Confirm delete Work workspace"]',
+    )?.click();
+    flushSync();
+
+    const saved = JSON.parse(
+      localStorage.getItem(WORKSPACES_STATE_KEY) ?? "",
+    ) as WorkspaceGroupsState;
+    expect(saved.workspaces.map((workspace) => workspace.id)).toEqual(["personal"]);
+    expect(saved.servicesById["whatsapp-work"]).toBeUndefined();
+    expect(saved.servicesById.gmail).toBeTruthy();
+    expect(document.querySelector('[data-testid="service-management-table"]')?.textContent).not.toContain(
+      "No workspace",
+    );
+    expect(invoke).toHaveBeenCalledWith(
+      "delete_webview",
+      expect.objectContaining({ payload: expect.objectContaining({ id: "whatsapp-work" }) }),
+    );
+
+    unmount(component);
+  });
+
+  it("prunes previously persisted orphan services when settings opens", () => {
+    const state = createServiceManagementState();
+    state.servicesById.orphan = {
+      id: "orphan",
+      name: "Orphan",
+      url: "https://orphan.example.com/",
+      storageKey: "storage-orphan",
+      notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+    };
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(state));
+
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    const saved = JSON.parse(
+      localStorage.getItem(WORKSPACES_STATE_KEY) ?? "",
+    ) as WorkspaceGroupsState;
+    expect(saved.servicesById.orphan).toBeUndefined();
+    expect(document.querySelector('[data-testid="service-management-table"]')?.textContent).not.toContain(
+      "No workspace",
+    );
+    expect(invoke).toHaveBeenCalledWith(
+      "delete_webview",
+      expect.objectContaining({ payload: expect.objectContaining({ id: "orphan" }) }),
+    );
+
+    unmount(component);
+  });
+
   it("keeps runtime notification badges visible on the settings sidebar", () => {
     localStorage.setItem(
       "ferx-workspace-services",
