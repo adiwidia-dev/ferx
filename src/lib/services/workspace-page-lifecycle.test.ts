@@ -65,6 +65,7 @@ describe("readWorkspacePageStartupState", () => {
       savedAppSettings: JSON.stringify({
         spellCheckEnabled: false,
         resourceUsageMonitoringEnabled: true,
+        themeMode: "dark",
       }),
       savedTodoNotes: JSON.stringify([
         {
@@ -82,6 +83,7 @@ describe("readWorkspacePageStartupState", () => {
     expect(startup.workspaceState.workspaces[0].activeServiceId).toBe("slack");
     expect(startup.spellCheckEnabled).toBe(false);
     expect(startup.resourceUsageMonitoringEnabled).toBe(true);
+    expect(startup.themeMode).toBe("dark");
     expect(startup.todoNotes).toHaveLength(1);
     expect(startup.toastMessage).toBe("");
   });

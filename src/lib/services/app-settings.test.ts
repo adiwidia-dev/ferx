@@ -17,6 +17,7 @@ describe("app settings", () => {
       ...DEFAULT_APP_SETTINGS,
       spellCheckEnabled: true,
       resourceUsageMonitoringEnabled: false,
+      themeMode: "system",
     });
   });
 
@@ -28,6 +29,7 @@ describe("app settings", () => {
     expect(readAppSettings('{"spellCheckEnabled":false}')).toEqual({
       spellCheckEnabled: false,
       resourceUsageMonitoringEnabled: false,
+      themeMode: "system",
     });
   });
 
@@ -35,15 +37,49 @@ describe("app settings", () => {
     expect(readAppSettings('{"resourceUsageMonitoringEnabled":true}')).toEqual({
       spellCheckEnabled: true,
       resourceUsageMonitoringEnabled: true,
+      themeMode: "system",
     });
   });
 
-  it("serializes only app-level settings", () => {
+  it("defaults appearance to system when storage is missing", () => {
+    expect(readAppSettings(null)).toEqual({
+      spellCheckEnabled: true,
+      resourceUsageMonitoringEnabled: false,
+      themeMode: "system",
+    });
+  });
+
+  it("preserves valid theme mode preferences", () => {
+    expect(readAppSettings('{"themeMode":"dark"}')).toEqual({
+      spellCheckEnabled: true,
+      resourceUsageMonitoringEnabled: false,
+      themeMode: "dark",
+    });
+
+    expect(readAppSettings('{"themeMode":"light"}')).toEqual({
+      spellCheckEnabled: true,
+      resourceUsageMonitoringEnabled: false,
+      themeMode: "light",
+    });
+  });
+
+  it("falls back to system for invalid theme mode values", () => {
+    expect(readAppSettings('{"themeMode":"midnight"}')).toEqual({
+      spellCheckEnabled: true,
+      resourceUsageMonitoringEnabled: false,
+      themeMode: "system",
+    });
+  });
+
+  it("serializes app-level settings including appearance", () => {
     expect(
       serializeAppSettings({
         spellCheckEnabled: true,
         resourceUsageMonitoringEnabled: true,
+        themeMode: "dark",
       }),
-    ).toBe('{"spellCheckEnabled":true,"resourceUsageMonitoringEnabled":true}');
+    ).toBe(
+      '{"spellCheckEnabled":true,"resourceUsageMonitoringEnabled":true,"themeMode":"dark"}',
+    );
   });
 });

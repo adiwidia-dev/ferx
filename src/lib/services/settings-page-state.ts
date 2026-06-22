@@ -1,6 +1,7 @@
 import {
   APP_SETTINGS_STORAGE_KEY,
   readAppSettings,
+  type ThemeMode,
 } from "$lib/services/app-settings";
 import { WORKSPACE_ACTIVE_ID_KEY } from "$lib/services/workspace-state";
 import {
@@ -14,6 +15,7 @@ export function readSettingsPageStartupState(storage: Storage): {
   workspaceState: WorkspaceGroupsState;
   spellCheckEnabled: boolean;
   resourceUsageMonitoringEnabled: boolean;
+  themeMode: ThemeMode;
   initialSpellCheckEnabled: boolean;
 } {
   const startup = readWorkspaceGroupsStartupState(
@@ -27,6 +29,7 @@ export function readSettingsPageStartupState(storage: Storage): {
     workspaceState: startup.state,
     spellCheckEnabled: settings.spellCheckEnabled,
     resourceUsageMonitoringEnabled: settings.resourceUsageMonitoringEnabled,
+    themeMode: settings.themeMode,
     initialSpellCheckEnabled: settings.spellCheckEnabled,
   };
 }

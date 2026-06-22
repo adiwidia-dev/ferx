@@ -95,6 +95,7 @@
   import { createServiceHibernationStore } from "$lib/services/service-hibernation.svelte";
   import { createTodoPanelStore, TODOS_PANEL_WIDTH } from "$lib/services/todo-panel.svelte";
   import { createServiceEditorStore } from "$lib/services/service-editor.svelte";
+  import { installThemeMode } from "$lib/services/theme";
   import { onMount } from "svelte";
 
   // ---------------------------------------------------------------------------
@@ -115,6 +116,7 @@
   const webviewCommands = createWebviewCommandQueue();
   const serviceHibernation = createServiceHibernationStore();
   let lastVisibleHibernationServiceId: string | null = null;
+  let cleanupThemeMode: (() => void) | null = null;
 
   const workspaceStorage = createDebouncedStorageWriter({
     storageKey: WORKSPACE_PAGE_STORAGE_KEYS.workspaceState,
@@ -339,6 +341,8 @@
 
     spellCheckEnabled = startupState.spellCheckEnabled;
     resourceUsageMonitoringEnabled = startupState.resourceUsageMonitoringEnabled;
+    cleanupThemeMode?.();
+    cleanupThemeMode = installThemeMode(startupState.themeMode);
     workspaceState = startupState.workspaceState;
     todos.notes = startupState.todoNotes;
 
@@ -462,6 +466,8 @@
 
     return () => {
       cancelPreload();
+      cleanupThemeMode?.();
+      cleanupThemeMode = null;
       serviceHibernation.cancelAll();
       if (typeof document !== "undefined") {
         document.removeEventListener("visibilitychange", handleVisibilityChange);

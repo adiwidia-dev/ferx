@@ -1,6 +1,7 @@
 import {
   APP_SETTINGS_STORAGE_KEY,
   readAppSettings,
+  type ThemeMode,
 } from "$lib/services/app-settings";
 import {
   TODO_NOTES_STORAGE_KEY,
@@ -57,6 +58,7 @@ export function readWorkspacePageStartupState({
   workspaceState: WorkspaceGroupsState;
   spellCheckEnabled: boolean;
   resourceUsageMonitoringEnabled: boolean;
+  themeMode: ThemeMode;
   todoNotes: TodoNote[];
   toastMessage: string;
 } {
@@ -89,6 +91,7 @@ export function readWorkspacePageStartupState({
     workspaceState,
     spellCheckEnabled: settings.spellCheckEnabled,
     resourceUsageMonitoringEnabled: settings.resourceUsageMonitoringEnabled,
+    themeMode: settings.themeMode,
     todoNotes,
     toastMessage: startupState.toastMessage,
   };

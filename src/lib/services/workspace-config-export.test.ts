@@ -44,6 +44,7 @@ describe("workspace config export", () => {
       appSettings: {
         spellCheckEnabled: false,
         resourceUsageMonitoringEnabled: true,
+        themeMode: "dark",
       },
       appVersion: "0.2.4",
       exportedAt: "2026-04-23T12:00:00.000Z",
@@ -59,6 +60,7 @@ describe("workspace config export", () => {
       appSettings: {
         spellCheckEnabled: false,
         resourceUsageMonitoringEnabled: true,
+        themeMode: "dark",
       },
       workspaceState: expect.objectContaining({
         version: 1,
@@ -103,6 +105,7 @@ describe("workspace config export", () => {
       appSettings: {
         spellCheckEnabled: true,
         resourceUsageMonitoringEnabled: false,
+        themeMode: "system",
       },
       appVersion: "0.2.4",
       exportedAt: "2026-04-23T12:00:00.000Z",
@@ -122,6 +125,7 @@ describe("workspace config export", () => {
         appSettings: {
           spellCheckEnabled: true,
           resourceUsageMonitoringEnabled: false,
+          themeMode: "system",
         },
         appVersion: "0.2.4",
         exportedAt: "2026-04-23T12:00:00.000Z",

@@ -49,6 +49,7 @@ describe("workspace config import", () => {
     expect(result.value.appSettings).toEqual({
       spellCheckEnabled: false,
       resourceUsageMonitoringEnabled: false,
+      themeMode: "system",
     });
     expect(result.value.workspaceState.currentWorkspaceId).toBe(DEFAULT_WORKSPACE_ID);
     expect(result.value.workspaceState.workspaces[0]).toMatchObject({
@@ -286,6 +287,50 @@ describe("workspace config import", () => {
     expect(result.value.workspaceState.servicesById.mail.hibernateWhenInactive).toBe(true);
   });
 
+  it("preserves imported theme mode in app settings", () => {
+    const result = parseWorkspaceConfigImport(
+      JSON.stringify({
+        ferxExport: {
+          format: "ferx-workspace-config",
+          version: 2,
+          exportedAt: "2026-06-22T00:00:00.000Z",
+          appVersion: "0.7.0",
+        },
+        appSettings: {
+          spellCheckEnabled: true,
+          resourceUsageMonitoringEnabled: false,
+          themeMode: "dark",
+        },
+        workspaceState: {
+          version: 1,
+          currentWorkspaceId: "default",
+          workspaces: [
+            {
+              id: "default",
+              name: "Default",
+              serviceIds: ["mail"],
+              activeServiceId: "mail",
+              icon: "briefcase",
+            },
+          ],
+          servicesById: {
+            mail: {
+              id: "mail",
+              name: "Mail",
+              url: "mail.example.com",
+              storageKey: "storage-mail",
+            },
+          },
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.appSettings.themeMode).toBe("dark");
+    }
+  });
+
   it("writes validated import data transactionally to localStorage", () => {
     const result = parseWorkspaceConfigImport(JSON.stringify(validFile));
 
@@ -295,7 +340,7 @@ describe("workspace config import", () => {
     writeWorkspaceConfigImportToStorage(result.value, localStorage);
 
     expect(localStorage.getItem(APP_SETTINGS_STORAGE_KEY)).toBe(
-      '{"spellCheckEnabled":false,"resourceUsageMonitoringEnabled":false}',
+      '{"spellCheckEnabled":false,"resourceUsageMonitoringEnabled":false,"themeMode":"system"}',
     );
     expect(localStorage.getItem("ferx-workspace-active-id")).toBeNull();
     expect(localStorage.getItem("ferx-workspace-services")).toBeNull();

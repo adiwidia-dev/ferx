@@ -17,6 +17,7 @@
   import {
     APP_SETTINGS_STORAGE_KEY,
     serializeAppSettings,
+    type ThemeMode,
   } from "$lib/services/app-settings";
   import {
     buildWorkspaceConfigExportPayload,
@@ -39,6 +40,7 @@
     applyRuntimeBadgePayload,
     runtimeBadges,
   } from "$lib/services/runtime-badges.svelte";
+  import { installThemeMode } from "$lib/services/theme";
   import {
     createDefaultWorkspaceGroupsState,
     createNewWorkspace,
@@ -84,6 +86,7 @@
   let updater = $state<UpdaterState>({ status: "idle" });
   let spellCheckEnabled = $state(true);
   let resourceUsageMonitoringEnabled = $state(false);
+  let themeMode = $state<ThemeMode>("system");
   let initialSpellCheckEnabled = $state(true);
   let showRestartPrompt = $state(false);
   let showRestartConfirm = $state(false);
@@ -96,6 +99,7 @@
   let importError = $state("");
   let configStatus = $state("");
   let importInput = $state<HTMLInputElement | null>(null);
+  let cleanupThemeMode: (() => void) | null = null;
   let spellCheckRestartRequired = $derived(spellCheckEnabled !== initialSpellCheckEnabled);
 
   onMount(() => {
@@ -105,7 +109,10 @@
     workspaceState = startup.workspaceState;
     spellCheckEnabled = startup.spellCheckEnabled;
     resourceUsageMonitoringEnabled = startup.resourceUsageMonitoringEnabled;
+    themeMode = startup.themeMode;
     initialSpellCheckEnabled = startup.initialSpellCheckEnabled;
+    cleanupThemeMode?.();
+    cleanupThemeMode = installThemeMode(themeMode);
     showRestartPrompt = false;
     showRestartConfirm = false;
     restartError = "";
@@ -122,6 +129,8 @@
     });
 
     return () => {
+      cleanupThemeMode?.();
+      cleanupThemeMode = null;
       void unlistenBadgePromise.then((unlisten) => unlisten());
     };
   });
@@ -171,7 +180,7 @@
     spellCheckEnabled = enabled;
     localStorage.setItem(
       APP_SETTINGS_STORAGE_KEY,
-      serializeAppSettings({ spellCheckEnabled, resourceUsageMonitoringEnabled }),
+      serializeAppSettings({ spellCheckEnabled, resourceUsageMonitoringEnabled, themeMode }),
     );
     showRestartPrompt = enabled !== initialSpellCheckEnabled;
     restartError = "";
@@ -181,8 +190,18 @@
     resourceUsageMonitoringEnabled = enabled;
     localStorage.setItem(
       APP_SETTINGS_STORAGE_KEY,
-      serializeAppSettings({ spellCheckEnabled, resourceUsageMonitoringEnabled }),
+      serializeAppSettings({ spellCheckEnabled, resourceUsageMonitoringEnabled, themeMode }),
     );
+  }
+
+  function handleThemeModeChange(nextThemeMode: ThemeMode) {
+    themeMode = nextThemeMode;
+    localStorage.setItem(
+      APP_SETTINGS_STORAGE_KEY,
+      serializeAppSettings({ spellCheckEnabled, resourceUsageMonitoringEnabled, themeMode }),
+    );
+    cleanupThemeMode?.();
+    cleanupThemeMode = installThemeMode(themeMode);
   }
 
   function requestRestartFerx() {
@@ -215,6 +234,7 @@
         appSettings: {
           spellCheckEnabled: startup.spellCheckEnabled,
           resourceUsageMonitoringEnabled: startup.resourceUsageMonitoringEnabled,
+          themeMode: startup.themeMode,
         },
         appVersion: appInfo.version,
       });
@@ -529,10 +549,12 @@
             <SettingsPreferencesSection
               {spellCheckEnabled}
               {resourceUsageMonitoringEnabled}
+              {themeMode}
               {spellCheckRestartRequired}
               {restartError}
               onSpellCheckChange={handleSpellCheckChange}
               onResourceUsageMonitoringChange={handleResourceUsageMonitoringChange}
+              onThemeModeChange={handleThemeModeChange}
               onRequestRestart={requestRestartFerx}
             />
 

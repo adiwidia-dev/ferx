@@ -1,14 +1,22 @@
 export const APP_SETTINGS_STORAGE_KEY = "ferx-app-settings";
 
+export type ThemeMode = "system" | "light" | "dark";
+
 export interface AppSettings {
   spellCheckEnabled: boolean;
   resourceUsageMonitoringEnabled: boolean;
+  themeMode: ThemeMode;
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   spellCheckEnabled: true,
   resourceUsageMonitoringEnabled: false,
+  themeMode: "system",
 };
+
+export function isThemeMode(value: unknown): value is ThemeMode {
+  return value === "system" || value === "light" || value === "dark";
+}
 
 export function readAppSettings(saved: string | null): AppSettings {
   if (!saved) {
@@ -27,6 +35,9 @@ export function readAppSettings(saved: string | null): AppSettings {
         typeof parsed.resourceUsageMonitoringEnabled === "boolean"
           ? parsed.resourceUsageMonitoringEnabled
           : DEFAULT_APP_SETTINGS.resourceUsageMonitoringEnabled,
+      themeMode: isThemeMode(parsed.themeMode)
+        ? parsed.themeMode
+        : DEFAULT_APP_SETTINGS.themeMode,
     };
   } catch {
     return { ...DEFAULT_APP_SETTINGS };
@@ -37,5 +48,6 @@ export function serializeAppSettings(settings: AppSettings): string {
   return JSON.stringify({
     spellCheckEnabled: settings.spellCheckEnabled,
     resourceUsageMonitoringEnabled: settings.resourceUsageMonitoringEnabled,
+    themeMode: settings.themeMode,
   });
 }

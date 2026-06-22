@@ -68,6 +68,7 @@ export function buildWorkspaceConfigExportPayload({
     appSettings: {
       spellCheckEnabled: appSettings.spellCheckEnabled,
       resourceUsageMonitoringEnabled: appSettings.resourceUsageMonitoringEnabled,
+      themeMode: appSettings.themeMode,
     },
     workspaceState: normalizeWorkspaceGroupsState(workspaceState),
   };

@@ -41,6 +41,8 @@ import SettingsPage from "./+page.svelte";
 describe("settings page", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
+    document.documentElement.className = "";
+    document.documentElement.style.colorScheme = "";
     localStorage.clear();
     invoke.mockClear();
     goto.mockClear();
@@ -103,9 +105,77 @@ describe("settings page", () => {
     flushSync();
 
     expect(localStorage.getItem("ferx-app-settings")).toBe(
-      '{"spellCheckEnabled":true,"resourceUsageMonitoringEnabled":true}',
+      '{"spellCheckEnabled":true,"resourceUsageMonitoringEnabled":true,"themeMode":"system"}',
     );
     expect(document.body.textContent).not.toContain("Restart Ferx to apply resource usage changes.");
+
+    unmount(component);
+  });
+
+  it("renders and persists the appearance segmented control", () => {
+    localStorage.setItem(
+      "ferx-app-settings",
+      JSON.stringify({
+        spellCheckEnabled: true,
+        resourceUsageMonitoringEnabled: false,
+        themeMode: "system",
+      }),
+    );
+
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    expect(document.body.textContent).toContain("Appearance");
+    expect(document.body.textContent).toContain(
+      "Choose how the Ferx interface follows your system theme.",
+    );
+
+    const darkButton = document.querySelector(
+      '[data-testid="appearance-option-dark"]',
+    ) as HTMLButtonElement | null;
+    darkButton?.click();
+    flushSync();
+
+    expect(JSON.parse(localStorage.getItem("ferx-app-settings") ?? "{}")).toEqual({
+      spellCheckEnabled: true,
+      resourceUsageMonitoringEnabled: false,
+      themeMode: "dark",
+    });
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(document.body.textContent).not.toContain(
+      "Restart Ferx to apply spell checking changes.",
+    );
+
+    unmount(component);
+  });
+
+  it("removes the dark class when explicit light appearance is selected", () => {
+    document.documentElement.classList.add("dark");
+    localStorage.setItem(
+      "ferx-app-settings",
+      JSON.stringify({
+        spellCheckEnabled: true,
+        resourceUsageMonitoringEnabled: false,
+        themeMode: "dark",
+      }),
+    );
+
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    const lightButton = document.querySelector(
+      '[data-testid="appearance-option-light"]',
+    ) as HTMLButtonElement | null;
+    lightButton?.click();
+    flushSync();
+
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
 
     unmount(component);
   });
@@ -548,7 +618,7 @@ describe("settings page", () => {
 
     expect(invoke).toHaveBeenCalledWith("close_all_service_webviews");
     expect(localStorage.getItem("ferx-app-settings")).toBe(
-      '{"spellCheckEnabled":false,"resourceUsageMonitoringEnabled":false}',
+      '{"spellCheckEnabled":false,"resourceUsageMonitoringEnabled":false,"themeMode":"system"}',
     );
     expect(localStorage.getItem("ferx-workspace-active-id")).toBeNull();
     expect(localStorage.getItem("ferx-workspace-services")).toBeNull();

@@ -143,6 +143,8 @@ async function unmountPageFakeTimers(component: ReturnType<typeof mount>) {
 describe("workspace switching webview commands", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
+    document.documentElement.className = "";
+    document.documentElement.style.colorScheme = "";
     setDocumentVisibility("visible");
     tauriWindow.state.visible = true;
     tauriWindow.state.minimized = false;
@@ -164,7 +166,32 @@ describe("workspace switching webview commands", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    document.documentElement.className = "";
+    document.documentElement.style.colorScheme = "";
     setDocumentVisibility("visible");
+  });
+
+  it("applies saved dark appearance on workspace startup", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+    localStorage.setItem(
+      "ferx-app-settings",
+      JSON.stringify({
+        spellCheckEnabled: true,
+        resourceUsageMonitoringEnabled: false,
+        themeMode: "dark",
+      }),
+    );
+    invoke.mockResolvedValue(undefined);
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+
+    await unmountPage(component);
   });
 
   it("waits for picker webviews to hide before opening the selected workspace service", async () => {

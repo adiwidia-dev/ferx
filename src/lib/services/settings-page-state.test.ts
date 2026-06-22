@@ -69,6 +69,7 @@ describe("readSettingsPageStartupState", () => {
     const appSettings: AppSettings = {
       spellCheckEnabled: false,
       resourceUsageMonitoringEnabled: true,
+      themeMode: "dark",
     };
 
     localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(workspaceState));
@@ -78,6 +79,7 @@ describe("readSettingsPageStartupState", () => {
       workspaceState,
       spellCheckEnabled: false,
       resourceUsageMonitoringEnabled: true,
+      themeMode: "dark",
       initialSpellCheckEnabled: false,
     });
   });

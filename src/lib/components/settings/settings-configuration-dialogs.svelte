@@ -56,7 +56,7 @@
         {formatServiceCount(sharedServiceCount(pendingExport.workspaceState))}, service URLs,
         names, and app settings. It does not include passwords or login sessions.
       </p>
-      <p class="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs font-medium text-amber-700">
+      <p class="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-300">
         The file is not encrypted. Store it somewhere you trust.
       </p>
       {#if exportError}
@@ -116,7 +116,7 @@
           </p>
         {/if}
       </div>
-      <p class="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs font-medium text-amber-700">
+      <p class="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-300">
         Existing sessions are not imported. Replacing configuration does not erase old session
         data from disk.
       </p>

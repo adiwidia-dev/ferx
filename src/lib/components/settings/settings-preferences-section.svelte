@@ -1,26 +1,44 @@
 <script lang="ts">
   import ActivityIcon from "@lucide/svelte/icons/activity";
   import KeyboardIcon from "@lucide/svelte/icons/keyboard";
+  import MonitorIcon from "@lucide/svelte/icons/monitor";
+  import MoonIcon from "@lucide/svelte/icons/moon";
   import RotateCwIcon from "@lucide/svelte/icons/rotate-cw";
+  import SunIcon from "@lucide/svelte/icons/sun";
   import { Button } from "$lib/components/ui/button";
+  import type { ThemeMode } from "$lib/services/app-settings";
 
   interface Props {
     spellCheckEnabled: boolean;
     resourceUsageMonitoringEnabled: boolean;
+    themeMode: ThemeMode;
     spellCheckRestartRequired: boolean;
     restartError: string;
     onSpellCheckChange: (enabled: boolean) => void;
     onResourceUsageMonitoringChange: (enabled: boolean) => void;
+    onThemeModeChange: (themeMode: ThemeMode) => void;
     onRequestRestart: () => void;
   }
+
+  const appearanceOptions: Array<{
+    value: ThemeMode;
+    label: string;
+    icon: typeof MonitorIcon;
+  }> = [
+    { value: "system", label: "System", icon: MonitorIcon },
+    { value: "light", label: "Light", icon: SunIcon },
+    { value: "dark", label: "Dark", icon: MoonIcon },
+  ];
 
   let {
     spellCheckEnabled,
     resourceUsageMonitoringEnabled,
+    themeMode,
     spellCheckRestartRequired,
     restartError,
     onSpellCheckChange,
     onResourceUsageMonitoringChange,
+    onThemeModeChange,
     onRequestRestart,
   }: Props = $props();
 </script>
@@ -39,6 +57,36 @@
   </div>
 
   <div class="divide-y">
+    <div class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="min-w-0">
+        <p class="text-sm font-semibold text-foreground">Appearance</p>
+        <p class="mt-1 text-xs text-muted-foreground">
+          Choose how the Ferx interface follows your system theme.
+        </p>
+      </div>
+
+      <div
+        class="grid w-full grid-cols-3 rounded-lg border bg-muted p-1 sm:w-auto"
+        role="radiogroup"
+        aria-label="Appearance"
+      >
+        {#each appearanceOptions as option (option.value)}
+          {@const OptionIcon = option.icon}
+          <button
+            type="button"
+            class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 {themeMode === option.value ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}"
+            role="radio"
+            aria-checked={themeMode === option.value}
+            data-testid={`appearance-option-${option.value}`}
+            onclick={() => onThemeModeChange(option.value)}
+          >
+            <OptionIcon class="size-3.5" />
+            <span>{option.label}</span>
+          </button>
+        {/each}
+      </div>
+    </div>
+
     <div class="flex items-center justify-between gap-4 px-5 py-4">
       <div class="min-w-0">
         <p class="text-sm font-semibold text-foreground">Enable Spell Checking</p>
@@ -46,7 +94,7 @@
           Uses the built-in spell checker for service inputs.
         </p>
         {#if spellCheckRestartRequired}
-          <p class="mt-2 inline-flex rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700">
+          <p class="mt-2 inline-flex rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
             Restart Ferx to apply spell checking changes.
           </p>
         {/if}
