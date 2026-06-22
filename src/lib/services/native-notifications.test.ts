@@ -100,6 +100,7 @@ describe("buildNativeUnreadNotification", () => {
     expect(buildNativeUnreadNotification(service({ id: "teams", name: "Teams" }), 3)).toEqual({
       title: "New message in Teams",
       body: "Teams has 3 unread messages.",
+      icon: "/app-icon.png",
       tag: "ferx:teams:unread",
       data: { serviceId: "teams" },
     });

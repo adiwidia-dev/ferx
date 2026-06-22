@@ -777,6 +777,7 @@ describe("workspace switching webview commands", () => {
     expect(nativeNotification.sendNotification).toHaveBeenCalledWith({
       title: "New message in YouTube Music",
       body: "YouTube Music has 1 unread message.",
+      icon: "/app-icon.png",
       tag: "ferx:youtube:unread",
       data: { serviceId: "youtube" },
     });

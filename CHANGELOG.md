@@ -15,8 +15,13 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ### Changed
 
+- Refined the dark appearance palette toward neutral VS Code Dark Modern-style shell colors.
 - Updated Svelte, SvelteKit, Tauri, Vitest, Lucide, serde_json, and the Tauri MCP bridge dependency versions from Dependabot maintenance updates.
 - Updated transitive Undici and Rust tar dependencies to patched versions for Dependabot security advisories.
+
+### Fixed
+
+- Added an explicit Ferx app icon hint to native unread notifications for platforms that honor notification icons.
 
 ---
 

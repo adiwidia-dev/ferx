@@ -11,6 +11,7 @@ export type NativeNotificationService = {
 export type NativeUnreadNotification = {
   title: string;
   body: string;
+  icon: string;
   tag: string;
   data: { serviceId: string };
 };
@@ -41,6 +42,7 @@ export function buildNativeUnreadNotification(
   return {
     title: `New message in ${service.name}`,
     body: `${service.name} has ${unreadCount} unread ${noun}.`,
+    icon: "/app-icon.png",
     tag: `ferx:${service.id}:unread`,
     data: { serviceId: service.id },
   };
