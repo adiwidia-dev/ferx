@@ -38,10 +38,12 @@ export function commitSettingsWorkspaceState(storage: Storage, nextState: Worksp
   storage.setItem(WORKSPACES_STATE_KEY, serializeWorkspaceGroupsState(nextState));
 }
 
+export type SettingsServiceRoute = "/" | `/?open=${string}`;
+
 export function resolveSettingsServiceRoute(
   workspaceState: WorkspaceGroupsState,
   serviceId: string,
-) {
+): SettingsServiceRoute {
   const service = workspaceState.servicesById[serviceId];
   if (!service || service.disabled) {
     return "/";

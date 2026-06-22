@@ -12,6 +12,7 @@ import {
   deleteServiceFromWorkspaceState,
   deleteWorkspaceWithEffects,
   setWorkspaceDisabledWithEffects,
+  toggleManagedServiceDisabled,
   toggleWorkspaceServiceDisabled,
   updateServiceNotificationPrefs,
 } from "./workspace-actions";
@@ -113,6 +114,19 @@ describe("workspace actions", () => {
     });
     expect(nextState.state.servicesById.youtube.disabled).toBe(true);
     expect(nextState.closeWebviewId).toBe("youtube");
+  });
+
+  it("toggles a managed service across the workspace tree", () => {
+    const state = {
+      ...createWorkspaceState(),
+      currentWorkspaceId: "default",
+    };
+
+    const nextState = toggleManagedServiceDisabled(state, "shared");
+
+    expect(nextState.state.servicesById.shared.disabled).toBe(true);
+    expect(nextState.state.workspaces[1].activeServiceId).toBe("");
+    expect(nextState.closeWebviewId).toBe("shared");
   });
 
   it("updates notification preferences for only the targeted service", () => {

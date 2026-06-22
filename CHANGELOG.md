@@ -10,6 +10,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ### Added
 
+- Added a centralized Services section in Settings for searching and filtering services across workspaces, toggling badge/tray/sound/native-notification/hibernation settings, disabling services, and deleting services with confirmation.
 - Added an Appearance setting with System, Light, and Dark modes for the Ferx shell UI.
 - Added native OS unread notifications for services, with a per-service context-menu toggle and Do Not Disturb suppression.
 

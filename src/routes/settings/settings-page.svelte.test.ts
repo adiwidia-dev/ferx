@@ -36,7 +36,59 @@ import {
   clearRuntimeBadges,
   setRuntimeBadge,
 } from "$lib/services/runtime-badges.svelte";
+import { DEFAULT_NOTIFICATION_PREFS } from "$lib/services/notification-prefs";
+import {
+  WORKSPACES_STATE_KEY,
+  WORKSPACES_STATE_VERSION,
+  type WorkspaceGroupsState,
+} from "$lib/services/workspace-groups";
 import SettingsPage from "./+page.svelte";
+
+function createServiceManagementState(): WorkspaceGroupsState {
+  return {
+    version: WORKSPACES_STATE_VERSION,
+    currentWorkspaceId: "personal",
+    workspaces: [
+      {
+        id: "personal",
+        name: "Personal",
+        serviceIds: ["whatsapp-personal", "gmail"],
+        activeServiceId: "whatsapp-personal",
+        icon: "user",
+      },
+      {
+        id: "work",
+        name: "Work",
+        serviceIds: ["whatsapp-work", "gmail"],
+        activeServiceId: "whatsapp-work",
+        icon: "briefcase",
+      },
+    ],
+    servicesById: {
+      "whatsapp-personal": {
+        id: "whatsapp-personal",
+        name: "WhatsApp Personal",
+        url: "https://web.whatsapp.com/",
+        storageKey: "storage-whatsapp-personal",
+        notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+      },
+      "whatsapp-work": {
+        id: "whatsapp-work",
+        name: "WhatsApp Work",
+        url: "https://web.whatsapp.com/",
+        storageKey: "storage-whatsapp-work",
+        notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+      },
+      gmail: {
+        id: "gmail",
+        name: "Gmail",
+        url: "https://mail.google.com/mail/u/0/",
+        storageKey: "storage-gmail",
+        notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+      },
+    },
+  };
+}
 
 describe("settings page", () => {
   beforeEach(() => {
@@ -337,13 +389,14 @@ describe("settings page", () => {
     }));
 
     expect(sectionLinks).toEqual([
-      { href: "#general", text: "General" },
-      { href: "#preferences", text: "Preferences" },
-      { href: "#configuration", text: "Configuration" },
-      { href: "#updates", text: "Updates" },
+      { href: "/settings#general", text: "General" },
+      { href: "/settings#preferences", text: "Preferences" },
+      { href: "/settings#services", text: "Services" },
+      { href: "/settings#configuration", text: "Configuration" },
+      { href: "/settings#updates", text: "Updates" },
     ]);
 
-    for (const id of ["general", "preferences", "configuration", "updates"]) {
+    for (const id of ["general", "preferences", "services", "configuration", "updates"]) {
       expect(document.querySelector(`section#${id}`)).toBeTruthy();
     }
 
@@ -395,6 +448,165 @@ describe("settings page", () => {
     ) as HTMLElement | null;
     expect(serviceButton?.className).toContain("h-14 w-16");
     expect(serviceButton?.className).toContain("rounded-2xl");
+
+    unmount(component);
+  });
+
+  it("renders service management rows and filters them by search and workspace", () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createServiceManagementState()));
+
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    const table = document.querySelector('[data-testid="service-management-table"]');
+    expect(table?.textContent).toContain("WhatsApp Personal");
+    expect(table?.textContent).toContain("WhatsApp Work");
+    expect(table?.textContent).toContain("Gmail");
+    expect(table?.textContent).toContain("Personal");
+    expect(table?.textContent).toContain("Work");
+
+    const search = document.querySelector(
+      '[data-testid="service-management-search"]',
+    ) as HTMLInputElement | null;
+    search!.value = "google";
+    search!.dispatchEvent(new Event("input", { bubbles: true }));
+    flushSync();
+
+    expect(table?.textContent).toContain("Gmail");
+    expect(table?.textContent).not.toContain("WhatsApp Personal");
+    expect(table?.textContent).not.toContain("WhatsApp Work");
+
+    search!.value = "";
+    search!.dispatchEvent(new Event("input", { bubbles: true }));
+    const workspaceFilter = document.querySelector(
+      '[data-testid="service-management-workspace-filter"]',
+    ) as HTMLSelectElement | null;
+    workspaceFilter!.value = "work";
+    workspaceFilter!.dispatchEvent(new Event("change", { bubbles: true }));
+    flushSync();
+
+    expect(table?.textContent).toContain("Gmail");
+    expect(table?.textContent).toContain("WhatsApp Work");
+    expect(table?.textContent).not.toContain("WhatsApp Personal");
+
+    unmount(component);
+  });
+
+  it("persists service management toggles and mirrors runtime sound/close commands", () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createServiceManagementState()));
+
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+    invoke.mockClear();
+
+    const enabled = document.querySelector(
+      '[data-testid="service-enabled-whatsapp-work"]',
+    ) as HTMLInputElement | null;
+    enabled!.checked = false;
+    enabled!.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const badge = document.querySelector(
+      '[data-testid="service-badge-whatsapp-work"]',
+    ) as HTMLInputElement | null;
+    badge!.checked = false;
+    badge!.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const tray = document.querySelector(
+      '[data-testid="service-tray-whatsapp-work"]',
+    ) as HTMLInputElement | null;
+    tray!.checked = false;
+    tray!.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const sound = document.querySelector(
+      '[data-testid="service-sound-whatsapp-work"]',
+    ) as HTMLInputElement | null;
+    sound!.checked = false;
+    sound!.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const native = document.querySelector(
+      '[data-testid="service-native-whatsapp-work"]',
+    ) as HTMLInputElement | null;
+    native!.checked = false;
+    native!.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const hibernate = document.querySelector(
+      '[data-testid="service-hibernate-whatsapp-work"]',
+    ) as HTMLInputElement | null;
+    hibernate!.checked = true;
+    hibernate!.dispatchEvent(new Event("change", { bubbles: true }));
+    flushSync();
+
+    const saved = JSON.parse(
+      localStorage.getItem(WORKSPACES_STATE_KEY) ?? "",
+    ) as WorkspaceGroupsState;
+    expect(saved.servicesById["whatsapp-work"].disabled).toBe(true);
+    expect(saved.servicesById["whatsapp-work"].hibernateWhenInactive).toBe(true);
+    expect(saved.servicesById["whatsapp-work"].notificationPrefs).toEqual({
+      showBadge: false,
+      affectTray: false,
+      muteAudio: true,
+      showNativeNotifications: false,
+    });
+    expect(invoke).toHaveBeenCalledWith("close_webview", {
+      payload: { id: "whatsapp-work" },
+    });
+    expect(invoke).toHaveBeenCalledWith("set_service_webview_audio_muted", {
+      payload: { id: "whatsapp-work", muted: true },
+    });
+
+    unmount(component);
+  });
+
+  it("deletes a managed service after confirmation and shows affected workspaces", () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createServiceManagementState()));
+    setRuntimeBadge("gmail", 8);
+
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+    invoke.mockClear();
+
+    const deleteButton = document.querySelector(
+      '[data-testid="service-delete-gmail"]',
+    ) as HTMLButtonElement | null;
+    deleteButton?.click();
+    flushSync();
+
+    expect(document.querySelector('[data-testid="service-delete-dialog"]')).toBeTruthy();
+    expect(document.body.textContent).toContain("Delete Gmail?");
+    expect(document.body.textContent).toContain("Personal");
+    expect(document.body.textContent).toContain("Work");
+
+    const confirmButton = document.querySelector(
+      '[data-testid="confirm-service-delete-button"]',
+    ) as HTMLButtonElement | null;
+    confirmButton?.click();
+    flushSync();
+
+    const saved = JSON.parse(
+      localStorage.getItem(WORKSPACES_STATE_KEY) ?? "",
+    ) as WorkspaceGroupsState;
+    expect(saved.servicesById.gmail).toBeUndefined();
+    expect(saved.workspaces[0].serviceIds).toEqual(["whatsapp-personal"]);
+    expect(saved.workspaces[1].serviceIds).toEqual(["whatsapp-work"]);
+    expect(document.querySelector('[data-testid="service-delete-dialog"]')).toBeFalsy();
+    expect(invoke).toHaveBeenCalledWith("delete_webview", {
+      payload: {
+        id: "gmail",
+        name: "Gmail",
+        url: "https://mail.google.com/mail/u/0/",
+        storageKey: "storage-gmail",
+        notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+      },
+    });
 
     unmount(component);
   });

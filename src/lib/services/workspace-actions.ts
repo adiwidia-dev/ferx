@@ -71,6 +71,36 @@ export function toggleWorkspaceServiceDisabled(
   };
 }
 
+export function toggleManagedServiceDisabled(
+  state: WorkspaceGroupsState,
+  serviceId: string,
+): {
+  state: WorkspaceGroupsState;
+  closeWebviewId?: string;
+} {
+  const service = state.servicesById[serviceId];
+
+  if (!service) {
+    return { state };
+  }
+
+  const disabled = !service.disabled;
+
+  return {
+    state: normalizeWorkspaceGroupsState({
+      ...state,
+      servicesById: {
+        ...state.servicesById,
+        [serviceId]: {
+          ...service,
+          disabled,
+        },
+      },
+    }),
+    ...(disabled ? { closeWebviewId: serviceId } : {}),
+  };
+}
+
 export function updateServiceNotificationPrefs(
   state: WorkspaceGroupsState,
   serviceId: string,

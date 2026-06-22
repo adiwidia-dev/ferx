@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import AppWindowIcon from "@lucide/svelte/icons/app-window";
   import { onMount } from "svelte";
@@ -10,6 +11,7 @@
   import SettingsConfigurationSection from "$lib/components/settings/settings-configuration-section.svelte";
   import SettingsPreferencesSection from "$lib/components/settings/settings-preferences-section.svelte";
   import SettingsRestartDialogs from "$lib/components/settings/settings-restart-dialogs.svelte";
+  import SettingsServicesSection from "$lib/components/settings/settings-services-section.svelte";
   import SettingsUpdatesSection from "$lib/components/settings/settings-updates-section.svelte";
   import WorkspaceSidebar from "$lib/components/workspace/workspace-sidebar.svelte";
   import { getAppInfo } from "$lib/services/app-info";
@@ -38,8 +40,16 @@
   } from "$lib/services/updater";
   import {
     applyRuntimeBadgePayload,
+    replaceRuntimeBadges,
     runtimeBadges,
   } from "$lib/services/runtime-badges.svelte";
+  import type { NotificationPrefs } from "$lib/services/notification-prefs";
+  import {
+    buildServiceManagementRows,
+    filterServiceManagementRows,
+    setServiceHibernationEnabled,
+    type ServiceManagementWorkspaceFilter,
+  } from "$lib/services/service-management";
   import { installThemeMode } from "$lib/services/theme";
   import {
     createDefaultWorkspaceGroupsState,
@@ -53,22 +63,40 @@
     type WorkspaceGroupsState,
   } from "$lib/services/workspace-groups";
   import {
+    deleteServiceFromWorkspaceState,
+    toggleManagedServiceDisabled,
+    updateServiceNotificationPrefs as updateWorkspaceServiceNotificationPrefs,
+  } from "$lib/services/workspace-actions";
+  import {
     commitSettingsWorkspaceState,
     getSettingsActiveServiceId,
     readSettingsPageStartupState,
     resolveSettingsServiceRoute,
     scheduleSettingsWorkspaceReload,
+    type SettingsServiceRoute,
   } from "$lib/services/settings-page-state";
   import {
+    closeServiceWebview,
+    deleteServiceWebview,
     setAllServiceWebviewsAudioMuted,
+    setServiceWebviewAudioMuted,
     showServiceContextMenu,
   } from "$lib/services/webview-commands";
   import type { WorkspaceIconKey } from "$lib/services/workspace-icons";
 
+  type SettingsInternalRoute =
+    | SettingsServiceRoute
+    | "/settings"
+    | `/settings?${string}`
+    | `/#${string}`
+    | `/settings#${string}`;
+  type SettingsSectionHash = `#${string}`;
+
   const appInfo = getAppInfo();
-  const settingsSections = [
+  const settingsSections: Array<{ href: SettingsSectionHash; label: string }> = [
     { href: "#general", label: "General" },
     { href: "#preferences", label: "Preferences" },
+    { href: "#services", label: "Services" },
     { href: "#configuration", label: "Configuration" },
     { href: "#updates", label: "Updates" },
   ];
@@ -99,8 +127,23 @@
   let importError = $state("");
   let configStatus = $state("");
   let importInput = $state<HTMLInputElement | null>(null);
+  let serviceManagementSearch = $state("");
+  let serviceManagementWorkspaceFilter = $state<ServiceManagementWorkspaceFilter>("all");
+  let pendingDeleteServiceId = $state<string | null>(null);
   let cleanupThemeMode: (() => void) | null = null;
   let spellCheckRestartRequired = $derived(spellCheckEnabled !== initialSpellCheckEnabled);
+  let serviceManagementRows = $derived(buildServiceManagementRows(workspaceState));
+  let visibleServiceManagementRows = $derived(
+    filterServiceManagementRows(serviceManagementRows, {
+      workspaceId: serviceManagementWorkspaceFilter,
+      query: serviceManagementSearch,
+    }),
+  );
+  let pendingDeleteServiceRow = $derived(
+    pendingDeleteServiceId
+      ? (serviceManagementRows.find((row) => row.service.id === pendingDeleteServiceId) ?? null)
+      : null,
+  );
 
   onMount(() => {
     void invoke("hide_all_webviews");
@@ -335,6 +378,83 @@
     commitSettingsWorkspaceState(localStorage, nextState);
   }
 
+  function updateManagedServiceNotificationPrefs(
+    id: string,
+    updater: (prefs: NotificationPrefs) => NotificationPrefs,
+  ) {
+    commitWorkspaceState(updateWorkspaceServiceNotificationPrefs(workspaceState, id, updater));
+  }
+
+  function toggleManagedServiceEnabled(id: string) {
+    const nextState = toggleManagedServiceDisabled(workspaceState, id);
+    commitWorkspaceState(nextState.state);
+
+    if (nextState.closeWebviewId) {
+      void closeServiceWebview(nextState.closeWebviewId);
+    }
+  }
+
+  function toggleManagedServiceBadge(id: string) {
+    updateManagedServiceNotificationPrefs(id, (prefs) => ({
+      ...prefs,
+      showBadge: !prefs.showBadge,
+    }));
+  }
+
+  function toggleManagedServiceTray(id: string) {
+    updateManagedServiceNotificationPrefs(id, (prefs) => ({
+      ...prefs,
+      affectTray: !prefs.affectTray,
+    }));
+  }
+
+  function toggleManagedServiceSound(id: string) {
+    let nextMuteAudio = false;
+    updateManagedServiceNotificationPrefs(id, (prefs) => {
+      nextMuteAudio = !prefs.muteAudio;
+      return { ...prefs, muteAudio: nextMuteAudio };
+    });
+    void setServiceWebviewAudioMuted(id, nextMuteAudio);
+  }
+
+  function toggleManagedServiceNativeNotifications(id: string) {
+    updateManagedServiceNotificationPrefs(id, (prefs) => ({
+      ...prefs,
+      showNativeNotifications: !prefs.showNativeNotifications,
+    }));
+  }
+
+  function toggleManagedServiceHibernation(id: string, enabled: boolean) {
+    commitWorkspaceState(setServiceHibernationEnabled(workspaceState, id, enabled));
+  }
+
+  function requestManagedServiceDelete(id: string) {
+    pendingDeleteServiceId = id;
+  }
+
+  function cancelManagedServiceDelete() {
+    pendingDeleteServiceId = null;
+  }
+
+  function confirmManagedServiceDelete() {
+    if (!pendingDeleteServiceId) {
+      return;
+    }
+
+    const nextState = deleteServiceFromWorkspaceState(
+      workspaceState,
+      runtimeBadges,
+      pendingDeleteServiceId,
+    );
+    commitWorkspaceState(nextState.state);
+    replaceRuntimeBadges(nextState.badges);
+    pendingDeleteServiceId = null;
+
+    if (nextState.deletedService) {
+      void deleteServiceWebview(nextState.deletedService);
+    }
+  }
+
   function switchWorkspace(id: string) {
     commitWorkspaceState(setCurrentWorkspaceId(workspaceState, id));
   }
@@ -343,12 +463,12 @@
     isWorkspaceSwitcherOpen = open;
   }
 
-  function openRoute(path: string) {
+  function openRoute(path: SettingsInternalRoute) {
     if (typeof window === "undefined") {
       return;
     }
 
-    void goto(path);
+    void goto(resolve(path));
   }
 
   function handleSelectService(id: string) {
@@ -487,7 +607,7 @@
           <div class="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
             {#each settingsSections as section (section.href)}
               <a
-                href={section.href}
+                href={resolve(`/settings${section.href}` as `/settings#${string}`)}
                 class="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:w-full"
               >
                 {section.label}
@@ -556,6 +676,28 @@
               onResourceUsageMonitoringChange={handleResourceUsageMonitoringChange}
               onThemeModeChange={handleThemeModeChange}
               onRequestRestart={requestRestartFerx}
+            />
+
+            <SettingsServicesSection
+              rows={visibleServiceManagementRows}
+              totalCount={serviceManagementRows.length}
+              workspaces={workspaceState.workspaces}
+              workspaceFilter={serviceManagementWorkspaceFilter}
+              searchQuery={serviceManagementSearch}
+              pendingDeleteRow={pendingDeleteServiceRow}
+              onWorkspaceFilterChange={(workspaceId) =>
+                (serviceManagementWorkspaceFilter = workspaceId)}
+              onSearchQueryChange={(query) => (serviceManagementSearch = query)}
+              onOpenService={handleSelectService}
+              onToggleEnabled={toggleManagedServiceEnabled}
+              onToggleBadge={toggleManagedServiceBadge}
+              onToggleTray={toggleManagedServiceTray}
+              onToggleSound={toggleManagedServiceSound}
+              onToggleNativeNotifications={toggleManagedServiceNativeNotifications}
+              onToggleHibernation={toggleManagedServiceHibernation}
+              onRequestDelete={requestManagedServiceDelete}
+              onCancelDelete={cancelManagedServiceDelete}
+              onConfirmDelete={confirmManagedServiceDelete}
             />
 
             <SettingsConfigurationSection
