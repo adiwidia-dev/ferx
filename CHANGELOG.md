@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ## [Unreleased]
 
+---
+
+## [0.7.0] — 2026-06-19
+
 ### Added
 
 - Added Linux release artifacts for AppImage, Debian, and RPM packages.
@@ -226,6 +230,8 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 - Service config validation and safety guardrails: invalid URLs, malformed payloads, and unsupported schemes are rejected before any state change is applied.
 - CI baseline: pre-push validation runs type-check, unit tests, and Rust tests.
 
+[0.7.0]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.7.0
+[0.6.1]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.6.1
 [0.6.0]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.6.0
 [0.5.0]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.5.0
 [0.4.2]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.4.2
