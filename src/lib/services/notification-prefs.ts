@@ -2,12 +2,14 @@ export interface NotificationPrefs {
   showBadge: boolean;
   affectTray: boolean;
   muteAudio: boolean;
+  showNativeNotifications: boolean;
 }
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   showBadge: true,
   affectTray: true,
   muteAudio: false,
+  showNativeNotifications: true,
 };
 
 type LegacyNotificationPrefs = Partial<NotificationPrefs> & {
@@ -52,11 +54,15 @@ function normalizeNotificationPrefs(notificationPrefs?: LegacyNotificationPrefs)
       showBadge: notificationPrefs?.showBadge ?? DEFAULT_NOTIFICATION_PREFS.showBadge,
       affectTray: notificationPrefs?.affectTray ?? DEFAULT_NOTIFICATION_PREFS.affectTray,
       muteAudio: migratedMuteAudio ?? DEFAULT_NOTIFICATION_PREFS.muteAudio,
+      showNativeNotifications:
+        notificationPrefs?.showNativeNotifications ??
+        DEFAULT_NOTIFICATION_PREFS.showNativeNotifications,
     },
     changed:
       !notificationPrefs ||
       notificationPrefs.showBadge === undefined ||
       notificationPrefs.affectTray === undefined ||
+      notificationPrefs.showNativeNotifications === undefined ||
       !hasMuteAudio ||
       legacyHasAllowNotifications,
   };

@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ## [Unreleased]
 
+### Added
+
+- Added native OS unread notifications for services, with a per-service context-menu toggle and Do Not Disturb suppression.
+
 ### Changed
 
 - Updated Svelte, SvelteKit, Tauri, Vitest, Lucide, serde_json, and the Tauri MCP bridge dependency versions from Dependabot maintenance updates.

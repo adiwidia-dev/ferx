@@ -33,6 +33,7 @@ fn show_context_menu(
     show_badge: bool,
     affect_tray: bool,
     mute_audio: bool,
+    show_native_notifications: bool,
 ) {
     desktop_ui::show_context_menu(
         app,
@@ -42,6 +43,7 @@ fn show_context_menu(
         show_badge,
         affect_tray,
         mute_audio,
+        show_native_notifications,
     );
 }
 
@@ -100,6 +102,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(app_state::ActiveWebview(std::sync::Mutex::new(
             String::new(),
         )))

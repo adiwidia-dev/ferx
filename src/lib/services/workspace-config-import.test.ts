@@ -67,6 +67,7 @@ describe("workspace config import", () => {
         showBadge: false,
         affectTray: true,
         muteAudio: false,
+        showNativeNotifications: true,
       },
     });
   });

@@ -26,6 +26,7 @@
     "core:webview:allow-webview-hide",
     "core:webview:allow-webview-show",
     "updater:default",
+    "notification:default",
     "process:default",
     "process:allow-restart"
   ]

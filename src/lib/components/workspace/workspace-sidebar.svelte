@@ -28,7 +28,7 @@
     onSetWorkspaceDisabled: (input: { workspaceId: string; disabled: boolean }) => void;
     onDeleteWorkspace: (workspaceId: string) => void;
     onWorkspaceSwitcherOpenChange: (open: boolean) => void;
-    onOpenServiceContextMenu: (input: { id: string; disabled: boolean; showBadge: boolean; affectTray: boolean; muteAudio: boolean }) => void;
+    onOpenServiceContextMenu: (input: { id: string; disabled: boolean; showBadge: boolean; affectTray: boolean; muteAudio: boolean; showNativeNotifications: boolean }) => void;
     onToggleDnd: () => void;
     onOpenAddModal: () => void;
     onToggleTodosPanel: () => void;
@@ -82,6 +82,7 @@
       showBadge: service.notificationPrefs.showBadge,
       affectTray: service.notificationPrefs.affectTray,
       muteAudio: service.notificationPrefs.muteAudio,
+      showNativeNotifications: service.notificationPrefs.showNativeNotifications,
     });
   }
 </script>

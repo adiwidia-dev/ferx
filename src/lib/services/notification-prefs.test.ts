@@ -12,6 +12,7 @@ describe("DEFAULT_NOTIFICATION_PREFS", () => {
       showBadge: true,
       affectTray: true,
       muteAudio: false,
+      showNativeNotifications: true,
     });
   });
 });
@@ -49,6 +50,7 @@ describe("ensureServiceNotificationPrefs", () => {
       showBadge: false,
       affectTray: true,
       muteAudio: false,
+      showNativeNotifications: true,
     });
   });
 
@@ -86,6 +88,7 @@ describe("ensureServiceNotificationPrefs", () => {
           showBadge: false,
           affectTray: true,
           muteAudio: true,
+          showNativeNotifications: false,
         },
       },
     ]);
@@ -95,6 +98,7 @@ describe("ensureServiceNotificationPrefs", () => {
       showBadge: false,
       affectTray: true,
       muteAudio: true,
+      showNativeNotifications: false,
     });
   });
 
@@ -118,6 +122,7 @@ describe("ensureServiceNotificationPrefs", () => {
       showBadge: true,
       affectTray: true,
       muteAudio: true,
+      showNativeNotifications: true,
     });
   });
 });
@@ -135,6 +140,7 @@ describe("countTrayRelevantUnreadServices", () => {
           showBadge: true,
           affectTray: true,
           muteAudio: false,
+          showNativeNotifications: true,
         },
       },
       {
@@ -147,6 +153,7 @@ describe("countTrayRelevantUnreadServices", () => {
           showBadge: true,
           affectTray: false,
           muteAudio: false,
+          showNativeNotifications: true,
         },
       },
     ]);
@@ -167,6 +174,7 @@ describe("countTrayRelevantUnreadServices", () => {
           showBadge: true,
           affectTray: true,
           muteAudio: false,
+          showNativeNotifications: true,
         },
       },
     ]);
@@ -187,6 +195,7 @@ describe("countTrayRelevantUnreadServices", () => {
           showBadge: true,
           affectTray: true,
           muteAudio: false,
+          showNativeNotifications: true,
         },
       },
     ]);

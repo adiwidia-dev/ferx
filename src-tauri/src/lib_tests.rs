@@ -222,6 +222,7 @@ fn default_capability_grants_updater_and_process_restart() {
     let capability = include_str!("../capabilities/default.json");
 
     assert!(capability.contains("updater:default"));
+    assert!(capability.contains("notification:default"));
     assert!(capability.contains("process:default"));
     assert!(capability.contains("process:allow-restart"));
 }

@@ -14,6 +14,7 @@ type StoredService = {
     showBadge?: boolean;
     affectTray?: boolean;
     muteAudio?: boolean;
+    showNativeNotifications?: boolean;
   };
 };
 
@@ -35,7 +36,9 @@ function isNotificationPrefs(value: unknown): value is StoredService["notificati
     (candidate.affectTray === undefined ||
       typeof candidate.affectTray === "boolean") &&
     (candidate.muteAudio === undefined ||
-      typeof candidate.muteAudio === "boolean")
+      typeof candidate.muteAudio === "boolean") &&
+    (candidate.showNativeNotifications === undefined ||
+      typeof candidate.showNativeNotifications === "boolean")
   );
 }
 

@@ -376,6 +376,7 @@ describe("normalizeWorkspaceGroupsState", () => {
       showBadge: true,
       affectTray: false,
       muteAudio: true,
+      showNativeNotifications: true,
     });
   });
 });

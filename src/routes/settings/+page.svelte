@@ -367,11 +367,13 @@
     showBadge: boolean;
     affectTray: boolean;
     muteAudio: boolean;
+    showNativeNotifications: boolean;
   }) {
     void showServiceContextMenu(input.id, input.disabled, {
       showBadge: input.showBadge,
       affectTray: input.affectTray,
       muteAudio: input.muteAudio,
+      showNativeNotifications: input.showNativeNotifications,
     });
   }
 

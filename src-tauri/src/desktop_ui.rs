@@ -9,6 +9,7 @@ pub(crate) fn show_context_menu(
     show_badge: bool,
     affect_tray: bool,
     mute_audio: bool,
+    show_native_notifications: bool,
 ) {
     use tauri::menu::{Menu, MenuItem};
 
@@ -78,6 +79,23 @@ pub(crate) fn show_context_menu(
             return;
         }
     };
+    let toggle_native_notifications = match MenuItem::with_id(
+        &app,
+        format!("toggle-native-notifications:{}", id),
+        if show_native_notifications {
+            "Disable OS Notifications"
+        } else {
+            "Enable OS Notifications"
+        },
+        true,
+        None::<&str>,
+    ) {
+        Ok(item) => item,
+        Err(error) => {
+            eprintln!("Failed to build Disable/Enable OS Notifications menu item: {error}");
+            return;
+        }
+    };
     let toggle = match MenuItem::with_id(
         &app,
         format!("toggle:{}", id),
@@ -117,6 +135,7 @@ pub(crate) fn show_context_menu(
             &toggle_badge,
             &toggle_tray,
             &toggle_notifications,
+            &toggle_native_notifications,
             &toggle,
             &delete,
         ],

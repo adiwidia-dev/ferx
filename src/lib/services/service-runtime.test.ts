@@ -28,6 +28,7 @@ function createService(overrides: {
       showBadge: overrides.showBadge ?? true,
       affectTray: overrides.affectTray ?? true,
       muteAudio: overrides.muteAudio ?? false,
+      showNativeNotifications: true,
     },
   };
 }

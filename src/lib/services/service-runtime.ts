@@ -26,6 +26,7 @@ export type ServiceWebviewService = {
     showBadge?: boolean;
     affectTray?: boolean;
     muteAudio: boolean;
+    showNativeNotifications?: boolean;
   };
 };
 

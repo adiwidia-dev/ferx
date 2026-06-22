@@ -18,6 +18,7 @@ const services: PageService[] = [
       showBadge: true,
       affectTray: false,
       muteAudio: false,
+      showNativeNotifications: true,
     },
   },
   {
@@ -31,6 +32,7 @@ const services: PageService[] = [
       showBadge: false,
       affectTray: true,
       muteAudio: true,
+      showNativeNotifications: false,
     },
   },
 ];

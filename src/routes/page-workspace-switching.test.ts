@@ -39,6 +39,11 @@ const tauriWindow = vi.hoisted(() => {
     }),
   };
 });
+const nativeNotification = vi.hoisted(() => ({
+  isPermissionGranted: vi.fn(() => Promise.resolve(true)),
+  requestPermission: vi.fn(() => Promise.resolve("granted")),
+  sendNotification: vi.fn(),
+}));
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke,
@@ -55,6 +60,8 @@ vi.mock("@tauri-apps/api/window", () => ({
     onFocusChanged: tauriWindow.onFocusChanged,
   }),
 }));
+
+vi.mock("@tauri-apps/plugin-notification", () => nativeNotification);
 
 function createWorkspaceState(): WorkspaceGroupsState {
   return {
@@ -146,6 +153,11 @@ describe("workspace switching webview commands", () => {
     localStorage.clear();
     invoke.mockReset();
     listen.mockClear();
+    nativeNotification.isPermissionGranted.mockReset();
+    nativeNotification.isPermissionGranted.mockResolvedValue(true);
+    nativeNotification.requestPermission.mockReset();
+    nativeNotification.requestPermission.mockResolvedValue("granted");
+    nativeNotification.sendNotification.mockReset();
     clearDndState();
     clearRuntimeBadges();
   });
@@ -293,6 +305,7 @@ describe("workspace switching webview commands", () => {
       showBadge: true,
       affectTray: true,
       muteAudio: false,
+      showNativeNotifications: true,
     });
 
     await unmountPage(component);
@@ -324,6 +337,7 @@ describe("workspace switching webview commands", () => {
       showBadge: true,
       affectTray: true,
       muteAudio: true,
+      showNativeNotifications: true,
     });
 
     await unmountPage(component);
@@ -359,6 +373,7 @@ describe("workspace switching webview commands", () => {
       showBadge: true,
       affectTray: true,
       muteAudio: false,
+      showNativeNotifications: true,
     });
 
     await unmountPage(component);
@@ -715,6 +730,52 @@ describe("workspace switching webview commands", () => {
     expect(
       document.querySelector<HTMLElement>('[title="YouTube Music (Cmd+1)"]')?.textContent,
     ).toContain("8");
+
+    await unmountPage(component);
+  });
+
+  it("sends a native OS notification when a known unread badge count increases", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+
+    listen.handlers["update-badge"]({ payload: "youtube:0" });
+    await settle();
+    listen.handlers["update-badge"]({ payload: "youtube:1" });
+    await settle();
+
+    expect(nativeNotification.sendNotification).toHaveBeenCalledWith({
+      title: "New message in YouTube Music",
+      body: "YouTube Music has 1 unread message.",
+      tag: "ferx:youtube:unread",
+      data: { serviceId: "youtube" },
+    });
+
+    await unmountPage(component);
+  });
+
+  it("does not send native OS notifications for initial badge reports or DND", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+
+    listen.handlers["update-badge"]({ payload: "youtube:4" });
+    await settle();
+    expect(nativeNotification.sendNotification).not.toHaveBeenCalled();
+
+    document.querySelector<HTMLButtonElement>('button[title="Turn On Do Not Disturb"]')
+      ?.click();
+    await settle();
+
+    listen.handlers["update-badge"]({ payload: "youtube:5" });
+    await settle();
+    expect(nativeNotification.sendNotification).not.toHaveBeenCalled();
 
     await unmountPage(component);
   });

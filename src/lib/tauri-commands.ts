@@ -57,8 +57,8 @@ async deleteWebview(payload: DeleteWebviewPayload) : Promise<void> {
 async loadService(payload: ServiceWebviewCommandPayload) : Promise<void> {
     await TAURI_INVOKE("load_service", { payload });
 },
-async showContextMenu(id: string, disabled: boolean, showBadge: boolean, affectTray: boolean, muteAudio: boolean) : Promise<void> {
-    await TAURI_INVOKE("show_context_menu", { id, disabled, showBadge, affectTray, muteAudio });
+async showContextMenu(id: string, disabled: boolean, showBadge: boolean, affectTray: boolean, muteAudio: boolean, showNativeNotifications: boolean) : Promise<void> {
+    await TAURI_INVOKE("show_context_menu", { id, disabled, showBadge, affectTray, muteAudio, showNativeNotifications });
 },
 async updateTrayIcon(hasUnread: boolean) : Promise<void> {
     await TAURI_INVOKE("update_tray_icon", { hasUnread });

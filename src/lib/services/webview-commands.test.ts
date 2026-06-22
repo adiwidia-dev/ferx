@@ -23,6 +23,7 @@ function createService(overrides: Partial<Parameters<typeof openServiceWebview>[
       showBadge: true,
       affectTray: true,
       muteAudio: false,
+      showNativeNotifications: true,
     },
     ...overrides,
   };
@@ -43,7 +44,7 @@ describe("webview command wrappers", () => {
     await showServiceContextMenu(
       "chat",
       true,
-      { showBadge: true, affectTray: true, muteAudio: false },
+      { showBadge: true, affectTray: true, muteAudio: false, showNativeNotifications: true },
       invokeCommand,
     );
     await setServiceWebviewAudioMuted("chat", true, invokeCommand);
@@ -88,6 +89,7 @@ describe("webview command wrappers", () => {
       showBadge: true,
       affectTray: true,
       muteAudio: false,
+      showNativeNotifications: true,
     });
     expect(invokeCommand).toHaveBeenNthCalledWith(9, "set_service_webview_audio_muted", {
       payload: { id: "chat", muted: true },

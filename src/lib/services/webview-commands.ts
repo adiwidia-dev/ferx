@@ -59,7 +59,12 @@ export function hideAllWebviews(invokeCommand: InvokeCommand = invoke) {
 export function showServiceContextMenu(
   id: string,
   disabled: boolean,
-  notificationPrefs: { showBadge: boolean; affectTray: boolean; muteAudio: boolean },
+  notificationPrefs: {
+    showBadge: boolean;
+    affectTray: boolean;
+    muteAudio: boolean;
+    showNativeNotifications: boolean;
+  },
   invokeCommand: InvokeCommand = invoke,
 ) {
   return invokeCommand("show_context_menu", {
@@ -68,6 +73,7 @@ export function showServiceContextMenu(
     showBadge: notificationPrefs.showBadge,
     affectTray: notificationPrefs.affectTray,
     muteAudio: notificationPrefs.muteAudio,
+    showNativeNotifications: notificationPrefs.showNativeNotifications,
   });
 }
 

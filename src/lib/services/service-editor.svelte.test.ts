@@ -9,7 +9,12 @@ function makePageService(overrides = {}) {
     name: "Slack",
     url: "https://app.slack.com",
     storageKey: "storage-svc-1",
-    notificationPrefs: { muteAudio: false, showBadge: true, affectTray: true },
+    notificationPrefs: {
+      muteAudio: false,
+      showBadge: true,
+      affectTray: true,
+      showNativeNotifications: true,
+    },
     ...overrides,
   };
 }

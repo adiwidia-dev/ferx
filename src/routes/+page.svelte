@@ -1,6 +1,11 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
+  import {
+    isPermissionGranted,
+    requestPermission,
+    sendNotification,
+  } from "@tauri-apps/plugin-notification";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { moveItemToTarget } from "$lib/services/reorder";
   import ServiceEditorDialog, {
@@ -30,6 +35,10 @@
     countTrayRelevantUnreadServices,
     type NotificationPrefs,
   } from "$lib/services/notification-prefs";
+  import {
+    buildNativeUnreadNotification,
+    shouldSendNativeUnreadNotification,
+  } from "$lib/services/native-notifications";
   import {
     parseResourceUsagePayload,
     type ResourceUsageSnapshot,
@@ -163,6 +172,7 @@
   let lastTrayUnreadState: boolean | null = null;
   let lastAppliedDndAudioState: boolean | null = null;
   let lastActivationKey: string | null = null;
+  let nativeNotificationPermissionGranted: boolean | null = null;
 
   // ---------------------------------------------------------------------------
   // Effects
@@ -399,11 +409,37 @@
         });
         void webviewCommands.run(() => setServiceWebviewAudioMuted(targetId, newMuteAudio));
       }
+      if (action === "toggle-native-notifications") {
+        updateServiceNotificationPrefs(targetId, (prefs) => ({
+          ...prefs,
+          showNativeNotifications: !prefs.showNativeNotifications,
+        }));
+      }
       if (action === "delete") deleteService(targetId);
     });
 
     const unlistenBadgePromise = listen("update-badge", (event) => {
-      applyRuntimeBadgePayload(event.payload, services);
+      const [targetId, countStr] =
+        typeof event.payload === "string" ? event.payload.split(":") : ["", ""];
+      const previousBadge = targetId ? runtimeBadges[targetId] : undefined;
+      const changed = applyRuntimeBadgePayload(event.payload, services);
+      if (!changed || !targetId) return;
+
+      const nextBadge = Number.parseInt(countStr, 10);
+      const service = displayServices.find((candidate) => candidate.id === targetId);
+      if (!service || Number.isNaN(nextBadge)) return;
+      if (
+        !shouldSendNativeUnreadNotification({
+          service,
+          previousBadge,
+          nextBadge,
+          dndEnabled: dndState.enabled,
+        })
+      ) {
+        return;
+      }
+
+      void showNativeUnreadNotification(service, nextBadge);
     });
 
     const unlistenResourceUsagePromise = listen("resource-usage-update", (event) => {
@@ -588,6 +624,38 @@
     workspaceState = updateWorkspaceServiceNotificationPrefs(workspaceState, id, updater);
   }
 
+  async function ensureNativeNotificationPermission() {
+    if (nativeNotificationPermissionGranted === true) return true;
+    if (nativeNotificationPermissionGranted === false) return false;
+
+    try {
+      if (await isPermissionGranted()) {
+        nativeNotificationPermissionGranted = true;
+        return true;
+      }
+
+      nativeNotificationPermissionGranted = (await requestPermission()) === "granted";
+      return nativeNotificationPermissionGranted;
+    } catch (error) {
+      console.error("[ferx] native notification permission check failed:", error);
+      nativeNotificationPermissionGranted = false;
+      return false;
+    }
+  }
+
+  async function showNativeUnreadNotification(
+    service: Parameters<typeof buildNativeUnreadNotification>[0],
+    unreadCount: number,
+  ) {
+    if (!(await ensureNativeNotificationPermission())) return;
+
+    try {
+      sendNotification(buildNativeUnreadNotification(service, unreadCount));
+    } catch (error) {
+      console.error("[ferx] native notification failed:", error);
+    }
+  }
+
   function deleteService(id: string) {
     clearServiceHibernation(id);
     const nextState = deleteServiceFromWorkspaceState(workspaceState, runtimeBadges, id);
@@ -604,11 +672,13 @@
     showBadge: boolean;
     affectTray: boolean;
     muteAudio: boolean;
+    showNativeNotifications: boolean;
   }) {
     await showServiceContextMenu(input.id, input.disabled, {
       showBadge: input.showBadge,
       affectTray: input.affectTray,
       muteAudio: input.muteAudio,
+      showNativeNotifications: input.showNativeNotifications,
     });
   }
 

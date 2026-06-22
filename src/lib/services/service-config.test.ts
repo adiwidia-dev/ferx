@@ -250,10 +250,12 @@ describe("readStoredServices", () => {
           disabled: true,
           hibernateWhenInactive: true,
           badge: 5,
+          iconBgColor: undefined,
           notificationPrefs: {
             showBadge: false,
             affectTray: true,
             muteAudio: true,
+            showNativeNotifications: true,
           },
         },
       ],
