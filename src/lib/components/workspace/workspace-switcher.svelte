@@ -368,16 +368,19 @@
 
             {#if confirmingDeleteWorkspaceId === workspace.id}
               <div
-                class="mx-2 flex items-center gap-2 rounded-xl border bg-destructive/5 p-2 text-xs text-muted-foreground"
+                class="mx-2 flex items-start gap-2 rounded-xl border bg-destructive/5 p-2 text-xs text-muted-foreground"
               >
-                <span class="min-w-0 flex-1 truncate px-2">
-                  Delete {workspace.name}?
-                </span>
+                <div class="min-w-0 flex-1 px-2">
+                  <p class="font-semibold text-foreground">
+                    Delete {workspace.name} and its exclusive services?
+                  </p>
+                  <p class="mt-1 leading-5">Services that only belong to this workspace will be deleted with their local webview data.</p>
+                </div>
                 <button
                   type="button"
                   title={`Confirm delete ${workspace.name} workspace`}
                   aria-label={`Confirm delete ${workspace.name} workspace`}
-                  class="h-8 rounded-lg bg-destructive px-3 font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90"
+                  class="h-8 shrink-0 rounded-lg bg-destructive px-3 font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90"
                   onclick={() => deleteWorkspace(workspace.id)}
                 >
                   Delete
@@ -386,7 +389,7 @@
                   type="button"
                   title={`Cancel delete ${workspace.name} workspace`}
                   aria-label={`Cancel delete ${workspace.name} workspace`}
-                  class="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                   onclick={() => (confirmingDeleteWorkspaceId = null)}
                 >
                   <XIcon class="h-4 w-4" />

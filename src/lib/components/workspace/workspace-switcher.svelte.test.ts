@@ -371,6 +371,10 @@ describe("WorkspaceSwitcher", () => {
     flushSync();
 
     expect(onDeleteWorkspace).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("Delete Work and its exclusive services?");
+    expect(document.body.textContent).toContain(
+      "Services that only belong to this workspace will be deleted with their local webview data.",
+    );
 
     const confirmButton = document.querySelector(
       '[title="Confirm delete Work workspace"]',
