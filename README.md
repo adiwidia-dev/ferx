@@ -18,7 +18,10 @@ Ferx is a lightweight desktop application for running services like WhatsApp, Sl
 - Optional per-service hibernation that closes inactive services after 60 seconds to reduce background resource usage
 - Per-service enable and disable states
 - Custom unread badge handling
+- Native OS unread notifications with per-service control and Do Not Disturb suppression
 - Native context menus for sidebar actions
+- Centralized service management in Settings for availability, unread indicators, notifications, hibernation, and deletion
+- System, Light, and Dark appearance modes for the Ferx shell UI
 - Camera and microphone support for meeting-oriented services
 - Multiple workspace support with create, rename, and delete
 - In-workspace todo notes panel with local storage persistence

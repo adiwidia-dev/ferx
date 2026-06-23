@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ## [Unreleased]
 
+---
+
+## [0.8.0] — 2026-06-23
+
 ### Added
 
 - Added a centralized Services section in Settings for searching and filtering services across workspaces, toggling badge/tray/sound/native-notification/hibernation settings, disabling services, and deleting services with confirmation.
@@ -251,6 +255,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 - Service config validation and safety guardrails: invalid URLs, malformed payloads, and unsupported schemes are rejected before any state change is applied.
 - CI baseline: pre-push validation runs type-check, unit tests, and Rust tests.
 
+[0.8.0]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.8.0
 [0.7.0]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.7.0
 [0.6.1]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.6.1
 [0.6.0]: https://github.com/adiwidia-dev/ferx/releases/tag/v0.6.0

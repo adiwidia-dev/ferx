@@ -22,12 +22,16 @@ Current high-traffic modules:
 | `workspace-page-lifecycle.ts` | Startup state assembly, debounced storage writers, preload scheduling, activation-key/display-service helpers. |
 | `webview-commands.ts` | Frontend wrappers for Tauri commands and the serialized webview command queue. |
 | `service-runtime.ts` | Payload builder helpers and re-exported Tauri command payload types. Do not redefine those payloads elsewhere. |
+| `service-management.ts` | Pure Settings Services table row projection, filtering, and hibernation toggle helpers. |
 | `service-editor.svelte.ts` | Add/edit dialog state and save flow. |
 | `service-hibernation.svelte.ts` | Runtime-only hibernation timers, hibernated service state, cancellation versions, and wake generations. |
 | `todo-panel.svelte.ts` | Todo notes state, mutations, panel open/close, and storage scheduling. |
 | `drag-drop.svelte.ts` | Pointer drag state and handlers. |
 | `runtime-badges.svelte.ts` | Runtime unread badge map and badge event application. |
 | `notification-prefs.ts` | Notification/audio preference helpers and tray-relevant unread counting, including runtime hibernation exclusion. |
+| `native-notifications.ts` | Pure app-shell OS notification gating and unread-notification payload helpers. |
+| `app-settings.ts` | App-wide Settings persistence, including spell check, resource usage monitoring, and shell appearance mode. |
+| `theme.ts` | Browser integration for applying System, Light, and Dark shell appearance modes. |
 | `settings-page-state.ts` | Settings page startup and workspace color helpers. |
 | `updater.ts` | Wrapper around `@tauri-apps/plugin-updater` for settings UI tests and update flow. |
 

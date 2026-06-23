@@ -12,8 +12,11 @@
 - Confirm the invalid service URL path fails safely.
 - Confirm editing a service URL updates the live service behavior.
 - Confirm disabling a service unloads it rather than leaving it live in the background.
+- Confirm native OS unread notifications appear for a badge increase, respect Do Not Disturb, and can be disabled per service.
+- Confirm the Settings Services section can filter by search/workspace and toggle availability, badge, tray, sound, OS notifications, and hibernation for services across workspaces.
 - Confirm a service with **Hibernate when inactive** enabled closes after 60 seconds of inactivity, shows the hibernated sidebar state, and wakes when clicked without losing its saved session.
 - Confirm hibernated services are visually distinct from disabled services and do not use disabled opacity/grayscale styling.
+- Confirm System, Light, and Dark appearance modes only affect the Ferx shell UI and do not alter service webviews.
 - Confirm opening overlays such as the service editor, workspace switcher, and todos panel moves the active service webview offscreen without closing or reloading it.
 - Confirm switching between already-loaded services does not steal focus or re-activate the current service when unrelated workspace preferences change.
 - Confirm hiding or minimizing Ferx starts the hibernation timer for the active hibernation-enabled service.
