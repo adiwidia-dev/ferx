@@ -26,6 +26,8 @@ The current build intentionally targets direct distribution rather than the Mac 
 
 - WhatsApp Web assumes notifications are blocked if the platform prompt is unavailable.
 - Ferx intentionally overrides parts of the notification and permissions surface to avoid a persistent in-app warning banner.
+- Native OS unread notifications are app-shell notifications sent through `tauri-plugin-notification` after badge increases pass app-side preference, Do Not Disturb, disabled-service, and hibernation checks.
+- Keep native OS notifications separate from the injected web `Notification` permission shim. The shim exists so third-party services behave correctly inside their webviews; it is not the delivery path for Ferx's shell notifications.
 - Do not remove or simplify this behavior without re-testing the affected services.
 
 ## 4. Retina Sizing And Coordinate Spaces
