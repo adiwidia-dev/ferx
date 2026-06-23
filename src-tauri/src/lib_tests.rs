@@ -209,6 +209,14 @@ fn macos_info_plist_disables_press_and_hold_for_key_repeat() {
     assert!(info_plist.contains("<false/>"));
 }
 
+#[test]
+fn macos_info_plist_allows_continuity_camera_device_type() {
+    let info_plist = include_str!("../Info.plist");
+
+    assert!(info_plist.contains("<key>NSCameraUseContinuityCameraDeviceType</key>"));
+    assert!(info_plist.contains("<true/>"));
+}
+
 #[cfg(target_os = "macos")]
 #[test]
 fn macos_runtime_defaults_disable_press_and_hold_for_key_repeat() {

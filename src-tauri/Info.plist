@@ -6,6 +6,8 @@
   <false/>
   <key>NSCameraUsageDescription</key>
   <string>Ferx requires camera access for video meetings.</string>
+  <key>NSCameraUseContinuityCameraDeviceType</key>
+  <true/>
   <key>NSMicrophoneUsageDescription</key>
   <string>Ferx requires microphone access for audio calls.</string>
 </dict>
