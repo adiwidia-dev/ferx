@@ -476,6 +476,11 @@
     set-cookie-parser "^3.0.0"
     sirv "^3.0.0"
 
+"@sveltejs/load-config@^0.2.0":
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/@sveltejs/load-config/-/load-config-0.2.0.tgz#149fbaea4a9b1b4106bcd3c28b96420702a99234"
+  integrity sha512-1LgZ/qUqSoq+QorD83lk2hka79Px0wXNW2q5V1nZlxGhQgw1jrsIbVz5YiCeucVLo4XvFLjXukUaQjIiqowkcg==
+
 "@sveltejs/vite-plugin-svelte-inspector@^5.0.0":
   version "5.0.2"
   resolved "https://registry.npmjs.org/@sveltejs/vite-plugin-svelte-inspector/-/vite-plugin-svelte-inspector-5.0.2.tgz"
@@ -1404,12 +1409,13 @@ style-to-object@^1.0.8:
   dependencies:
     inline-style-parser "0.2.7"
 
-svelte-check@^4.0.0:
-  version "4.4.6"
-  resolved "https://registry.npmmirror.com/svelte-check/-/svelte-check-4.4.6.tgz"
-  integrity sha512-kP1zG81EWaFe9ZyTv4ZXv44Csi6Pkdpb7S3oj6m+K2ec/IcDg/a8LsFsnVLqm2nxtkSwsd5xPj/qFkTBgXHXjg==
+svelte-check@^4.7.0:
+  version "4.7.0"
+  resolved "https://registry.yarnpkg.com/svelte-check/-/svelte-check-4.7.0.tgz#ea5c7f154b6d3ff774151f9232ff4264fac8e727"
+  integrity sha512-XChCqdDg29UWOWai2I1s2Ss003piZ9mae2y2KXwoOX01W75mg7/fwLLnx9Yruk9asHkxHPDdSfEfsJh5tr9JvQ==
   dependencies:
     "@jridgewell/trace-mapping" "^0.3.25"
+    "@sveltejs/load-config" "^0.2.0"
     chokidar "^4.0.1"
     fdir "^6.2.0"
     picocolors "^1.0.0"
