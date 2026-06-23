@@ -495,6 +495,24 @@ describe("settings page", () => {
     unmount(component);
   });
 
+  it("uses responsive service management table sizing without a forced wide minimum", () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createServiceManagementState()));
+
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    const table = document.querySelector(
+      '[data-testid="service-management-table"]',
+    ) as HTMLTableElement | null;
+    expect(table?.className).toContain("table-fixed");
+    expect(table?.className).not.toContain("min-w-[920px]");
+
+    unmount(component);
+  });
+
   it("persists service management toggles and mirrors runtime sound/close commands", () => {
     localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createServiceManagementState()));
 

@@ -119,19 +119,30 @@
     </div>
   </div>
 
-  <div class="overflow-x-auto">
-    <table data-testid="service-management-table" class="w-full min-w-[920px] text-left">
+  <div class="overflow-hidden">
+    <table data-testid="service-management-table" class="w-full table-fixed text-left">
+      <colgroup>
+        <col class="w-[31%]" />
+        <col class="w-[13%]" />
+        <col class="w-[7.5%]" />
+        <col class="w-[7.5%]" />
+        <col class="w-[7.5%]" />
+        <col class="w-[7.5%]" />
+        <col class="w-[7.5%]" />
+        <col class="w-[7.5%]" />
+        <col class="w-[11%]" />
+      </colgroup>
       <thead class="border-b bg-muted/45 text-[11px] font-semibold uppercase text-muted-foreground">
         <tr>
-          <th class="w-[300px] px-5 py-3">Service</th>
-          <th class="w-[220px] px-3 py-3">Workspaces</th>
-          <th class="px-3 py-3 text-center">Enabled</th>
-          <th class="px-3 py-3 text-center">Badge</th>
-          <th class="px-3 py-3 text-center">Tray</th>
-          <th class="px-3 py-3 text-center">Sound</th>
-          <th class="px-3 py-3 text-center">OS Notify</th>
-          <th class="px-3 py-3 text-center">Hibernate</th>
-          <th class="w-[92px] px-5 py-3 text-right">Actions</th>
+          <th class="px-5 py-3">Service</th>
+          <th class="px-2 py-3">Workspaces</th>
+          <th class="px-1 py-3 text-center">Enabled</th>
+          <th class="px-1 py-3 text-center">Badge</th>
+          <th class="px-1 py-3 text-center">Tray</th>
+          <th class="px-1 py-3 text-center">Sound</th>
+          <th class="px-1 py-3 text-center">OS Notify</th>
+          <th class="px-1 py-3 text-center">Hibernate</th>
+          <th class="px-3 py-3 text-right">Actions</th>
         </tr>
       </thead>
       <tbody class="divide-y">
@@ -150,11 +161,11 @@
               </div>
             </td>
 
-            <td class="px-3 py-3">
-              <div class="flex max-w-[220px] flex-wrap gap-1.5">
+            <td class="px-2 py-3">
+              <div class="flex min-w-0 flex-wrap gap-1.5">
                 {#if row.workspaces.length > 0}
                   {#each row.workspaces as workspace (workspace.id)}
-                    <span class="max-w-[160px] truncate rounded-md border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                    <span class="max-w-full truncate rounded-md border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
                       {workspace.name}
                     </span>
                   {/each}
@@ -164,7 +175,7 @@
               </div>
             </td>
 
-            <td class="px-3 py-3">
+            <td class="px-1 py-3">
               <label class="relative mx-auto inline-flex cursor-pointer items-center" title="Toggle service availability">
                 <input
                   data-testid={`service-enabled-${service.id}`}
@@ -178,7 +189,7 @@
               </label>
             </td>
 
-            <td class="px-3 py-3">
+            <td class="px-1 py-3">
               <label class="relative mx-auto inline-flex cursor-pointer items-center" title="Toggle sidebar unread badge">
                 <input
                   data-testid={`service-badge-${service.id}`}
@@ -192,7 +203,7 @@
               </label>
             </td>
 
-            <td class="px-3 py-3">
+            <td class="px-1 py-3">
               <label class="relative mx-auto inline-flex cursor-pointer items-center" title="Toggle tray unread contribution">
                 <input
                   data-testid={`service-tray-${service.id}`}
@@ -206,7 +217,7 @@
               </label>
             </td>
 
-            <td class="px-3 py-3">
+            <td class="px-1 py-3">
               <label class="relative mx-auto inline-flex cursor-pointer items-center" title="Toggle notification sound">
                 <input
                   data-testid={`service-sound-${service.id}`}
@@ -220,7 +231,7 @@
               </label>
             </td>
 
-            <td class="px-3 py-3">
+            <td class="px-1 py-3">
               <label class="relative mx-auto inline-flex cursor-pointer items-center" title="Toggle native OS notifications">
                 <input
                   data-testid={`service-native-${service.id}`}
@@ -234,7 +245,7 @@
               </label>
             </td>
 
-            <td class="px-3 py-3">
+            <td class="px-1 py-3">
               <label class="relative mx-auto inline-flex cursor-pointer items-center" title="Toggle inactive hibernation">
                 <input
                   data-testid={`service-hibernate-${service.id}`}
@@ -252,7 +263,7 @@
               </label>
             </td>
 
-            <td class="px-5 py-3">
+            <td class="px-3 py-3">
               <div class="flex justify-end gap-1">
                 <Button
                   variant="ghost"

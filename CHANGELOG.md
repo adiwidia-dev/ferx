@@ -22,6 +22,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ### Fixed
 
+- Fixed the Settings Services table layout so it uses the available width instead of forcing horizontal scrolling at normal desktop sizes.
 - Fixed workspace deletion so services that only belonged to the deleted workspace are removed from configuration and their webview storage is deleted, preventing inaccessible orphan services from appearing in Settings.
 - Fixed the Services workspace filter dropdown styling so it matches the rest of the Settings controls instead of using the native platform gradient.
 - Added an explicit Ferx app icon hint to native unread notifications for platforms that honor notification icons.
