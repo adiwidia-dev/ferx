@@ -443,12 +443,7 @@
   resolved "https://registry.npmmirror.com/@standard-schema/spec/-/spec-1.1.0.tgz"
   integrity sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==
 
-"@sveltejs/acorn-typescript@^1.0.5":
-  version "1.0.9"
-  resolved "https://registry.npmmirror.com/@sveltejs/acorn-typescript/-/acorn-typescript-1.0.9.tgz"
-  integrity sha512-lVJX6qEgs/4DOcRTpo56tmKzVPtoWAaVbL4hfO7t7NVwl9AAXzQR6cihesW1BmNMPl+bK6dreu2sOKBP2Q9CIA==
-
-"@sveltejs/acorn-typescript@^1.0.9":
+"@sveltejs/acorn-typescript@^1.0.5", "@sveltejs/acorn-typescript@^1.0.9":
   version "1.0.10"
   resolved "https://registry.npmmirror.com/@sveltejs/acorn-typescript/-/acorn-typescript-1.0.10.tgz#72376d9f46c04be82b714b1c33f0956911a7a6d6"
   integrity sha512-4WfKk68eTih+MiJD4fSbxN7E8kVBmTMPWHUPYjvl2N0rMs53YLTT8/YjKU5Dtnz5LqDjl7LEw4U7lXR2W3J5WA==
@@ -458,10 +453,10 @@
   resolved "https://registry.npmmirror.com/@sveltejs/adapter-static/-/adapter-static-3.0.10.tgz"
   integrity sha512-7D9lYFWJmB7zxZyTE/qxjksvMqzMuYrrsyh1f4AlZqeZeACPRySjbC3aFiY55wb1tWUaKOQG9PVbm74JcN2Iew==
 
-"@sveltejs/kit@^2.60.1":
-  version "2.66.0"
-  resolved "https://registry.npmmirror.com/@sveltejs/kit/-/kit-2.66.0.tgz#c4bf496240a97c5d11656f9e259c825dc91e3375"
-  integrity sha512-7nN4Ur4+nofZ36DVo83JbRe02m61Vc+I441mML/DYa1pUTZ/x26+lbrdqPen8gjmsUc6flMtHEqAtn0UfmfvAw==
+"@sveltejs/kit@^2.67.0":
+  version "2.67.0"
+  resolved "https://registry.yarnpkg.com/@sveltejs/kit/-/kit-2.67.0.tgz#230212cd3812fbea830a4704c27bcfe6018d27ca"
+  integrity sha512-JXHbsDwRes1Wgyof3q5ApzzpbCWvinKXMQCiV67TFO6xlZPYLoK0fq3xQMqSicDMgCtFGqLkrQXkseOcASdZ8A==
   dependencies:
     "@standard-schema/spec" "^1.0.0"
     "@sveltejs/acorn-typescript" "^1.0.9"
@@ -813,12 +808,7 @@
     convert-source-map "^2.0.0"
     tinyrainbow "^3.1.0"
 
-acorn@^8.12.1:
-  version "8.16.0"
-  resolved "https://registry.npmmirror.com/acorn/-/acorn-8.16.0.tgz"
-  integrity sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw==
-
-acorn@^8.16.0:
+acorn@^8.12.1, acorn@^8.16.0:
   version "8.17.0"
   resolved "https://registry.npmmirror.com/acorn/-/acorn-8.17.0.tgz#1785adb84faf8d8add10369b93826fc2bd08f1fe"
   integrity sha512-xRQbDb9BnwDafYNn6Vwl839DYVjqXYb1XVGtWAZ1kcDc6iwAL4hg3B1dZlRiuENFeO2H53gFG3in621AdERVAg==
