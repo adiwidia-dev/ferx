@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ## [Unreleased]
 
+### Changed
+
+- Updated Svelte, SvelteKit, svelte-check, shadcn-svelte, and Tauri dependency versions from Dependabot maintenance updates.
+
 ---
 
 ## [0.8.0] — 2026-06-23
