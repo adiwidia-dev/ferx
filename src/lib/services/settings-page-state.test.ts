@@ -70,6 +70,7 @@ describe("readSettingsPageStartupState", () => {
       spellCheckEnabled: false,
       resourceUsageMonitoringEnabled: true,
       themeMode: "dark",
+      startupPreloadLimit: 2,
     };
 
     localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(workspaceState));
@@ -80,6 +81,7 @@ describe("readSettingsPageStartupState", () => {
       spellCheckEnabled: false,
       resourceUsageMonitoringEnabled: true,
       themeMode: "dark",
+      startupPreloadLimit: 2,
       initialSpellCheckEnabled: false,
     });
   });

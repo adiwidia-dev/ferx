@@ -16,7 +16,11 @@
   import WorkspaceDisabledState from "$lib/components/workspace/workspace-disabled-state.svelte";
   import WorkspaceEmptyState from "$lib/components/workspace/workspace-empty-state.svelte";
   import WorkspaceSidebar from "$lib/components/workspace/workspace-sidebar.svelte";
-  import { DEFAULT_APP_SETTINGS } from "$lib/services/app-settings";
+  import {
+    DEFAULT_APP_SETTINGS,
+    startupPreloadLimitToMaxPreloads,
+    type StartupPreloadLimit,
+  } from "$lib/services/app-settings";
   import {
     closeServiceWebview,
     createWebviewCommandQueue,
@@ -57,7 +61,6 @@
     consumeOpenServiceParam,
     createDebouncedStorageWriter,
     createDisplayServicesProjector,
-    MAX_BACKGROUND_PRELOADS,
     PRELOAD_GAP_MS,
     PRELOAD_START_MS,
     readWorkspacePageStartupState,
@@ -114,6 +117,9 @@
   let spellCheckEnabled = $state(DEFAULT_APP_SETTINGS.spellCheckEnabled);
   let resourceUsageMonitoringEnabled = $state(
     DEFAULT_APP_SETTINGS.resourceUsageMonitoringEnabled,
+  );
+  let startupPreloadLimit = $state<StartupPreloadLimit>(
+    DEFAULT_APP_SETTINGS.startupPreloadLimit,
   );
   let isWorkspaceSwitcherOpen = $state(false);
   let isAppInactive = $state(false);
@@ -348,6 +354,7 @@
 
     spellCheckEnabled = startupState.spellCheckEnabled;
     resourceUsageMonitoringEnabled = startupState.resourceUsageMonitoringEnabled;
+    startupPreloadLimit = startupState.startupPreloadLimit;
     cleanupThemeMode?.();
     cleanupThemeMode = installThemeMode(startupState.themeMode);
     const prunedStartupState = pruneOrphanedServicesFromWorkspaceState(
@@ -384,7 +391,7 @@
             services: startupServices,
             activeId: startupActiveId,
             spellCheckEnabled,
-            maxPreloads: MAX_BACKGROUND_PRELOADS,
+            maxPreloads: startupPreloadLimitToMaxPreloads(startupPreloadLimit),
             gapMs: PRELOAD_GAP_MS,
             shouldCancel: isCancelled,
             schedulePreload: async (operation) => {

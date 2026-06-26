@@ -19,6 +19,7 @@
   import {
     APP_SETTINGS_STORAGE_KEY,
     serializeAppSettings,
+    type StartupPreloadLimit,
     type ThemeMode,
   } from "$lib/services/app-settings";
   import {
@@ -116,6 +117,7 @@
   let spellCheckEnabled = $state(true);
   let resourceUsageMonitoringEnabled = $state(false);
   let themeMode = $state<ThemeMode>("system");
+  let startupPreloadLimit = $state<StartupPreloadLimit>(null);
   let initialSpellCheckEnabled = $state(true);
   let showRestartPrompt = $state(false);
   let showRestartConfirm = $state(false);
@@ -161,6 +163,7 @@
     spellCheckEnabled = startup.spellCheckEnabled;
     resourceUsageMonitoringEnabled = startup.resourceUsageMonitoringEnabled;
     themeMode = startup.themeMode;
+    startupPreloadLimit = startup.startupPreloadLimit;
     initialSpellCheckEnabled = startup.initialSpellCheckEnabled;
     cleanupThemeMode?.();
     cleanupThemeMode = installThemeMode(themeMode);
@@ -227,32 +230,40 @@
     }
   }
 
-  function handleSpellCheckChange(enabled: boolean) {
-    spellCheckEnabled = enabled;
+  function persistAppSettings() {
     localStorage.setItem(
       APP_SETTINGS_STORAGE_KEY,
-      serializeAppSettings({ spellCheckEnabled, resourceUsageMonitoringEnabled, themeMode }),
+      serializeAppSettings({
+        spellCheckEnabled,
+        resourceUsageMonitoringEnabled,
+        themeMode,
+        startupPreloadLimit,
+      }),
     );
+  }
+
+  function handleSpellCheckChange(enabled: boolean) {
+    spellCheckEnabled = enabled;
+    persistAppSettings();
     showRestartPrompt = enabled !== initialSpellCheckEnabled;
     restartError = "";
   }
 
   function handleResourceUsageMonitoringChange(enabled: boolean) {
     resourceUsageMonitoringEnabled = enabled;
-    localStorage.setItem(
-      APP_SETTINGS_STORAGE_KEY,
-      serializeAppSettings({ spellCheckEnabled, resourceUsageMonitoringEnabled, themeMode }),
-    );
+    persistAppSettings();
   }
 
   function handleThemeModeChange(nextThemeMode: ThemeMode) {
     themeMode = nextThemeMode;
-    localStorage.setItem(
-      APP_SETTINGS_STORAGE_KEY,
-      serializeAppSettings({ spellCheckEnabled, resourceUsageMonitoringEnabled, themeMode }),
-    );
+    persistAppSettings();
     cleanupThemeMode?.();
     cleanupThemeMode = installThemeMode(themeMode);
+  }
+
+  function handleStartupPreloadLimitChange(limit: StartupPreloadLimit) {
+    startupPreloadLimit = limit;
+    persistAppSettings();
   }
 
   function requestRestartFerx() {
@@ -286,6 +297,7 @@
           spellCheckEnabled: startup.spellCheckEnabled,
           resourceUsageMonitoringEnabled: startup.resourceUsageMonitoringEnabled,
           themeMode: startup.themeMode,
+          startupPreloadLimit: startup.startupPreloadLimit,
         },
         appVersion: appInfo.version,
       });
@@ -688,11 +700,13 @@
               {spellCheckEnabled}
               {resourceUsageMonitoringEnabled}
               {themeMode}
+              {startupPreloadLimit}
               {spellCheckRestartRequired}
               {restartError}
               onSpellCheckChange={handleSpellCheckChange}
               onResourceUsageMonitoringChange={handleResourceUsageMonitoringChange}
               onThemeModeChange={handleThemeModeChange}
+              onStartupPreloadLimitChange={handleStartupPreloadLimitChange}
               onRequestRestart={requestRestartFerx}
             />
 

@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 ### Added
 
 - Added native notification previews from service Web Notification API calls, with unread-count notifications kept as fallback.
+- Added a Settings preference for limiting how many inactive services Ferx preloads in the background after startup.
 
 ### Changed
 

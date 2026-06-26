@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   APP_SETTINGS_STORAGE_KEY,
   DEFAULT_APP_SETTINGS,
+  MAX_STARTUP_PRELOAD_LIMIT,
   readAppSettings,
   serializeAppSettings,
+  startupPreloadLimitToMaxPreloads,
 } from "./app-settings";
 
 describe("app settings", () => {
@@ -18,6 +20,7 @@ describe("app settings", () => {
       spellCheckEnabled: true,
       resourceUsageMonitoringEnabled: false,
       themeMode: "system",
+      startupPreloadLimit: null,
     });
   });
 
@@ -30,6 +33,7 @@ describe("app settings", () => {
       spellCheckEnabled: false,
       resourceUsageMonitoringEnabled: false,
       themeMode: "system",
+      startupPreloadLimit: null,
     });
   });
 
@@ -38,6 +42,7 @@ describe("app settings", () => {
       spellCheckEnabled: true,
       resourceUsageMonitoringEnabled: true,
       themeMode: "system",
+      startupPreloadLimit: null,
     });
   });
 
@@ -46,6 +51,7 @@ describe("app settings", () => {
       spellCheckEnabled: true,
       resourceUsageMonitoringEnabled: false,
       themeMode: "system",
+      startupPreloadLimit: null,
     });
   });
 
@@ -54,12 +60,14 @@ describe("app settings", () => {
       spellCheckEnabled: true,
       resourceUsageMonitoringEnabled: false,
       themeMode: "dark",
+      startupPreloadLimit: null,
     });
 
     expect(readAppSettings('{"themeMode":"light"}')).toEqual({
       spellCheckEnabled: true,
       resourceUsageMonitoringEnabled: false,
       themeMode: "light",
+      startupPreloadLimit: null,
     });
   });
 
@@ -68,7 +76,35 @@ describe("app settings", () => {
       spellCheckEnabled: true,
       resourceUsageMonitoringEnabled: false,
       themeMode: "system",
+      startupPreloadLimit: null,
     });
+  });
+
+  it("preserves valid startup preload limits", () => {
+    expect(readAppSettings('{"startupPreloadLimit":0}').startupPreloadLimit).toBe(0);
+    expect(readAppSettings('{"startupPreloadLimit":5}').startupPreloadLimit).toBe(5);
+    expect(
+      readAppSettings(`{"startupPreloadLimit":${MAX_STARTUP_PRELOAD_LIMIT}}`)
+        .startupPreloadLimit,
+    ).toBe(MAX_STARTUP_PRELOAD_LIMIT);
+    expect(readAppSettings('{"startupPreloadLimit":null}').startupPreloadLimit).toBeNull();
+  });
+
+  it("falls back to all startup preloads for invalid preload limits", () => {
+    for (const saved of [
+      '{"startupPreloadLimit":-1}',
+      '{"startupPreloadLimit":1.5}',
+      `{"startupPreloadLimit":${MAX_STARTUP_PRELOAD_LIMIT + 1}}`,
+      '{"startupPreloadLimit":"5"}',
+    ]) {
+      expect(readAppSettings(saved).startupPreloadLimit).toBeNull();
+    }
+  });
+
+  it("converts the saved preload preference to a runtime preload cap", () => {
+    expect(startupPreloadLimitToMaxPreloads(null)).toBe(Number.MAX_SAFE_INTEGER);
+    expect(startupPreloadLimitToMaxPreloads(0)).toBe(0);
+    expect(startupPreloadLimitToMaxPreloads(7)).toBe(7);
   });
 
   it("serializes app-level settings including appearance", () => {
@@ -77,9 +113,10 @@ describe("app settings", () => {
         spellCheckEnabled: true,
         resourceUsageMonitoringEnabled: true,
         themeMode: "dark",
+        startupPreloadLimit: 4,
       }),
     ).toBe(
-      '{"spellCheckEnabled":true,"resourceUsageMonitoringEnabled":true,"themeMode":"dark"}',
+      '{"spellCheckEnabled":true,"resourceUsageMonitoringEnabled":true,"themeMode":"dark","startupPreloadLimit":4}',
     );
   });
 });

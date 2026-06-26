@@ -1,6 +1,7 @@
 import {
   APP_SETTINGS_STORAGE_KEY,
   readAppSettings,
+  type StartupPreloadLimit,
   type ThemeMode,
 } from "$lib/services/app-settings";
 import {
@@ -21,7 +22,6 @@ import type { PageService } from "$lib/services/workspace-state";
 export const WORKSPACE_SAVE_DEBOUNCE_MS = 1200;
 export const PRELOAD_START_MS = 2000;
 export const PRELOAD_GAP_MS = 1000;
-export const MAX_BACKGROUND_PRELOADS = Number.MAX_SAFE_INTEGER;
 
 export function consumeOpenServiceParam(search: string): {
   openServiceId: string | null;
@@ -59,6 +59,7 @@ export function readWorkspacePageStartupState({
   spellCheckEnabled: boolean;
   resourceUsageMonitoringEnabled: boolean;
   themeMode: ThemeMode;
+  startupPreloadLimit: StartupPreloadLimit;
   todoNotes: TodoNote[];
   toastMessage: string;
 } {
@@ -92,6 +93,7 @@ export function readWorkspacePageStartupState({
     spellCheckEnabled: settings.spellCheckEnabled,
     resourceUsageMonitoringEnabled: settings.resourceUsageMonitoringEnabled,
     themeMode: settings.themeMode,
+    startupPreloadLimit: settings.startupPreloadLimit,
     todoNotes,
     toastMessage: startupState.toastMessage,
   };

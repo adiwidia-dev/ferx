@@ -15,7 +15,6 @@ import {
   consumeOpenServiceParam,
   createDebouncedStorageWriter,
   createDisplayServicesProjector,
-  MAX_BACKGROUND_PRELOADS,
   readWorkspacePageStartupState,
   registerFlushOnExit,
   scheduleCancellableTask,
@@ -66,6 +65,7 @@ describe("readWorkspacePageStartupState", () => {
         spellCheckEnabled: false,
         resourceUsageMonitoringEnabled: true,
         themeMode: "dark",
+        startupPreloadLimit: 3,
       }),
       savedTodoNotes: JSON.stringify([
         {
@@ -84,14 +84,22 @@ describe("readWorkspacePageStartupState", () => {
     expect(startup.spellCheckEnabled).toBe(false);
     expect(startup.resourceUsageMonitoringEnabled).toBe(true);
     expect(startup.themeMode).toBe("dark");
+    expect(startup.startupPreloadLimit).toBe(3);
     expect(startup.todoNotes).toHaveLength(1);
     expect(startup.toastMessage).toBe("");
   });
-});
 
-describe("background service preloading", () => {
-  it("allows all enabled inactive services to preload during startup", () => {
-    expect(MAX_BACKGROUND_PRELOADS).toBe(Number.MAX_SAFE_INTEGER);
+  it("defaults startup preloading to all inactive services", () => {
+    const startup = readWorkspacePageStartupState({
+      savedWorkspaceState: null,
+      legacySavedServices: null,
+      legacyActiveServiceId: null,
+      savedAppSettings: null,
+      savedTodoNotes: null,
+      openServiceId: null,
+    });
+
+    expect(startup.startupPreloadLimit).toBeNull();
   });
 });
 

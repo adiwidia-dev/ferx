@@ -156,9 +156,12 @@ describe("settings page", () => {
     checkbox!.dispatchEvent(new Event("change", { bubbles: true }));
     flushSync();
 
-    expect(localStorage.getItem("ferx-app-settings")).toBe(
-      '{"spellCheckEnabled":true,"resourceUsageMonitoringEnabled":true,"themeMode":"system"}',
-    );
+    expect(JSON.parse(localStorage.getItem("ferx-app-settings") ?? "{}")).toEqual({
+      spellCheckEnabled: true,
+      resourceUsageMonitoringEnabled: true,
+      themeMode: "system",
+      startupPreloadLimit: null,
+    });
     expect(document.body.textContent).not.toContain("Restart Ferx to apply resource usage changes.");
 
     unmount(component);
@@ -195,6 +198,7 @@ describe("settings page", () => {
       spellCheckEnabled: true,
       resourceUsageMonitoringEnabled: false,
       themeMode: "dark",
+      startupPreloadLimit: null,
     });
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(document.body.textContent).not.toContain(
@@ -228,6 +232,61 @@ describe("settings page", () => {
     flushSync();
 
     expect(document.documentElement.classList.contains("dark")).toBe(false);
+
+    unmount(component);
+  });
+
+  it("renders and persists the startup preload limit setting", () => {
+    const component = mount(SettingsPage, {
+      target: document.body,
+    });
+
+    flushSync();
+
+    expect(document.body.textContent).toContain("Startup Service Preload");
+    expect(document.body.textContent).toContain(
+      "Limits inactive services opened in the background after launch.",
+    );
+
+    const modeSelect = document.querySelector(
+      'select[name="startup-preload-mode"]',
+    ) as HTMLSelectElement | null;
+
+    expect(modeSelect).toBeTruthy();
+    expect(modeSelect?.value).toBe("all");
+
+    modeSelect!.value = "custom";
+    modeSelect!.dispatchEvent(new Event("change", { bubbles: true }));
+    flushSync();
+
+    const limitInput = document.querySelector(
+      'input[name="startup-preload-limit"]',
+    ) as HTMLInputElement | null;
+
+    expect(limitInput).toBeTruthy();
+    expect(limitInput?.value).toBe("3");
+
+    limitInput!.value = "2";
+    limitInput!.dispatchEvent(new Event("change", { bubbles: true }));
+    flushSync();
+
+    expect(JSON.parse(localStorage.getItem("ferx-app-settings") ?? "{}")).toEqual({
+      spellCheckEnabled: true,
+      resourceUsageMonitoringEnabled: false,
+      themeMode: "system",
+      startupPreloadLimit: 2,
+    });
+
+    modeSelect!.value = "all";
+    modeSelect!.dispatchEvent(new Event("change", { bubbles: true }));
+    flushSync();
+
+    expect(JSON.parse(localStorage.getItem("ferx-app-settings") ?? "{}")).toEqual({
+      spellCheckEnabled: true,
+      resourceUsageMonitoringEnabled: false,
+      themeMode: "system",
+      startupPreloadLimit: null,
+    });
 
     unmount(component);
   });
@@ -920,7 +979,7 @@ describe("settings page", () => {
 
     expect(invoke).toHaveBeenCalledWith("close_all_service_webviews");
     expect(localStorage.getItem("ferx-app-settings")).toBe(
-      '{"spellCheckEnabled":false,"resourceUsageMonitoringEnabled":false,"themeMode":"system"}',
+      '{"spellCheckEnabled":false,"resourceUsageMonitoringEnabled":false,"themeMode":"system","startupPreloadLimit":null}',
     );
     expect(localStorage.getItem("ferx-workspace-active-id")).toBeNull();
     expect(localStorage.getItem("ferx-workspace-services")).toBeNull();

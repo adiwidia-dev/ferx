@@ -50,6 +50,7 @@ describe("workspace config import", () => {
       spellCheckEnabled: false,
       resourceUsageMonitoringEnabled: false,
       themeMode: "system",
+      startupPreloadLimit: null,
     });
     expect(result.value.workspaceState.currentWorkspaceId).toBe(DEFAULT_WORKSPACE_ID);
     expect(result.value.workspaceState.workspaces[0]).toMatchObject({
@@ -238,6 +239,7 @@ describe("workspace config import", () => {
         appSettings: {
           spellCheckEnabled: true,
           resourceUsageMonitoringEnabled: true,
+          startupPreloadLimit: 4,
         },
         workspaceState: {
           version: 1,
@@ -285,6 +287,7 @@ describe("workspace config import", () => {
     ]);
     expect(result.value.workspaceState.servicesById.mail.url).toBe("https://mail.example.com/");
     expect(result.value.workspaceState.servicesById.mail.hibernateWhenInactive).toBe(true);
+    expect(result.value.appSettings.startupPreloadLimit).toBe(4);
   });
 
   it("preserves imported theme mode in app settings", () => {
@@ -300,6 +303,7 @@ describe("workspace config import", () => {
           spellCheckEnabled: true,
           resourceUsageMonitoringEnabled: false,
           themeMode: "dark",
+          startupPreloadLimit: 8,
         },
         workspaceState: {
           version: 1,
@@ -328,6 +332,7 @@ describe("workspace config import", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.appSettings.themeMode).toBe("dark");
+      expect(result.value.appSettings.startupPreloadLimit).toBe(8);
     }
   });
 
@@ -340,7 +345,7 @@ describe("workspace config import", () => {
     writeWorkspaceConfigImportToStorage(result.value, localStorage);
 
     expect(localStorage.getItem(APP_SETTINGS_STORAGE_KEY)).toBe(
-      '{"spellCheckEnabled":false,"resourceUsageMonitoringEnabled":false,"themeMode":"system"}',
+      '{"spellCheckEnabled":false,"resourceUsageMonitoringEnabled":false,"themeMode":"system","startupPreloadLimit":null}',
     );
     expect(localStorage.getItem("ferx-workspace-active-id")).toBeNull();
     expect(localStorage.getItem("ferx-workspace-services")).toBeNull();
