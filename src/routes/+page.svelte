@@ -36,8 +36,12 @@
     type NotificationPrefs,
   } from "$lib/services/notification-prefs";
   import {
+    buildNativeNotificationPreview,
     buildNativeUnreadNotification,
+    parseNativeNotificationPreviewPayload,
+    shouldSendNativeNotificationPreview,
     shouldSendNativeUnreadNotification,
+    type NativeUnreadNotification,
   } from "$lib/services/native-notifications";
   import {
     parseResourceUsagePayload,
@@ -116,8 +120,10 @@
 
   const webviewCommands = createWebviewCommandQueue();
   const serviceHibernation = createServiceHibernationStore();
+  const NATIVE_NOTIFICATION_PREVIEW_DUPLICATE_WINDOW_MS = 10000;
   let lastVisibleHibernationServiceId: string | null = null;
   let cleanupThemeMode: (() => void) | null = null;
+  let nativeNotificationPreviewShownAt: Record<string, number | undefined> = {};
 
   const workspaceStorage = createDebouncedStorageWriter({
     storageKey: WORKSPACE_PAGE_STORAGE_KEYS.workspaceState,
@@ -442,6 +448,7 @@
       const nextBadge = Number.parseInt(countStr, 10);
       const service = displayServices.find((candidate) => candidate.id === targetId);
       if (!service || Number.isNaN(nextBadge)) return;
+      if (recentlyShowedNativeNotificationPreview(targetId)) return;
       if (
         !shouldSendNativeUnreadNotification({
           service,
@@ -455,6 +462,27 @@
 
       void showNativeUnreadNotification(service, nextBadge);
     });
+
+    const unlistenNativeNotificationPreviewPromise = listen(
+      "native-notification-preview",
+      (event) => {
+        const preview = parseNativeNotificationPreviewPayload(event.payload);
+        if (!preview) return;
+
+        const service = displayServices.find((candidate) => candidate.id === preview.serviceId);
+        if (!service) return;
+        if (
+          !shouldSendNativeNotificationPreview({
+            service,
+            dndEnabled: dndState.enabled,
+          })
+        ) {
+          return;
+        }
+
+        void showNativeNotificationPreview(service, preview);
+      },
+    );
 
     const unlistenResourceUsagePromise = listen("resource-usage-update", (event) => {
       const [targetId, payload = ""] = (event.payload as string).split(/:(.*)/s);
@@ -494,6 +522,7 @@
         unlistenShortcutPromise,
         toastTimeout,
       });
+      void unlistenNativeNotificationPreviewPromise.then((unlisten) => unlisten());
       void unlistenResourceUsagePromise.then((unlisten) => unlisten());
     };
   });
@@ -659,17 +688,46 @@
     }
   }
 
+  async function sendNativeNotification(notification: NativeUnreadNotification) {
+    if (!(await ensureNativeNotificationPermission())) return;
+
+    try {
+      sendNotification(notification);
+      return true;
+    } catch (error) {
+      console.error("[ferx] native notification failed:", error);
+    }
+
+    return false;
+  }
+
+  function recentlyShowedNativeNotificationPreview(serviceId: string) {
+    const shownAt = nativeNotificationPreviewShownAt[serviceId];
+    return (
+      shownAt !== undefined &&
+      Date.now() - shownAt < NATIVE_NOTIFICATION_PREVIEW_DUPLICATE_WINDOW_MS
+    );
+  }
+
   async function showNativeUnreadNotification(
     service: Parameters<typeof buildNativeUnreadNotification>[0],
     unreadCount: number,
   ) {
-    if (!(await ensureNativeNotificationPermission())) return;
+    return sendNativeNotification(buildNativeUnreadNotification(service, unreadCount));
+  }
 
-    try {
-      sendNotification(buildNativeUnreadNotification(service, unreadCount));
-    } catch (error) {
-      console.error("[ferx] native notification failed:", error);
+  async function showNativeNotificationPreview(
+    service: Parameters<typeof buildNativeNotificationPreview>[0],
+    preview: Parameters<typeof buildNativeNotificationPreview>[1],
+  ) {
+    const sent = await sendNativeNotification(buildNativeNotificationPreview(service, preview));
+    if (sent) {
+      nativeNotificationPreviewShownAt = {
+        ...nativeNotificationPreviewShownAt,
+        [service.id]: Date.now(),
+      };
     }
+    return sent;
   }
 
   function deleteService(id: string) {

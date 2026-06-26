@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ## [Unreleased]
 
+### Added
+
+- Added native notification previews from service Web Notification API calls, with unread-count notifications kept as fallback.
+
 ### Changed
 
 - Updated Svelte, SvelteKit, svelte-check, shadcn-svelte, and Tauri dependency versions from Dependabot maintenance updates.

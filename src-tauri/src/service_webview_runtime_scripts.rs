@@ -5,7 +5,24 @@ pub(crate) fn google_auth_compat_script() -> &'static str {
 pub(crate) fn notification_script(allow_notifications: bool) -> &'static str {
     if allow_notifications {
         r#"
-    const mockNotification = Object.assign(function(title, options) {}, {
+    const reportNotificationPreview = (title, options) => {
+        try {
+            const payload = {
+                title: String(title || ''),
+                body: String(options?.body || ''),
+                tag: options?.tag == null ? undefined : String(options.tag)
+            };
+            window.location.href = 'https://ferx.notification/?data=' + encodeURIComponent(JSON.stringify(payload));
+        } catch (_error) {}
+    };
+
+    const mockNotification = Object.assign(function(title, options) {
+        reportNotificationPreview(title, options || {});
+        this.title = String(title || '');
+        this.body = String(options?.body || '');
+        this.tag = options?.tag == null ? '' : String(options.tag);
+        this.close = () => {};
+    }, {
         permission: 'granted',
         requestPermission: () => Promise.resolve('granted')
     });

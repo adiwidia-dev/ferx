@@ -529,6 +529,24 @@ fn title_observer_binds_to_title_then_tracks_head_child_list() {
 }
 
 #[test]
+fn notification_shim_forwards_web_notification_previews_when_allowed() {
+    let script = injected_js(true);
+
+    assert!(script.contains("https://ferx.notification/?data="));
+    assert!(script.contains("JSON.stringify(payload)"));
+    assert!(script.contains("title: String(title || '')"));
+    assert!(script.contains("body: String(options?.body || '')"));
+    assert!(script.contains("tag: options?.tag == null ? undefined : String(options.tag)"));
+}
+
+#[test]
+fn notification_shim_does_not_forward_previews_when_denied() {
+    let script = injected_js(false);
+
+    assert!(!script.contains("https://ferx.notification/?data="));
+}
+
+#[test]
 fn badge_evaluation_contains_strategy_errors() {
     let script = injected_js(false);
 

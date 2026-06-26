@@ -1,5 +1,27 @@
 use crate::badge_payload::{parse_badge_payload, BadgePayload};
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
+
+const NOTIFICATION_PREVIEW_MAX_DATA_BYTES: usize = 4096;
+const NOTIFICATION_PREVIEW_MAX_TITLE_CHARS: usize = 120;
+const NOTIFICATION_PREVIEW_MAX_BODY_CHARS: usize = 240;
+const NOTIFICATION_PREVIEW_MAX_TAG_CHARS: usize = 120;
+
+#[derive(Debug, Deserialize)]
+struct RawNotificationPreviewPayload {
+    title: String,
+    body: String,
+    tag: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NativeNotificationPreviewEventPayload {
+    pub(crate) service_id: String,
+    pub(crate) title: String,
+    pub(crate) body: String,
+    pub(crate) tag: Option<String>,
+}
 
 pub(crate) fn badge_update_event_payload(label: &str, payload: &str) -> Option<String> {
     let normalized = match parse_badge_payload(payload)? {
@@ -17,6 +39,44 @@ pub(crate) fn emit_badge_update(app: &AppHandle, label: &str, payload: &str) {
             eprintln!("update-badge emit failed for {label}: {e}");
         }
     }
+}
+
+fn normalize_preview_text(value: &str, max_chars: usize) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(max_chars)
+        .collect()
+}
+
+pub(crate) fn native_notification_preview_event_payload(
+    service_id: &str,
+    data: &str,
+) -> Option<NativeNotificationPreviewEventPayload> {
+    if service_id.is_empty() || data.len() > NOTIFICATION_PREVIEW_MAX_DATA_BYTES {
+        return None;
+    }
+
+    let raw: RawNotificationPreviewPayload = serde_json::from_str(data).ok()?;
+    let title = normalize_preview_text(&raw.title, NOTIFICATION_PREVIEW_MAX_TITLE_CHARS);
+    let body = normalize_preview_text(&raw.body, NOTIFICATION_PREVIEW_MAX_BODY_CHARS);
+    let tag = raw
+        .tag
+        .map(|value| normalize_preview_text(&value, NOTIFICATION_PREVIEW_MAX_TAG_CHARS))
+        .filter(|value| !value.is_empty());
+
+    if title.is_empty() && body.is_empty() {
+        return None;
+    }
+
+    Some(NativeNotificationPreviewEventPayload {
+        service_id: service_id.to_string(),
+        title,
+        body,
+        tag,
+    })
 }
 
 pub(crate) fn validated_external_open_target(raw: &str) -> Option<String> {
@@ -61,6 +121,21 @@ pub(crate) fn handle_special_navigation(
         return false;
     }
 
+    if url.host_str() == Some("ferx.notification") {
+        if let Some(data) = url
+            .query_pairs()
+            .find(|(k, _)| k == "data")
+            .map(|(_, v)| v.into_owned())
+        {
+            if let Some(payload) = native_notification_preview_event_payload(service_id, &data) {
+                if let Err(e) = app_handle.emit("native-notification-preview", payload) {
+                    eprintln!("native-notification-preview emit failed for {service_id}: {e}");
+                }
+            }
+        }
+        return false;
+    }
+
     if url.host_str() == Some("ferx.shortcut") {
         if let Some(key_str) = url.path().strip_prefix('/') {
             if let Err(e) = app_handle.emit("switch-shortcut", key_str) {
@@ -92,7 +167,10 @@ pub(crate) fn handle_special_navigation(
 
 #[cfg(test)]
 mod tests {
-    use super::{badge_update_event_payload, validated_external_open_target};
+    use super::{
+        badge_update_event_payload, native_notification_preview_event_payload,
+        validated_external_open_target,
+    };
 
     #[test]
     fn badge_update_event_payload_normalizes_reported_badges() {
@@ -109,6 +187,57 @@ mod tests {
             Some("outlook:0".to_string())
         );
         assert_eq!(badge_update_event_payload("outlook", "bogus"), None);
+    }
+
+    #[test]
+    fn native_notification_preview_event_payload_accepts_valid_data() {
+        assert_eq!(
+            native_notification_preview_event_payload(
+                "messenger",
+                r#"{"title":"Jane Doe","body":"Can you check this?","tag":"thread-123"}"#,
+            ),
+            Some(super::NativeNotificationPreviewEventPayload {
+                service_id: "messenger".to_string(),
+                title: "Jane Doe".to_string(),
+                body: "Can you check this?".to_string(),
+                tag: Some("thread-123".to_string()),
+            })
+        );
+    }
+
+    #[test]
+    fn native_notification_preview_event_payload_rejects_empty_or_malformed_data() {
+        assert_eq!(
+            native_notification_preview_event_payload("", r#"{"title":"Jane"}"#),
+            None
+        );
+        assert_eq!(
+            native_notification_preview_event_payload("messenger", r#"{"title":"","body":""}"#),
+            None
+        );
+        assert_eq!(
+            native_notification_preview_event_payload("messenger", "not-json"),
+            None
+        );
+        assert_eq!(
+            native_notification_preview_event_payload("messenger", r#"{"title":42,"body":""}"#),
+            None
+        );
+    }
+
+    #[test]
+    fn native_notification_preview_event_payload_normalizes_and_truncates_text() {
+        let long_body = "x".repeat(260);
+        let raw = format!(
+            r#"{{"title":"  Jane\nDoe  ","body":"{}","tag":"  thread\n123  "}}"#,
+            long_body
+        );
+        let payload = native_notification_preview_event_payload("messenger", &raw)
+            .expect("expected preview payload");
+
+        assert_eq!(payload.title, "Jane Doe");
+        assert_eq!(payload.body.chars().count(), 240);
+        assert_eq!(payload.tag, Some("thread 123".to_string()));
     }
 
     #[test]

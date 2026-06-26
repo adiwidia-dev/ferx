@@ -17,7 +17,11 @@ const listen = vi.hoisted(() => {
   const handlers: Record<string, (event: { payload: unknown }) => void> = {};
   const fn = vi.fn((event: string, callback: (event: { payload: unknown }) => void) => {
     handlers[event] = callback;
-    return Promise.resolve(() => {});
+    return Promise.resolve(() => {
+      if (handlers[event] === callback) {
+        delete handlers[event];
+      }
+    });
   });
   return Object.assign(fn, { handlers });
 });
@@ -109,6 +113,18 @@ async function settle() {
   flushSync();
 }
 
+async function emitTauriEvent(event: string, payload: unknown) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const handler = listen.handlers[event];
+    if (typeof handler === "function") {
+      handler({ payload });
+      return;
+    }
+    await settle();
+  }
+  throw new Error(`Tauri event handler was not registered: ${event}`);
+}
+
 async function waitFor(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
   flushSync();
@@ -154,7 +170,18 @@ describe("workspace switching webview commands", () => {
     tauriWindow.onFocusChanged.mockClear();
     localStorage.clear();
     invoke.mockReset();
-    listen.mockClear();
+    listen.mockReset();
+    for (const event of Object.keys(listen.handlers)) {
+      delete listen.handlers[event];
+    }
+    listen.mockImplementation((event: string, callback: (event: { payload: unknown }) => void) => {
+      listen.handlers[event] = callback;
+      return Promise.resolve(() => {
+        if (listen.handlers[event] === callback) {
+          delete listen.handlers[event];
+        }
+      });
+    });
     nativeNotification.isPermissionGranted.mockReset();
     nativeNotification.isPermissionGranted.mockResolvedValue(true);
     nativeNotification.requestPermission.mockReset();
@@ -771,9 +798,9 @@ describe("workspace switching webview commands", () => {
     });
     await settle();
 
-    listen.handlers["update-badge"]({ payload: "youtube:0" });
+    await emitTauriEvent("update-badge", "youtube:0");
     await settle();
-    listen.handlers["update-badge"]({ payload: "youtube:1" });
+    await emitTauriEvent("update-badge", "youtube:1");
     await settle();
 
     expect(nativeNotification.sendNotification).toHaveBeenCalledWith({
@@ -787,6 +814,103 @@ describe("workspace switching webview commands", () => {
     await unmountPage(component);
   });
 
+  it("sends a native OS notification preview from web notification events", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+
+    await emitTauriEvent("native-notification-preview", {
+      serviceId: "youtube",
+      title: "Jane Doe",
+      body: "Can you check this?",
+      tag: "thread-123",
+    });
+    await settle();
+
+    expect(nativeNotification.sendNotification).toHaveBeenCalledWith({
+      title: "Jane Doe",
+      body: "Can you check this?",
+      icon: "/app-icon.png",
+      tag: "ferx:youtube:preview:thread-123",
+      data: { serviceId: "youtube" },
+    });
+
+    await unmountPage(component);
+  });
+
+  it("does not send native OS notification previews for DND or disabled native notifications", async () => {
+    const state = createWorkspaceState();
+    state.servicesById.youtube.notificationPrefs = {
+      ...DEFAULT_NOTIFICATION_PREFS,
+      showNativeNotifications: false,
+    };
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(state));
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+
+    await emitTauriEvent("native-notification-preview", {
+      serviceId: "youtube",
+      title: "Jane Doe",
+      body: "Can you check this?",
+    });
+    await settle();
+    expect(nativeNotification.sendNotification).not.toHaveBeenCalled();
+
+    await unmountPage(component);
+
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+    const dndComponent = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+
+    document.querySelector<HTMLButtonElement>('button[title="Turn On Do Not Disturb"]')
+      ?.click();
+    await settle();
+
+    await emitTauriEvent("native-notification-preview", {
+      serviceId: "youtube",
+      title: "Jane Doe",
+      body: "Can you check this?",
+    });
+    await settle();
+    expect(nativeNotification.sendNotification).not.toHaveBeenCalled();
+
+    await unmountPage(dndComponent);
+  });
+
+  it("suppresses unread-count fallback immediately after a preview notification", async () => {
+    localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+    await settle();
+
+    await emitTauriEvent("native-notification-preview", {
+      serviceId: "youtube",
+      title: "Jane Doe",
+      body: "Can you check this?",
+    });
+    await settle();
+
+    nativeNotification.sendNotification.mockClear();
+    await emitTauriEvent("update-badge", "youtube:0");
+    await settle();
+    await emitTauriEvent("update-badge", "youtube:1");
+    await settle();
+
+    expect(nativeNotification.sendNotification).not.toHaveBeenCalled();
+
+    await unmountPage(component);
+  });
+
   it("does not send native OS notifications for initial badge reports or DND", async () => {
     localStorage.setItem(WORKSPACES_STATE_KEY, JSON.stringify(createWorkspaceState()));
 
@@ -795,7 +919,7 @@ describe("workspace switching webview commands", () => {
     });
     await settle();
 
-    listen.handlers["update-badge"]({ payload: "youtube:4" });
+    await emitTauriEvent("update-badge", "youtube:4");
     await settle();
     expect(nativeNotification.sendNotification).not.toHaveBeenCalled();
 
@@ -803,7 +927,7 @@ describe("workspace switching webview commands", () => {
       ?.click();
     await settle();
 
-    listen.handlers["update-badge"]({ payload: "youtube:5" });
+    await emitTauriEvent("update-badge", "youtube:5");
     await settle();
     expect(nativeNotification.sendNotification).not.toHaveBeenCalled();
 
