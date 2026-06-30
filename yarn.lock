@@ -296,10 +296,10 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@lucide/svelte@^1.16.0":
-  version "1.21.0"
-  resolved "https://registry.npmmirror.com/@lucide/svelte/-/svelte-1.21.0.tgz#e5533ba0bef76411d0c50103cc49a3f4a9b77ce6"
-  integrity sha512-MEv//A7Jv3kHukZowv/DWp1MAtUzJKYwtJsmnQ7X98lCgtac3z3NbaToDl3Q6jO3gS9sougFpcD+t+YuxOkRMw==
+"@lucide/svelte@^1.22.0":
+  version "1.22.0"
+  resolved "https://registry.yarnpkg.com/@lucide/svelte/-/svelte-1.22.0.tgz#61d6c8ea947f90722ac874a334a4f8f29ec29d40"
+  integrity sha512-eaNC3GGu9ma7mviB9vPL6OnawXqxdvRnoAQSq5l15mBlsuwD7kozZ7pzPXSlT6OwSl7hz4qTk+ZU3OEewwi5gQ==
 
 "@napi-rs/wasm-runtime@^1.1.1":
   version "1.1.4"
