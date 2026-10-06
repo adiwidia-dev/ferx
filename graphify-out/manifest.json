@@ -4,11 +4,6 @@
     "ast_hash": "7e30b3f7a73ec4856b2faeda423d5a42",
     "semantic_hash": "7e30b3f7a73ec4856b2faeda423d5a42"
   },
-  ".codex/hooks.json": {
-    "mtime": 1784861938.4253983,
-    "ast_hash": "19cb844765ff7ed1e7aeb6ba45322545",
-    "semantic_hash": "19cb844765ff7ed1e7aeb6ba45322545"
-  },
   ".vscode/extensions.json": {
     "mtime": 1775550246.9778051,
     "ast_hash": "66bc4d2caa831e7f64813c7fb1715f8a",
@@ -25,9 +20,9 @@
     "semantic_hash": "24f9743e2cc420157c493497e60ebaee"
   },
   "package.json": {
-    "mtime": 1782351560.6072915,
-    "ast_hash": "39bbae746985ddf46379e6f720148653",
-    "semantic_hash": "39bbae746985ddf46379e6f720148653"
+    "mtime": 1791252581.4588208,
+    "ast_hash": "4da2d8486365e59b9f70ab5013074746",
+    "semantic_hash": ""
   },
   "scripts/bump-version.mjs": {
     "mtime": 1776850497.625911,
@@ -845,7 +840,7 @@
     "semantic_hash": "bbfa39cdc494932105ab7eecee63fc79"
   },
   "src/lib/tauri-commands.ts": {
-    "mtime": 1782476784.431143,
+    "mtime": 1791252970.5220745,
     "ast_hash": "971543e1928d8782c92e3f691e469d4b",
     "semantic_hash": "971543e1928d8782c92e3f691e469d4b"
   },
@@ -935,9 +930,9 @@
     "semantic_hash": "4fa1b6484c6575dc7e287e1b762602a0"
   },
   "CHANGELOG.md": {
-    "mtime": 1782476738.7902465,
-    "ast_hash": "833bf93102dc7f5266a311709312a8af",
-    "semantic_hash": "833bf93102dc7f5266a311709312a8af"
+    "mtime": 1791252037.5924873,
+    "ast_hash": "c76dcad68057f89520f382e9553efac3",
+    "semantic_hash": ""
   },
   "CONTRIBUTING.md": {
     "mtime": 1782322593.896525,
@@ -1243,5 +1238,20 @@
     "mtime": 1775550246.980997,
     "ast_hash": "3a387408ecc6cc283f724b39ca5fffb4",
     "semantic_hash": "3a387408ecc6cc283f724b39ca5fffb4"
+  },
+  ".github/dependabot.yml": {
+    "mtime": 1775815103.8264787,
+    "ast_hash": "f921750729c5fc5008077ec8c3a43625",
+    "semantic_hash": ""
+  },
+  ".github/pull_request_template.md": {
+    "mtime": 1778868136.273961,
+    "ast_hash": "adf50283feab5ee1bc6565b4d90788dc",
+    "semantic_hash": ""
+  },
+  "src/app.html": {
+    "mtime": 1776850497.640481,
+    "ast_hash": "f081e64ea0cf196dc2ae0a7b7c742b0e",
+    "semantic_hash": ""
   }
 }

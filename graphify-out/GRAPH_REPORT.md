@@ -1,13 +1,18 @@
-# Graph Report - .  (2026-07-24)
+# Graph Report - ferx  (2026-10-06)
 
 ## Corpus Check
-- 252 files · ~87,677 words
+- 194 files · ~87,681 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1159 nodes · 1936 edges · 159 communities (80 shown, 79 thin omitted)
+- 1163 nodes · 1939 edges · 162 communities (81 shown, 81 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 100 edges (avg confidence: 0.81)
 - Token cost: 0 input · 0 output
+
+## Graph Freshness
+- Built from commit: `12a4fbd8`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - Rust Webview State Lifecycle
@@ -144,6 +149,9 @@
 - Static Raster App Icon
 - Static Vector App Icon
 - Svelte Favicon Asset
+- page-todos-panel.test.ts
+- $lib/components/settings/settings-preferences-section.svelte
+- pull_request_template.md
 
 ## God Nodes (most connected - your core abstractions)
 1. `$lib/services/workspace-groups` - 58 edges
@@ -176,7 +184,7 @@
 - **Webview Lifecycle Safety** — docs_architecture_long_lived_service_webviews, docs_architecture_serialized_webview_queue, docs_architecture_service_hibernation, agents_webview_lifecycle_invariant, changelog_webview_reliability_improvements [EXTRACTED 1.00]
 - **Signed Cross-Platform Release Pipeline** — docs_architecture_minisign_updater, github_workflows_release_serial_platform_builds, github_workflows_release_signed_updater_artifacts, docs_release_process_minisign_key_management, docs_release_process_publish_latest_manifest, readme_cross_platform_distribution [EXTRACTED 1.00]
 
-## Communities (159 total, 79 thin omitted)
+## Communities (162 total, 81 thin omitted)
 
 ### Community 0 - "Rust Webview State Lifecycle"
 Cohesion: 0.06
@@ -184,7 +192,7 @@ Nodes (79): AtomicU64, HashMap, Mutex, PhysicalPosition, active_resource_usage_m
 
 ### Community 1 - "Todos and Page Lifecycle"
 Cohesion: 0.08
-Nodes (42): $lib/components/workspace/todos-panel.svelte, #each(), sanitizeTextInputValue(), stripMacosNavigationPrivateUseChars(), $lib/services/todo-panel.svelte, createTodoPanelStore(), SetPanelWidth, splitTodoItems() (+34 more)
+Nodes (43): $lib/components/workspace/todos-panel.svelte, #each(), sanitizeTextInputValue(), stripMacosNavigationPrivateUseChars(), $lib/services/todo-panel.svelte, createTodoPanelStore(), SetPanelWidth, splitTodoItems() (+35 more)
 
 ### Community 2 - "Rust Behavioral Test Suite"
 Cohesion: 0.05
@@ -195,20 +203,20 @@ Cohesion: 0.05
 Nodes (43): clsx, @fontsource-variable/inter, @internationalized/date, jsdom, @lucide/svelte, devDependencies, bits-ui, clsx (+35 more)
 
 ### Community 4 - "Webview Command Runtime"
-Cohesion: 0.09
-Nodes (34): createAudioMutedPayload(), createDeleteWebviewPayload(), createRightPanelWidthPayload(), createServiceWebviewPayload(), createWebviewIdPayload(), ServiceWebviewService, shouldPreloadService(), $lib/services/webview-commands (+26 more)
+Cohesion: 0.10
+Nodes (33): createAudioMutedPayload(), createDeleteWebviewPayload(), createRightPanelWidthPayload(), createServiceWebviewPayload(), createWebviewIdPayload(), ServiceWebviewService, shouldPreloadService(), $lib/services/webview-commands (+25 more)
 
 ### Community 6 - "Workspace Group State"
-Cohesion: 0.15
-Nodes (34): deleteWorkspaceWithEffects(), $lib/services/workspace-groups, addServiceToWorkspace(), createDefaultWorkspaceGroupsState(), createNewWorkspace(), createServicesById(), createWorkspaceGroup(), deleteWorkspaceGroup() (+26 more)
+Cohesion: 0.16
+Nodes (31): $lib/services/workspace-groups, addServiceToWorkspace(), createDefaultWorkspaceGroupsState(), createNewWorkspace(), createServicesById(), createWorkspaceGroup(), deleteWorkspaceGroup(), getWorkspace() (+23 more)
 
 ### Community 7 - "DND and Runtime Badges"
 Cohesion: 0.10
 Nodes (21): $lib/services/dnd-state.svelte, clearDndState(), dndState, $lib/services/runtime-badges.svelte, applyRuntimeBadgePayload(), clearRuntimeBadges(), replaceRuntimeBadges(), runtimeBadges (+13 more)
 
 ### Community 8 - "Service Configuration Editor"
-Cohesion: 0.14
-Nodes (20): isNotificationPrefs(), isValidStorageKey(), normalizeServiceUrl(), parseStoredService(), readStoredServices(), StoredService, $lib/services/service-editor.svelte, createServiceEditorStore() (+12 more)
+Cohesion: 0.22
+Nodes (12): $lib/services/service-editor.svelte, createServiceEditorStore(), SaveServiceContext, CtxMocks, $lib/services/workspace-state, applySaveServiceResult(), cleanupPageListeners(), PageService (+4 more)
 
 ### Community 9 - "Badge Engine Test Harness"
 Cohesion: 0.19
@@ -231,12 +239,12 @@ Cohesion: 0.15
 Nodes (16): DragDropEvent, build_drag_event_js(), build_drag_event_js_uses_viewport_center(), build_file_drop_js(), build_file_drop_js_generates_drop_sequence_at_viewport_center(), build_file_drop_js_returns_none_for_empty_paths(), build_file_drop_js_returns_none_for_nonexistent_paths(), handle_file_drop() (+8 more)
 
 ### Community 14 - "Notification Preference Integration"
-Cohesion: 0.12
-Nodes (13): $lib/services/notification-prefs, countTrayRelevantUnreadServices(), DEFAULT_NOTIFICATION_PREFS, ensureServiceNotificationPrefs(), hasOwn(), LegacyNotificationPrefs, normalizeNotificationPrefs(), ServiceWithNotificationPrefs (+5 more)
+Cohesion: 0.17
+Nodes (17): $lib/services/notification-prefs, countTrayRelevantUnreadServices(), DEFAULT_NOTIFICATION_PREFS, ensureServiceNotificationPrefs(), hasOwn(), LegacyNotificationPrefs, normalizeNotificationPrefs(), ServiceWithNotificationPrefs (+9 more)
 
 ### Community 15 - "Main Workspace Interface"
-Cohesion: 0.14
-Nodes (6): $lib/components/settings/settings-restart-dialogs.svelte, $lib/components/settings/settings-updates-section.svelte, $lib/components/ui/button, $lib/components/workspace/workspace-disabled-state.svelte, $lib/components/workspace/workspace-empty-state.svelte, $lib/components/workspace/workspace-sidebar.svelte
+Cohesion: 0.15
+Nodes (6): $lib/components/settings/settings-restart-dialogs.svelte, $lib/components/ui/button, $lib/components/workspace/workspace-disabled-state.svelte, $lib/components/workspace/workspace-empty-state.svelte, $lib/components/workspace/workspace-sidebar.svelte, commitSettingsWorkspaceState()
 
 ### Community 16 - "Shared UI Primitives"
 Cohesion: 0.15
@@ -247,8 +255,8 @@ Cohesion: 0.11
 Nodes (18): app, dmg, icons/128x128@2x.png, icons/128x128.png, icons/32x32.png, icons/icon.icns, icons/icon.ico, bundle (+10 more)
 
 ### Community 18 - "Application Preferences"
-Cohesion: 0.16
-Nodes (10): $lib/components/settings/settings-preferences-section.svelte, $lib/services/app-settings, DEFAULT_APP_SETTINGS, isThemeMode(), normalizeStartupPreloadLimit(), readAppSettings(), serializeAppSettings(), StartupPreloadLimit (+2 more)
+Cohesion: 0.33
+Nodes (9): $lib/services/app-settings, DEFAULT_APP_SETTINGS, isThemeMode(), normalizeStartupPreloadLimit(), readAppSettings(), serializeAppSettings(), StartupPreloadLimit, startupPreloadLimitToMaxPreloads() (+1 more)
 
 ### Community 20 - "Shadcn Component Registry"
 Cohesion: 0.12
@@ -272,7 +280,7 @@ Nodes (7): $lib/components/ui/label, $lib/components/workspace/service-editor-di
 
 ### Community 25 - "Workspace Config Export"
 Cohesion: 0.24
-Nodes (13): AppSettings, NotificationPrefs, $lib/services/workspace-config-export, buildWorkspaceConfigExportPayload(), ExportedWorkspaceServiceV1, FerxWorkspaceConfigFile, FerxWorkspaceConfigFileV1, FerxWorkspaceConfigFileV2 (+5 more)
+Nodes (12): AppSettings, NotificationPrefs, $lib/services/workspace-config-export, buildWorkspaceConfigExportPayload(), ExportedWorkspaceServiceV1, FerxWorkspaceConfigFile, FerxWorkspaceConfigFileV1, FerxWorkspaceConfigFileV2 (+4 more)
 
 ### Community 26 - "Service URL Classification"
 Cohesion: 0.33
@@ -287,12 +295,12 @@ Cohesion: 0.26
 Nodes (12): bumpCargoToml(), bumpPackageJson(), bumpTauriConf(), cargoTomlPath, die(), main(), packageJsonPath, parseArgs() (+4 more)
 
 ### Community 29 - "Workspace Config Import"
-Cohesion: 0.31
-Nodes (12): $lib/services/workspace-config-import, ImportedServiceDraft, isRecord(), isValidStorageKey(), normalizeImportedServices(), parseImportedService(), parseNotificationPrefs(), ParseResult (+4 more)
+Cohesion: 0.20
+Nodes (16): createStorageKey(), ensureServiceStorageKeys(), ServiceWithOptionalStorageKey, ServiceWithStorageKey, $lib/services/workspace-config-import, ImportedServiceDraft, isRecord(), isValidStorageKey() (+8 more)
 
 ### Community 30 - "Workspace Mutation Actions"
 Cohesion: 0.32
-Nodes (11): $lib/services/workspace-actions, applyCurrentWorkspaceServices(), deleteServiceFromWorkspaceState(), pruneOrphanedServicesFromWorkspaceState(), setWorkspaceDisabledWithEffects(), createService(), createWorkspaceState(), toggleManagedServiceDisabled() (+3 more)
+Nodes (12): $lib/services/workspace-actions, applyCurrentWorkspaceServices(), deleteServiceFromWorkspaceState(), deleteWorkspaceWithEffects(), pruneOrphanedServicesFromWorkspaceState(), setWorkspaceDisabledWithEffects(), createService(), createWorkspaceState() (+4 more)
 
 ### Community 31 - "Native Download Dialog"
 Cohesion: 0.38
@@ -343,8 +351,8 @@ Cohesion: 0.25
 Nodes (3): $lib/services/drag-drop.svelte, createDragDropState(), DropCallback
 
 ### Community 44 - "In-App Updater Service"
-Cohesion: 0.33
-Nodes (8): $lib/services/updater, checkForUpdate(), downloadAndInstall(), formatErrorMessage(), relaunchApp(), checkMock, invokeMock, UpdaterState
+Cohesion: 0.23
+Nodes (9): $lib/components/settings/settings-updates-section.svelte, $lib/services/updater, checkForUpdate(), downloadAndInstall(), formatErrorMessage(), relaunchApp(), checkMock, invokeMock (+1 more)
 
 ### Community 45 - "Contributor Quality and Security"
 Cohesion: 0.25
@@ -398,25 +406,29 @@ Nodes (3): $lib/services/app-info, APP_INFO, getAppInfo()
 Cohesion: 0.50
 Nodes (3): resource_usage_script_processes_resource_entries_incrementally(), resource_usage_monitor_eval_script(), resource_usage_monitor_script()
 
+### Community 161 - "pull_request_template.md"
+Cohesion: 0.50
+Nodes (3): Risk Review, Summary, Testing
+
 ## Knowledge Gaps
-- **291 isolated node(s):** `$schema`, `css`, `baseColor`, `components`, `utils` (+286 more)
+- **294 isolated node(s):** `$schema`, `css`, `baseColor`, `components`, `utils` (+289 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **79 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **81 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `$lib/services/app-info` connect `Application Metadata Helpers` to `Tauri Build Version Sync`, `Package Metadata`, `Main Workspace Interface`?**
   _High betweenness centrality (0.068) - this node is a cross-community bridge._
-- **Why does `$lib/services/workspace-groups` connect `Workspace Group State` to `Todos and Page Lifecycle`, `Workspace Icon Catalog`, `DND and Runtime Badges`, `Service Configuration Editor`, `Service Management Settings`, `Notification Preference Integration`, `Main Workspace Interface`, `Settings Configuration State`, `Workspace Sidebar Tests`, `Workspace Config Export`, `Workspace Config Import`, `Workspace Mutation Actions`?**
-  _High betweenness centrality (0.062) - this node is a cross-community bridge._
+- **Why does `$lib/services/workspace-groups` connect `Workspace Group State` to `Todos and Page Lifecycle`, `Workspace Icon Catalog`, `DND and Runtime Badges`, `Service Configuration Editor`, `Service Management Settings`, `Notification Preference Integration`, `Main Workspace Interface`, `Settings Configuration State`, `Workspace Sidebar Tests`, `Workspace Config Export`, `Workspace Config Import`, `Workspace Mutation Actions`, `page-todos-panel.test.ts`?**
+  _High betweenness centrality (0.061) - this node is a cross-community bridge._
 - **Why does `devDependencies` connect `Frontend Dependency Ecosystem` to `Package Metadata`?**
-  _High betweenness centrality (0.046) - this node is a cross-community bridge._
+  _High betweenness centrality (0.045) - this node is a cross-community bridge._
 - **What connects `$schema`, `css`, `baseColor` to the rest of the system?**
-  _291 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _294 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Rust Webview State Lifecycle` be split into smaller, more focused modules?**
   _Cohesion score 0.06330532212885154 - nodes in this community are weakly interconnected._
 - **Should `Todos and Page Lifecycle` be split into smaller, more focused modules?**
-  _Cohesion score 0.07676767676767676 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07597402597402597 - nodes in this community are weakly interconnected._
 - **Should `Rust Behavioral Test Suite` be split into smaller, more focused modules?**
   _Cohesion score 0.04682040531097135 - nodes in this community are weakly interconnected._

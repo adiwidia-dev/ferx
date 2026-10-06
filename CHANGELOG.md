@@ -16,6 +16,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 ### Changed
 
 - Updated Svelte, SvelteKit, svelte-check, shadcn-svelte, and Tauri dependency versions from Dependabot maintenance updates.
+- Updated base64, serde, serde_json, Tokio, the Tauri MCP bridge, Tauri JavaScript API and CLI, Tailwind CSS, internationalized date, and Lucide dependencies from Dependabot maintenance updates.
 
 ---
 
