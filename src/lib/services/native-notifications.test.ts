@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildNativeNotificationPreview,
   buildNativeUnreadNotification,
+  parseNativeNotificationPreviewPayload,
+  shouldSendNativeNotificationPreview,
   shouldSendNativeUnreadNotification,
 } from "./native-notifications";
 
@@ -110,5 +113,99 @@ describe("buildNativeUnreadNotification", () => {
     expect(buildNativeUnreadNotification(service({ name: "WhatsApp" }), 1).body).toBe(
       "WhatsApp has 1 unread message.",
     );
+  });
+});
+
+describe("parseNativeNotificationPreviewPayload", () => {
+  it("accepts valid preview event payloads", () => {
+    expect(
+      parseNativeNotificationPreviewPayload({
+        serviceId: "messenger",
+        title: "Jane Doe",
+        body: "Can you check this?",
+        tag: "thread-123",
+      }),
+    ).toEqual({
+      serviceId: "messenger",
+      title: "Jane Doe",
+      body: "Can you check this?",
+      tag: "thread-123",
+    });
+  });
+
+  it("rejects malformed or empty preview payloads", () => {
+    expect(parseNativeNotificationPreviewPayload(null)).toBeNull();
+    expect(parseNativeNotificationPreviewPayload({ serviceId: "", title: "Jane", body: "" })).toBeNull();
+    expect(parseNativeNotificationPreviewPayload({ serviceId: "messenger", title: "", body: "" })).toBeNull();
+    expect(
+      parseNativeNotificationPreviewPayload({
+        serviceId: "messenger",
+        title: "Jane",
+        body: "",
+        tag: 42,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("shouldSendNativeNotificationPreview", () => {
+  it("sends previews when service native notifications are enabled", () => {
+    expect(
+      shouldSendNativeNotificationPreview({
+        service: service(),
+        dndEnabled: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not send previews when blocked by DND or service state", () => {
+    for (const input of [
+      { service: service(), dndEnabled: true },
+      { service: service({ disabled: true }), dndEnabled: false },
+      { service: service({ hibernated: true }), dndEnabled: false },
+      { service: service({ showNativeNotifications: false }), dndEnabled: false },
+    ]) {
+      expect(shouldSendNativeNotificationPreview(input)).toBe(false);
+    }
+  });
+});
+
+describe("buildNativeNotificationPreview", () => {
+  it("uses web notification title and body for native preview content", () => {
+    expect(
+      buildNativeNotificationPreview(service({ id: "messenger", name: "Messenger" }), {
+        serviceId: "messenger",
+        title: "Jane Doe",
+        body: "Can you check this?",
+        tag: "thread-123",
+      }),
+    ).toEqual({
+      title: "Jane Doe",
+      body: "Can you check this?",
+      icon: "/app-icon.png",
+      tag: "ferx:messenger:preview:thread-123",
+      data: { serviceId: "messenger" },
+    });
+  });
+
+  it("falls back to service copy when preview title or body is missing", () => {
+    expect(
+      buildNativeNotificationPreview(service({ id: "chat", name: "Chat" }), {
+        serviceId: "chat",
+        title: "",
+        body: "New encrypted message",
+      }),
+    ).toMatchObject({
+      title: "New message in Chat",
+      body: "New encrypted message",
+      tag: "ferx:chat:preview:latest",
+    });
+    expect(
+      buildNativeNotificationPreview(service({ id: "chat", name: "Chat" }), {
+        serviceId: "chat",
+        title: "Chat",
+        body: "",
+      }).body,
+    ).toBe("Open Chat to view the message.");
   });
 });

@@ -241,4 +241,23 @@ describe("preloadBackgroundServices", () => {
     expect(sleep).toHaveBeenCalledTimes(2);
     expect(sleep).toHaveBeenCalledWith(1000);
   });
+
+  it("skips background preloads when the configured cap is zero", async () => {
+    const invokeCommand = vi.fn(() => Promise.resolve());
+    const sleep = vi.fn(() => Promise.resolve());
+
+    await preloadBackgroundServices({
+      services: [createService({ id: "active" }), createService({ id: "background" })],
+      activeId: "active",
+      spellCheckEnabled: true,
+      maxPreloads: 0,
+      gapMs: 1000,
+      shouldCancel: () => false,
+      sleep,
+      invokeCommand,
+    });
+
+    expect(invokeCommand).not.toHaveBeenCalled();
+    expect(sleep).not.toHaveBeenCalled();
+  });
 });

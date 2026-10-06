@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { flushSync, mount, unmount } from "svelte";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { APP_SETTINGS_STORAGE_KEY } from "$lib/services/app-settings";
 import { DEFAULT_NOTIFICATION_PREFS } from "$lib/services/notification-prefs";
@@ -23,6 +23,10 @@ describe("workspace spell-check startup setting", () => {
     localStorage.clear();
     invoke.mockClear();
     listen.mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("opens the active service with the persisted disabled spell-check setting after restart", async () => {
@@ -60,6 +64,67 @@ describe("workspace spell-check startup setting", () => {
           badgeMonitoringEnabled: true,
           spellCheckEnabled: false,
           resourceUsageMonitoringEnabled: false,
+        }),
+      }),
+    );
+
+    unmount(component);
+  });
+
+  it("limits startup background service preloads from persisted app settings", async () => {
+    vi.useFakeTimers();
+    invoke.mockResolvedValue(undefined);
+    localStorage.setItem(
+      "ferx-workspace-services",
+      JSON.stringify([
+        {
+          id: "active",
+          name: "Active",
+          url: "https://active.example.com/",
+          storageKey: "storage-active",
+          notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+        },
+        {
+          id: "one",
+          name: "One",
+          url: "https://one.example.com/",
+          storageKey: "storage-one",
+          notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+        },
+        {
+          id: "two",
+          name: "Two",
+          url: "https://two.example.com/",
+          storageKey: "storage-two",
+          notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
+        },
+      ]),
+    );
+    localStorage.setItem(
+      APP_SETTINGS_STORAGE_KEY,
+      JSON.stringify({
+        spellCheckEnabled: true,
+        resourceUsageMonitoringEnabled: false,
+        startupPreloadLimit: 1,
+      }),
+    );
+
+    const component = mount(WorkspacePage, {
+      target: document.body,
+    });
+
+    flushSync();
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(2000);
+    flushSync();
+
+    const preloadCalls = invoke.mock.calls.filter(([command]) => command === "load_service");
+    expect(preloadCalls).toHaveLength(1);
+    expect(preloadCalls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          id: "one",
+          spellCheckEnabled: true,
         }),
       }),
     );

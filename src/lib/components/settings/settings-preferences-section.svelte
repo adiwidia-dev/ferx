@@ -6,17 +6,25 @@
   import RotateCwIcon from "@lucide/svelte/icons/rotate-cw";
   import SunIcon from "@lucide/svelte/icons/sun";
   import { Button } from "$lib/components/ui/button";
-  import type { ThemeMode } from "$lib/services/app-settings";
+  import {
+    MAX_STARTUP_PRELOAD_LIMIT,
+    type StartupPreloadLimit,
+    type ThemeMode,
+  } from "$lib/services/app-settings";
+
+  const DEFAULT_CUSTOM_STARTUP_PRELOAD_LIMIT = 3;
 
   interface Props {
     spellCheckEnabled: boolean;
     resourceUsageMonitoringEnabled: boolean;
     themeMode: ThemeMode;
+    startupPreloadLimit: StartupPreloadLimit;
     spellCheckRestartRequired: boolean;
     restartError: string;
     onSpellCheckChange: (enabled: boolean) => void;
     onResourceUsageMonitoringChange: (enabled: boolean) => void;
     onThemeModeChange: (themeMode: ThemeMode) => void;
+    onStartupPreloadLimitChange: (limit: StartupPreloadLimit) => void;
     onRequestRestart: () => void;
   }
 
@@ -34,13 +42,35 @@
     spellCheckEnabled,
     resourceUsageMonitoringEnabled,
     themeMode,
+    startupPreloadLimit,
     spellCheckRestartRequired,
     restartError,
     onSpellCheckChange,
     onResourceUsageMonitoringChange,
     onThemeModeChange,
+    onStartupPreloadLimitChange,
     onRequestRestart,
   }: Props = $props();
+
+  function handleStartupPreloadModeChange(event: Event) {
+    const mode = (event.currentTarget as HTMLSelectElement).value;
+    onStartupPreloadLimitChange(
+      mode === "all" ? null : DEFAULT_CUSTOM_STARTUP_PRELOAD_LIMIT,
+    );
+  }
+
+  function handleStartupPreloadLimitChange(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    if (!Number.isFinite(input.valueAsNumber)) {
+      return;
+    }
+
+    const limit = Math.min(
+      MAX_STARTUP_PRELOAD_LIMIT,
+      Math.max(0, Math.trunc(input.valueAsNumber)),
+    );
+    onStartupPreloadLimitChange(limit);
+  }
 </script>
 
 <section id="preferences" class="scroll-mt-8 rounded-lg border bg-card text-card-foreground shadow-sm">
@@ -137,6 +167,45 @@
         <span class="h-6 w-11 rounded-full bg-muted transition-colors peer-checked:bg-blue-500"></span>
         <span class="pointer-events-none absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-background shadow-sm transition-transform peer-checked:translate-x-5"></span>
       </label>
+    </div>
+
+    <div class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="min-w-0">
+        <div class="flex items-center gap-2">
+          <MonitorIcon class="size-4 text-muted-foreground" />
+          <p class="text-sm font-semibold text-foreground">Startup Service Preload</p>
+        </div>
+        <p class="mt-1 text-xs text-muted-foreground">
+          Limits inactive services opened in the background after launch.
+        </p>
+      </div>
+
+      <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        <select
+          name="startup-preload-mode"
+          class="h-9 rounded-lg border bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          aria-label="Startup service preload mode"
+          value={startupPreloadLimit === null ? "all" : "custom"}
+          onchange={handleStartupPreloadModeChange}
+        >
+          <option value="all">All inactive services</option>
+          <option value="custom">Custom count</option>
+        </select>
+
+        {#if startupPreloadLimit !== null}
+          <input
+            name="startup-preload-limit"
+            type="number"
+            min="0"
+            max={MAX_STARTUP_PRELOAD_LIMIT}
+            step="1"
+            value={startupPreloadLimit}
+            class="h-9 w-full rounded-lg border bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:w-24"
+            aria-label="Startup service preload count"
+            onchange={handleStartupPreloadLimitChange}
+          />
+        {/if}
+      </div>
     </div>
 
     <div class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
