@@ -608,10 +608,15 @@
     "@tailwindcss/oxide" "4.3.2"
     tailwindcss "4.3.2"
 
-"@tauri-apps/api@2.11.1", "@tauri-apps/api@^2.10.1", "@tauri-apps/api@^2.8.0":
+"@tauri-apps/api@2.11.1":
   version "2.11.1"
   resolved "https://registry.npmmirror.com/@tauri-apps/api/-/api-2.11.1.tgz#cd6b13fc26403ca095a02e39ecdbec8048d2872d"
   integrity sha512-M2FPuYND2m+wh5hfW9ZpSdxMPdEJovPBWwoHJmwUpysTYNHaOkVFN419m/K0LIgjb/7KU2vBgsUepJWugQCvAA==
+
+"@tauri-apps/api@^2.10.1", "@tauri-apps/api@^2.12.0", "@tauri-apps/api@^2.8.0":
+  version "2.12.1"
+  resolved "https://registry.yarnpkg.com/@tauri-apps/api/-/api-2.12.1.tgz#51dbfb830f6559dd13e808c0752ae022928d2853"
+  integrity sha512-DeyFHa3wynpyoqTDikDEDGTJIq4LQ5USfolQGRmGIWT6JMADyxZBTDa5cAdT3tDg73rUXufPaCwN7aXBos4OnQ==
 
 "@tauri-apps/cli-darwin-arm64@2.11.4":
   version "2.11.4"
@@ -693,11 +698,11 @@
     "@tauri-apps/api" "^2.8.0"
 
 "@tauri-apps/plugin-opener@^2":
-  version "2.5.3"
-  resolved "https://registry.npmmirror.com/@tauri-apps/plugin-opener/-/plugin-opener-2.5.3.tgz"
-  integrity sha512-CCcUltXMOfUEArbf3db3kCE7Ggy1ExBEBl51Ko2ODJ6GDYHRp1nSNlQm5uNCFY5k7/ufaK5Ib3Du/Zir19IYQQ==
+  version "2.7.0"
+  resolved "https://registry.yarnpkg.com/@tauri-apps/plugin-opener/-/plugin-opener-2.7.0.tgz#14d631a70282cbc07b46f4442ba6085d2200f301"
+  integrity sha512-mBorYfVKh9Lt7s4ZFtKbMUTxBw+Y/sVmSlKCtkkoBgMTC/DIbt/kaPm67L/2djAUqDI1wbixy5OHHVmipjuGMw==
   dependencies:
-    "@tauri-apps/api" "^2.8.0"
+    "@tauri-apps/api" "^2.12.0"
 
 "@tauri-apps/plugin-process@^2.3.1":
   version "2.3.1"
