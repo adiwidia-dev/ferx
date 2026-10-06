@@ -288,7 +288,12 @@
   resolved "https://registry.npmmirror.com/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.5.5.tgz"
   integrity sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==
 
-"@jridgewell/trace-mapping@^0.3.24", "@jridgewell/trace-mapping@^0.3.25":
+"@jridgewell/sourcemap-codec@^1.6.0":
+  version "1.6.0"
+  resolved "https://registry.yarnpkg.com/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.6.0.tgz#f4c663e862f06dc98ca4d453862c46902789a18d"
+  integrity sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw==
+
+"@jridgewell/trace-mapping@0.3.31", "@jridgewell/trace-mapping@^0.3.24", "@jridgewell/trace-mapping@^0.3.25":
   version "0.3.31"
   resolved "https://registry.npmmirror.com/@jridgewell/trace-mapping/-/trace-mapping-0.3.31.tgz"
   integrity sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==
@@ -438,7 +443,7 @@
   resolved "https://registry.npmmirror.com/@rollup/rollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.60.1.tgz#23b860113e9f87eea015d1fa3a4240a52b42fcd4"
   integrity sha512-lWMnixq/QzxyhTV6NjQJ4SFo1J6PvOX8vUx5Wb4bBPsEb+8xZ89Bz6kOXpfXj9ak9AHTQVQzlgzBEc1SyM27xQ==
 
-"@standard-schema/spec@^1.0.0", "@standard-schema/spec@^1.1.0":
+"@standard-schema/spec@^1.0.0":
   version "1.1.0"
   resolved "https://registry.npmmirror.com/@standard-schema/spec/-/spec-1.1.0.tgz"
   integrity sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==
@@ -748,65 +753,20 @@
   resolved "https://registry.npmmirror.com/@types/trusted-types/-/trusted-types-2.0.7.tgz"
   integrity sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==
 
-"@vitest/expect@4.1.11":
-  version "4.1.11"
-  resolved "https://registry.npmmirror.com/@vitest/expect/-/expect-4.1.11.tgz#5f580d1f9cdbba314dbf23b2d911f8eb23878f5f"
-  integrity sha512-VX2x5vNJXET47KAFzwERI+KRMtTTCSWTfSMKsW7JsUsXV4psq++e3DvZpuTDOpHcxytiDs6p2nhVb2tVDiiUYw==
+"@vitest/mocker@5.0.3":
+  version "5.0.3"
+  resolved "https://registry.yarnpkg.com/@vitest/mocker/-/mocker-5.0.3.tgz#58666c76660c445c215dd6301fd8704f4550cb58"
+  integrity sha512-T8sWAIbkSyAjkwTcaEc3Iu0o9A27X1/kdXrizhZkGuSKScRQtRzclfAMpOTcGdXCsqxeWlpGy3XjqaW8CpLORg==
   dependencies:
-    "@standard-schema/spec" "^1.1.0"
-    "@types/chai" "^5.2.2"
-    "@vitest/spy" "4.1.11"
-    "@vitest/utils" "4.1.11"
-    chai "^6.2.2"
-    tinyrainbow "^3.1.0"
-
-"@vitest/mocker@4.1.11":
-  version "4.1.11"
-  resolved "https://registry.npmmirror.com/@vitest/mocker/-/mocker-4.1.11.tgz#8e2906361bc5dfa271757a858ae80643118fcbb4"
-  integrity sha512-2XJVD55d1o5AZous5CCGKS74g/riOj9odEt2bQpCVZeblHyHdnMeFl4jl0XjU21stf4mbjUkew2eXQZt65g5CQ==
-  dependencies:
-    "@vitest/spy" "4.1.11"
+    "@jridgewell/trace-mapping" "0.3.31"
+    "@vitest/spy" "5.0.3"
     estree-walker "^3.0.3"
-    magic-string "^0.30.21"
+    magic-string "^1.2.3"
 
-"@vitest/pretty-format@4.1.11":
-  version "4.1.11"
-  resolved "https://registry.npmmirror.com/@vitest/pretty-format/-/pretty-format-4.1.11.tgz#8b28eb8240771d6ea970e33beaeb41384b51868e"
-  integrity sha512-yiZzPbGTS9Sr/JpFl8zHrcIkAofNbFV6k21vIgQN/cY/oxZeXhJv5sc/MBJ5jFKWmWs+oJHw0UXLZjmf931+Vw==
-  dependencies:
-    tinyrainbow "^3.1.0"
-
-"@vitest/runner@4.1.11":
-  version "4.1.11"
-  resolved "https://registry.npmmirror.com/@vitest/runner/-/runner-4.1.11.tgz#bfbad98c8d6c3f1fb4df12056ad569821ff77f21"
-  integrity sha512-LztvUgdwMNJMIkj3hQnnxiC2Xy1zNxq928W/xhjCLaNCzqTZOudjwbQf6v9IntZGPw132i2Lq2rgTRZHD3JHNw==
-  dependencies:
-    "@vitest/utils" "4.1.11"
-    pathe "^2.0.3"
-
-"@vitest/snapshot@4.1.11":
-  version "4.1.11"
-  resolved "https://registry.npmmirror.com/@vitest/snapshot/-/snapshot-4.1.11.tgz#df461eb165924a3155986dde68e13360f53f3d4c"
-  integrity sha512-pN7ikn1ON7h8ee4gIAp4AzyK+zBtJPzVbqOgu5LCEh4VaJVbPQcgYQYJIMGQPXVeJJq1fnfazis7a5pFNPahog==
-  dependencies:
-    "@vitest/pretty-format" "4.1.11"
-    "@vitest/utils" "4.1.11"
-    magic-string "^0.30.21"
-    pathe "^2.0.3"
-
-"@vitest/spy@4.1.11":
-  version "4.1.11"
-  resolved "https://registry.npmmirror.com/@vitest/spy/-/spy-4.1.11.tgz#0add45cae953afed9c88f98e2f6fc9164558c32a"
-  integrity sha512-apNa/prQy2qCeywhnixOHPRCgGNhvg7T4Dapfl1GahLp/R+uhBm5cPyFoNVyqsNd2h1nJxL6BqqdIjiABL60YA==
-
-"@vitest/utils@4.1.11":
-  version "4.1.11"
-  resolved "https://registry.npmmirror.com/@vitest/utils/-/utils-4.1.11.tgz#9b27a4293b827942b223539bfab1bd9f7eada31b"
-  integrity sha512-zTCVGpyFsGWBhllOyKlTw/vnr6D9qxsfSDyfbyZmTyjHw5N/VuvzHpHoQjm2ZJzn4RJgx5w4r7V0er69CmLgPQ==
-  dependencies:
-    "@vitest/pretty-format" "4.1.11"
-    convert-source-map "^2.0.0"
-    tinyrainbow "^3.1.0"
+"@vitest/spy@5.0.3":
+  version "5.0.3"
+  resolved "https://registry.yarnpkg.com/@vitest/spy/-/spy-5.0.3.tgz#9f1024c35e0bb5ab54169da00b5b743e061f72b4"
+  integrity sha512-XhFysQTB8AZ+P4gMi+Lpo99vg2AZi0qKpaB9yXQl37+CaMEAPO3iH/wGVnSyL5MPERiLezpqTVtrR6UZH5GCXg==
 
 acorn@^8.12.1, acorn@^8.16.0:
   version "8.17.0"
@@ -873,11 +833,6 @@ commander@^14.0.0:
   version "14.0.3"
   resolved "https://registry.npmmirror.com/commander/-/commander-14.0.3.tgz"
   integrity sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==
-
-convert-source-map@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.npmmirror.com/convert-source-map/-/convert-source-map-2.0.0.tgz"
-  integrity sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==
 
 cookie@^0.6.0:
   version "0.6.0"
@@ -955,10 +910,10 @@ entities@^6.0.0:
   resolved "https://registry.npmmirror.com/entities/-/entities-6.0.1.tgz"
   integrity sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g==
 
-es-module-lexer@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.npmmirror.com/es-module-lexer/-/es-module-lexer-2.0.0.tgz"
-  integrity sha512-5POEcUuZybH7IdmGsD8wlf0AI55wMecM9rVBTI/qEAy2c1kTOm3DjFYjrBdI2K3BaJjJYfYFeRtM0t9ssnRuxw==
+es-module-lexer@^2.3.2:
+  version "2.3.2"
+  resolved "https://registry.yarnpkg.com/es-module-lexer/-/es-module-lexer-2.3.2.tgz#311fa4f40168c1975c505477c51b23234d41ad55"
+  integrity sha512-poHGpORABojJJucnV9KbOavETW8lBVnphkW77ER5/BQ5Fz7oXSoCNek7IH3vR5nRjdsEz926ibFYX8KtLQmdyw==
 
 esbuild@^0.25.0:
   version "0.25.12"
@@ -1011,10 +966,10 @@ estree-walker@^3.0.3:
   dependencies:
     "@types/estree" "^1.0.0"
 
-expect-type@^1.3.0:
-  version "1.3.0"
-  resolved "https://registry.npmmirror.com/expect-type/-/expect-type-1.3.0.tgz"
-  integrity sha512-knvyeauYhqjOYvQ66MznSMs83wmHrCycNEN6Ao+2AeYEfxUIkuiVxdEa1qlGEPK+We3n0THiDciYSsCcgW/DoA==
+expect-type@^1.4.0:
+  version "1.4.0"
+  resolved "https://registry.yarnpkg.com/expect-type/-/expect-type-1.4.0.tgz#24edf7f0cc69a44d008567ba4594ab96f3c3a3d6"
+  integrity sha512-KfYbmpRm0VbLjEvVa9yGwCi9GI34xvi7A/HXYWQO65CSD2u3MczUJSuwXKFIxlGsgBQizV9q5J9NHj4VG0n+pA==
 
 fdir@^6.2.0, fdir@^6.4.4, fdir@^6.5.0:
   version "6.5.0"
@@ -1204,6 +1159,13 @@ magic-string@^0.30.11, magic-string@^0.30.21, magic-string@^0.30.5:
   dependencies:
     "@jridgewell/sourcemap-codec" "^1.5.5"
 
+magic-string@^1.2.3:
+  version "1.4.3"
+  resolved "https://registry.yarnpkg.com/magic-string/-/magic-string-1.4.3.tgz#a0887990507b2ffbcdbc367a8759ed97e0b1233b"
+  integrity sha512-z12OxmaPGE0F4xlpGdjuAUckipLpQlTAuAmyGhNoD7ODpYUzvDfvtxUbjM/jwznyP178oju/KDdyi220wNJ0RQ==
+  dependencies:
+    "@jridgewell/sourcemap-codec" "^1.6.0"
+
 mdn-data@2.27.1:
   version "2.27.1"
   resolved "https://registry.npmmirror.com/mdn-data/-/mdn-data-2.27.1.tgz"
@@ -1234,10 +1196,10 @@ node-fetch-native@^1.6.4:
   resolved "https://registry.npmmirror.com/node-fetch-native/-/node-fetch-native-1.6.7.tgz"
   integrity sha512-g9yhqoedzIUm0nTnTqAQvueMPVOuIY16bqgAJJC8XOOubYFNwz6IER9qs0Gq2Xd0+CecCKFjtdDTMA4u4xG06Q==
 
-obug@^2.1.0, obug@^2.1.1:
-  version "2.1.1"
-  resolved "https://registry.npmmirror.com/obug/-/obug-2.1.1.tgz"
-  integrity sha512-uTqF9MuPraAQ+IsnPf366RG4cP9RtUi7MLO1N3KEc+wb0a6yKpeL0lmk2IB1jY5KHPAlTc6T/JRdC/YqxHNwkQ==
+obug@^2.1.0, obug@^2.1.4:
+  version "2.2.1"
+  resolved "https://registry.yarnpkg.com/obug/-/obug-2.2.1.tgz#9c453efeeda822050eb9774242e969c784d64d78"
+  integrity sha512-XrsrhT5sybtKI6wakr2SPOlGZWWYbUXZ7a0jT8/QOeAPau+1X/bSegNe5YR75oJmEZQbKningirmGOEJCIk61Q==
 
 parse5@^8.0.0:
   version "8.0.0"
@@ -1246,20 +1208,15 @@ parse5@^8.0.0:
   dependencies:
     entities "^6.0.0"
 
-pathe@^2.0.3:
-  version "2.0.3"
-  resolved "https://registry.npmmirror.com/pathe/-/pathe-2.0.3.tgz"
-  integrity sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==
-
 picocolors@^1.0.0, picocolors@^1.1.1:
   version "1.1.1"
   resolved "https://registry.npmmirror.com/picocolors/-/picocolors-1.1.1.tgz"
   integrity sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==
 
-picomatch@^4.0.2, picomatch@^4.0.3, picomatch@^4.0.4:
-  version "4.0.4"
-  resolved "https://registry.npmmirror.com/picomatch/-/picomatch-4.0.4.tgz"
-  integrity sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==
+picomatch@^4.0.2, picomatch@^4.0.4, picomatch@^4.0.7:
+  version "4.0.7"
+  resolved "https://registry.yarnpkg.com/picomatch/-/picomatch-4.0.7.tgz#6313360034ccb36b3dc61ecbdff78121f90fe21f"
+  integrity sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==
 
 postcss@8.5.23, postcss@^8.5.3, postcss@^8.5.5:
   version "8.5.23"
@@ -1357,11 +1314,6 @@ shadcn-svelte@^1.3.0:
     postcss "^8.5.5"
     tailwind-merge "^3.0.0"
 
-siginfo@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.npmmirror.com/siginfo/-/siginfo-2.0.0.tgz"
-  integrity sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==
-
 sirv@^3.0.0:
   version "3.0.2"
   resolved "https://registry.npmmirror.com/sirv/-/sirv-3.0.2.tgz"
@@ -1376,15 +1328,10 @@ source-map-js@1.2.2, source-map-js@^1.2.1:
   resolved "https://registry.npmmirror.com/source-map-js/-/source-map-js-1.2.2.tgz#79fb88d97535a21cb27162cb05d211b67acea4ab"
   integrity sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==
 
-stackback@0.0.2:
-  version "0.0.2"
-  resolved "https://registry.npmmirror.com/stackback/-/stackback-0.0.2.tgz"
-  integrity sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==
-
-std-env@^4.0.0-rc.1:
-  version "4.0.0"
-  resolved "https://registry.npmmirror.com/std-env/-/std-env-4.0.0.tgz"
-  integrity sha512-zUMPtQ/HBY3/50VbpkupYHbRroTRZJPRLvreamgErJVys0ceuzMkD44J/QjqhHjOzK42GQ3QZIeFG1OYfOtKqQ==
+std-env@^4.2.0:
+  version "4.3.0"
+  resolved "https://registry.yarnpkg.com/std-env/-/std-env-4.3.0.tgz#4e7231b61fd83219aa7f76f71fa8818b07e41321"
+  integrity sha512-OtU/EgQ1kIm5KwqQpBC6ZEMXrZRui11w8zgfTWp8cdO9B8OaPsbA8bTHO2P+HNo1VlUTGMVBwPhydu6poeXiag==
 
 style-to-object@^1.0.8:
   version "1.0.14"
@@ -1466,28 +1413,23 @@ tapable@^2.3.3:
   resolved "https://registry.npmmirror.com/tapable/-/tapable-2.3.3.tgz#5da7c9992c46038221267985ab28421a8879f160"
   integrity sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==
 
-tinybench@^2.9.0:
-  version "2.9.0"
-  resolved "https://registry.npmmirror.com/tinybench/-/tinybench-2.9.0.tgz"
-  integrity sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==
+tinybench@^6.1.4:
+  version "6.2.1"
+  resolved "https://registry.yarnpkg.com/tinybench/-/tinybench-6.2.1.tgz#84184d41be7d18815cc63daaf1f5057dafe2b3dd"
+  integrity sha512-IAbQaPJIIdhVxi0mqy9lez1wEwje0UQf9F1vwtbelEG5Nbgn0nPOxCvU+mNeNS9gyJTAhrHp74CbUaSynQpZcQ==
 
-tinyexec@^1.0.2:
-  version "1.1.1"
-  resolved "https://registry.npmmirror.com/tinyexec/-/tinyexec-1.1.1.tgz"
-  integrity sha512-VKS/ZaQhhkKFMANmAOhhXVoIfBXblQxGX1myCQ2faQrfmobMftXeJPcZGp0gS07ocvGJWDLZGyOZDadDBqYIJg==
+tinyexec@^1.3.0:
+  version "1.3.1"
+  resolved "https://registry.yarnpkg.com/tinyexec/-/tinyexec-1.3.1.tgz#16a2e3c6e23fafce72640e678e651db36145b9c6"
+  integrity sha512-GCvB3aoys96IuDFBMcTB46JOR6mdMtAToqwiW8JlWhsoh1mhHi/xn9ss/Dg7N555GiJyEt2qzoG/NHCwM6h1EA==
 
-tinyglobby@^0.2.13, tinyglobby@^0.2.15:
-  version "0.2.16"
-  resolved "https://registry.npmmirror.com/tinyglobby/-/tinyglobby-0.2.16.tgz"
-  integrity sha512-pn99VhoACYR8nFHhxqix+uvsbXineAasWm5ojXoN8xEwK5Kd3/TrhNn1wByuD52UxWRLy8pu+kRMniEi6Eq9Zg==
+tinyglobby@^0.2.13, tinyglobby@^0.2.17:
+  version "0.2.17"
+  resolved "https://registry.yarnpkg.com/tinyglobby/-/tinyglobby-0.2.17.tgz#562a9a6c9eb2b3b123d39719f9af5bb44fcd7631"
+  integrity sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==
   dependencies:
     fdir "^6.5.0"
     picomatch "^4.0.4"
-
-tinyrainbow@^3.1.0:
-  version "3.1.0"
-  resolved "https://registry.npmmirror.com/tinyrainbow/-/tinyrainbow-3.1.0.tgz"
-  integrity sha512-Bf+ILmBgretUrdJxzXM0SgXLZ3XfiaUuOj/IKQHuTXip+05Xn+uyEYdVg0kYDipTBcLrCVyUzAPz7QmArb0mmw==
 
 tldts-core@^7.0.28:
   version "7.0.28"
@@ -1540,7 +1482,7 @@ undici@7.29.1, undici@^7.21.0:
   resolved "https://registry.npmmirror.com/undici/-/undici-7.29.1.tgz#7741c6fc8b3e1a48e30323833642bfbe841443ad"
   integrity sha512-RYONW2MeafgYlkVOKYKkA/Ag7BmXqgIWCa8t1m0JcxrQg9pI9lEqRhAOruOBCbAohOa/gkCF+iPi9hrgvTzu6Q==
 
-vite@6.4.3, "vite@^6.0.0 || ^7.0.0 || ^8.0.0", vite@^6.4.3:
+vite@6.4.3, vite@^6.4.3:
   version "6.4.3"
   resolved "https://registry.npmmirror.com/vite/-/vite-6.4.3.tgz#85a164db7ce706f2a776812efa2b340f1721858e"
   integrity sha512-NTKlcQjlAK7MlQoyb6LgaqHc8sso/pVyUJYWMws3jg21uTJw/LddqIFPcPqP6PzpgbIcZyKI85sFE4HBrQDA8A==
@@ -1559,31 +1501,24 @@ vitefu@^1.1.1:
   resolved "https://registry.npmjs.org/vitefu/-/vitefu-1.1.3.tgz"
   integrity sha512-ub4okH7Z5KLjb6hDyjqrGXqWtWvoYdU3IGm/NorpgHncKoLTCfRIbvlhBm7r0YstIaQRYlp4yEbFqDcKSzXSSg==
 
-vitest@^4.1.11:
-  version "4.1.11"
-  resolved "https://registry.npmmirror.com/vitest/-/vitest-4.1.11.tgz#1653c1521ae917f960d9b21877797c47dfd8bf21"
-  integrity sha512-fhACrNXUidIbGSBr5FlbuBkO7VWC1ZyLl0DO4CU2DrQoAPxX84Ysxs+HeGQpii5lZWV1Q4gBZTTu49mF+A6Edw==
+vitest@^5.0.3:
+  version "5.0.3"
+  resolved "https://registry.yarnpkg.com/vitest/-/vitest-5.0.3.tgz#0d07cdc353bb0da4ff936e4471c1aa55f34c42ed"
+  integrity sha512-xMw97S3rjdtj5dkVat7jCsqWBpvchs3RlpQctUqwJD0KkERk40vz2fJ77lDwW/Vzh/pk18eItYAzkodhSes3jQ==
   dependencies:
-    "@vitest/expect" "4.1.11"
-    "@vitest/mocker" "4.1.11"
-    "@vitest/pretty-format" "4.1.11"
-    "@vitest/runner" "4.1.11"
-    "@vitest/snapshot" "4.1.11"
-    "@vitest/spy" "4.1.11"
-    "@vitest/utils" "4.1.11"
-    es-module-lexer "^2.0.0"
-    expect-type "^1.3.0"
-    magic-string "^0.30.21"
-    obug "^2.1.1"
-    pathe "^2.0.3"
-    picomatch "^4.0.3"
-    std-env "^4.0.0-rc.1"
-    tinybench "^2.9.0"
-    tinyexec "^1.0.2"
-    tinyglobby "^0.2.15"
-    tinyrainbow "^3.1.0"
-    vite "^6.0.0 || ^7.0.0 || ^8.0.0"
-    why-is-node-running "^2.3.0"
+    "@types/chai" "^5.2.2"
+    "@vitest/mocker" "5.0.3"
+    chai "^6.2.2"
+    es-module-lexer "^2.3.2"
+    expect-type "^1.4.0"
+    magic-string "^1.2.3"
+    obug "^2.1.4"
+    picomatch "^4.0.7"
+    std-env "^4.2.0"
+    tinybench "^6.1.4"
+    tinyexec "^1.3.0"
+    tinyglobby "^0.2.17"
+    why-is-node-running "3.2.1"
 
 w3c-xmlserializer@^5.0.0:
   version "5.0.0"
@@ -1611,13 +1546,10 @@ whatwg-url@^16.0.0:
     tr46 "^6.0.0"
     webidl-conversions "^8.0.1"
 
-why-is-node-running@^2.3.0:
-  version "2.3.0"
-  resolved "https://registry.npmmirror.com/why-is-node-running/-/why-is-node-running-2.3.0.tgz"
-  integrity sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w==
-  dependencies:
-    siginfo "^2.0.0"
-    stackback "0.0.2"
+why-is-node-running@3.2.1:
+  version "3.2.1"
+  resolved "https://registry.yarnpkg.com/why-is-node-running/-/why-is-node-running-3.2.1.tgz#f66f0d61f861e4d3965a7ad63645a953f550830c"
+  integrity sha512-Tb2FUhB4vUsGQlfSquQLYkApkuPAFQXGFzxWKHHumVz2dK+X1RUm/HnID4+TfIGYJ1kTcwOaCk/buYCEJr6YjQ==
 
 xml-name-validator@^5.0.0:
   version "5.0.0"
