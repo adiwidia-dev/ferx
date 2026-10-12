@@ -15,6 +15,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Dates are in YYYY-MM
 
 ### Changed
 
+- Updated the Tauri process, updater, opener, notification, build, and MCP bridge packages, base64, tailwind-merge, and Vitest from Dependabot maintenance updates; Node.js 22.12 or newer is now required for development and builds.
 - Updated Svelte, SvelteKit, svelte-check, shadcn-svelte, and Tauri dependency versions from Dependabot maintenance updates.
 - Updated base64, serde, serde_json, Tokio, the Tauri MCP bridge, Tauri JavaScript API and CLI, Tailwind CSS, internationalized date, and Lucide dependencies from Dependabot maintenance updates.
 - Updated vulnerable SvelteKit, Vite, Vitest, Undici, PostCSS, devalue, source-map-js, nanoid, rustls, and serde_with dependencies to patched releases.

@@ -19,7 +19,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.12.0
 
       - name: Activate Yarn classic
         run: corepack prepare yarn@1.22.22 --activate
@@ -27,7 +27,7 @@ jobs:
       - name: Set up Node.js cache
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.12.0
           cache: yarn
 
       - name: Set up Rust
