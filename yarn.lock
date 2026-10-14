@@ -869,6 +869,11 @@ clsx@^2.1.1:
   resolved "https://registry.npmmirror.com/clsx/-/clsx-2.1.1.tgz"
   integrity sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==
 
+cn@^0.3.0:
+  version "0.3.3"
+  resolved "https://registry.yarnpkg.com/cn/-/cn-0.3.3.tgz#c9e2b5844885c48f1e7796f648ae55bca22ea0d7"
+  integrity sha512-OEiyJkSpYm2kOuNOKQ+c2wmzZRG8orrb9fnObtHTbCGNx/E9KLnGcmcocItOzREKk5KzQN5I2e3BUCj563KEpw==
+
 commander@^14.0.0:
   version "14.0.3"
   resolved "https://registry.npmmirror.com/commander/-/commander-14.0.3.tgz"
@@ -1261,7 +1266,7 @@ picomatch@^4.0.2, picomatch@^4.0.3, picomatch@^4.0.4:
   resolved "https://registry.npmmirror.com/picomatch/-/picomatch-4.0.4.tgz"
   integrity sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==
 
-postcss@8.5.23, postcss@^8.5.3, postcss@^8.5.5:
+postcss@8.5.23, postcss@^8.5.10, postcss@^8.5.3:
   version "8.5.23"
   resolved "https://registry.npmmirror.com/postcss/-/postcss-8.5.23.tgz#3493550116f478487298301d2c2e8dc5a56e6594"
   integrity sha512-g50586zr4bZmwFiTlflMu8E0bDTb5I5gertgwAKmsdUlTQIhZtunzUlD1WSzwcVWPoAVpsrA6vlfCD7oXvRwgg==
@@ -1347,15 +1352,15 @@ set-cookie-parser@^3.0.0:
   resolved "https://registry.npmmirror.com/set-cookie-parser/-/set-cookie-parser-3.1.0.tgz"
   integrity sha512-kjnC1DXBHcxaOaOXBHBeRtltsDG2nUiUni+jP92M9gYdW12rsmx92UsfpH7o5tDRs7I1ZZPSQJQGv3UaRfCiuw==
 
-shadcn-svelte@^1.3.0:
-  version "1.3.0"
-  resolved "https://registry.npmmirror.com/shadcn-svelte/-/shadcn-svelte-1.3.0.tgz#9398ef5d25fbd108e07e872fd57f30f83bb36cfb"
-  integrity sha512-Pd4ICWTkTks/b2YU4c9vF2XsX1x5HFPRl5bKszS1LcnWS83x+7T4WiIvbWz8Qh9knkcGZ+SCz1+Dmhdq+AYooA==
+shadcn-svelte@^1.7.0:
+  version "1.7.0"
+  resolved "https://registry.yarnpkg.com/shadcn-svelte/-/shadcn-svelte-1.7.0.tgz#604ad1ba7fed97f9589e3b3519b364c0ef0e195d"
+  integrity sha512-AK3ZsYOL8PN/RxcEBCHGvQj2TrLfaaBsbw0QohyEb3nn/yPNDRC/+9iSjnTp/uKEe+tAi0tBxB/Yhzno0N7EEg==
   dependencies:
+    cn "^0.3.0"
     commander "^14.0.0"
     node-fetch-native "^1.6.4"
-    postcss "^8.5.5"
-    tailwind-merge "^3.0.0"
+    postcss "^8.5.10"
 
 siginfo@^2.0.0:
   version "2.0.0"
@@ -1446,7 +1451,7 @@ tabbable@^6.2.0:
   resolved "https://registry.npmmirror.com/tabbable/-/tabbable-6.4.0.tgz"
   integrity sha512-05PUHKSNE8ou2dwIxTngl4EzcnsCDZGJ/iCLtDflR/SHB/ny14rXc+qU5P4mG9JkusiV7EivzY9Mhm55AzAvCg==
 
-tailwind-merge@^3.0.0, tailwind-merge@^3.5.0:
+tailwind-merge@^3.5.0:
   version "3.5.0"
   resolved "https://registry.npmmirror.com/tailwind-merge/-/tailwind-merge-3.5.0.tgz"
   integrity sha512-I8K9wewnVDkL1NTGoqWmVEIlUcB9gFriAEkXkfCjX5ib8ezGxtR3xD7iZIxrfArjEsH7F1CHD4RFUtxefdqV/A==
